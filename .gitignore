@@ -1,0 +1,14 @@
+# binari compilati — si rifanno con ./build.sh
+/aipanel
+/menubar/theLAAP
+/theLAAP.app/
+/AiPanel.app/
+
+# stato locale della macchina, non del progetto
+/profili.json
+/backup-config/
+
+# roba di sistema e degli strumenti
+.DS_Store
+*.log
+/.playwright-mcp/

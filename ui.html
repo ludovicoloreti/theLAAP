@@ -1,0 +1,1639 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Sostituito all'avvio del server: accompagna ogni richiesta che cambia
+     stato, così una pagina aperta altrove non può comandare il pannello. -->
+<meta name="thelaap-token" content="__TOKEN__">
+<title>theLAAP — the local AI admin panel</title>
+<style>
+/* ────────────────────────────────────────────────────────────────
+   theLAAP — sala macchine.
+   Nessuna dipendenza: font di sistema, niente rete, niente build.
+   I colori stanno tutti qui sotto; il resto del foglio li usa e basta.
+   ──────────────────────────────────────────────────────────────── */
+:root{
+  --font:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:oklch(0.966 0.004 240); --surface:oklch(1 0 0); --inset:oklch(0.936 0.005 240);
+  --soft:oklch(0.947 0.028 215);
+  --strong:oklch(0.24 0.012 245); --body:oklch(0.38 0.010 245); --muted:oklch(0.555 0.010 245);
+  --line:oklch(0.885 0.006 245); --line2:oklch(0.805 0.010 245);
+  --accent:oklch(0.55 0.105 215); --accent-ink:oklch(0.47 0.105 215);
+  --ok:oklch(0.60 0.110 150); --ok-ink:oklch(0.46 0.100 150); --ok-bg:oklch(0.945 0.035 150);
+  --warn:oklch(0.68 0.115 72); --warn-ink:oklch(0.50 0.100 72); --warn-bg:oklch(0.957 0.040 80);
+  --bad:oklch(0.58 0.130 25); --bad-ink:oklch(0.49 0.130 25); --bad-bg:oklch(0.950 0.030 25);
+  --code-bg:oklch(0.215 0.012 245); --code-fg:oklch(0.86 0.020 210);
+  --s1:oklch(0.55 0.105 215); --s2:oklch(0.66 0.090 215); --s3:oklch(0.76 0.070 215); --s4:oklch(0.85 0.050 215);
+  --on-fill:oklch(0.99 0 0); --on-pale:oklch(0.26 0.015 245);
+}
+html[data-theme="dark"]{
+  --bg:oklch(0.208 0.008 245); --surface:oklch(0.248 0.009 245); --inset:oklch(0.292 0.009 245);
+  --soft:oklch(0.315 0.038 215);
+  --strong:oklch(0.98 0.003 245); --body:oklch(0.855 0.008 245); --muted:oklch(0.675 0.012 245);
+  --line:oklch(0.335 0.012 245); --line2:oklch(0.435 0.015 245);
+  --accent:oklch(0.62 0.110 215); --accent-ink:oklch(0.80 0.085 215);
+  --ok:oklch(0.68 0.120 150); --ok-ink:oklch(0.82 0.110 150); --ok-bg:oklch(0.315 0.050 150);
+  --warn:oklch(0.74 0.120 78); --warn-ink:oklch(0.84 0.110 78); --warn-bg:oklch(0.325 0.050 78);
+  --bad:oklch(0.62 0.140 25); --bad-ink:oklch(0.78 0.120 25); --bad-bg:oklch(0.330 0.060 25);
+  --code-bg:oklch(0.155 0.008 245); --on-pale:oklch(0.20 0.015 245);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--body);font:13px/1.5 var(--font);-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;overflow:hidden}
+a{color:var(--accent-ink);text-decoration:none} a:hover{text-decoration:underline}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.sp{flex:1}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px}
+
+/* testata */
+header{display:flex;align-items:center;gap:14px;height:52px;padding:0 14px;background:var(--surface);
+  border-bottom:1px solid var(--line);flex:none}
+header .titolo{display:flex;flex-direction:column;gap:1px;min-width:0}
+header .titolo b{font-family:var(--mono);font-size:13px;color:var(--strong);letter-spacing:.01em}
+header .titolo span{font-size:11px;color:var(--muted);white-space:nowrap}
+#apri-cmdk{display:flex;align-items:center;gap:9px;width:250px;height:32px;padding:0 9px 0 11px;
+  background:var(--inset);border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--muted);
+  font:13px var(--font)}
+#apri-cmdk:hover{border-color:var(--line2);color:var(--body)}
+#apri-cmdk span{flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+kbd{font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface);
+  border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:2px 5px;line-height:1}
+
+/* corpo a tre colonne */
+main{display:grid;grid-template-columns:224px minmax(0,1fr) 316px;flex:1;min-height:0}
+#lato{background:var(--bg);border-right:1px solid var(--line);padding:12px 8px 8px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:2px}
+#centro{overflow-y:auto;padding:22px 24px 36px;min-width:0}
+#insp{background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+
+/* voci di navigazione */
+.voce{display:flex;align-items:center;gap:10px;width:100%;padding:8px 11px;border:0;border-radius:7px;
+  background:transparent;color:var(--body);font:500 13px var(--font);cursor:pointer;text-align:left}
+.voce:hover{background:var(--inset)}
+.voce.on{background:var(--soft);color:var(--accent-ink)}
+.voce svg{width:17px;height:17px;flex:none;opacity:.7}
+.voce .nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.voce .n{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.gruppo{padding:12px 11px 5px}
+#pronto-card{display:flex;flex-direction:column;gap:5px;text-align:left;padding:9px 11px;margin-bottom:6px;
+  border:1px solid var(--accent);border-radius:8px;background:var(--soft);cursor:pointer;font:inherit}
+#pronto-card .t{font-size:13px;font-weight:600;color:var(--strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pronto-card .i{font-family:var(--mono);font-size:10px;color:var(--accent-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.dot.vivo{animation:puls 2.4s ease-in-out infinite}
+@keyframes puls{0%,100%{opacity:1}50%{opacity:.3}}
+@media(prefers-reduced-motion:reduce){.dot.vivo{animation:none}}
+
+/* bottoni */
+button{font:500 12.5px var(--font);border-radius:7px;cursor:pointer;border:1px solid transparent;
+  background:transparent;color:var(--body);padding:0 12px;min-height:32px;transition:.12s}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.b1{background:var(--accent);color:var(--on-fill)}
+.b2{border-color:var(--accent);color:var(--accent-ink)}
+.b2:hover:not(:disabled){background:var(--soft)}
+.b3:hover:not(:disabled){background:var(--inset)}
+.bx{background:var(--bad);color:var(--on-fill)}
+.bxq{color:var(--bad-ink)}
+.bxq:hover:not(:disabled){background:var(--bad-bg)}
+.sm{min-height:28px;padding:0 10px;font-size:12px}
+.seg{display:inline-flex;padding:3px;background:var(--inset);border-radius:8px;gap:2px;flex:none}
+.seg button{min-height:26px;padding:0 12px;border-radius:6px;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--accent-ink);box-shadow:0 1px 2px oklch(0.2 0.02 245/.14)}
+.seg.mini button{min-height:20px;padding:0 8px;font-size:10px}
+
+/* pezzi comuni */
+h1{margin:0 0 4px;font-size:25px;font-weight:600;color:var(--strong);letter-spacing:-.02em}
+h2{margin:0;font-size:16px;font-weight:600;color:var(--strong)}
+.sub{margin:0 0 18px;font-size:13px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.card>.testa{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.card>.corpo{padding:16px 18px}
+.riga{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--line)}
+.riga:first-child{border-top:0}
+.riga .cresci{flex:1;min-width:0}
+.riga .t{display:block;font-size:13px;font-weight:500;color:var(--strong)}
+.riga .m{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);
+  border:1px solid var(--line2);background:none;padding:4px 8px;border-radius:4px;white-space:nowrap;min-height:0}
+.tag.grigio{color:var(--muted);border-color:var(--line)}
+.pill{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;border:0;min-height:0;white-space:nowrap}
+.p-ok{background:var(--ok-bg);color:var(--ok-ink)} .p-acc{background:var(--soft);color:var(--accent-ink)}
+.p-warn{background:var(--warn-bg);color:var(--warn-ink)} .p-bad{background:var(--bad-bg);color:var(--bad-ink)}
+.p-neutro{background:var(--inset);color:var(--body)}
+.nota{display:flex;gap:12px;padding:12px 15px;border:1px solid var(--line);border-left-width:3px;
+  border-radius:8px;background:var(--surface);margin-bottom:14px}
+.nota b{display:block;color:var(--strong);font-size:13px} .nota div>span{font-size:13px;line-height:1.5}
+.n-ok{border-left-color:var(--ok)} .n-warn{border-left-color:var(--warn)}
+.n-bad{border-left-color:var(--bad)} .n-info{border-left-color:var(--accent)}
+input[type=text],input[type=search],input[type=password],input[type=number]{
+  min-height:34px;padding:0 11px;border:1px solid var(--line);border-radius:7px;background:var(--surface);
+  color:var(--strong);font:13px var(--font);width:100%}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
+textarea{width:100%;border:0;resize:vertical;min-height:320px;padding:14px 16px;background:var(--code-bg);
+  color:var(--code-fg);font:11.5px/1.6 var(--mono);display:block}
+textarea:focus{outline:none;box-shadow:inset 0 0 0 1px var(--accent)}
+pre.out{margin:0;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word;
+  background:var(--code-bg);color:var(--code-fg);border-radius:8px;padding:14px 16px;font:11.5px/1.6 var(--mono)}
+.vuoto{padding:48px 24px;text-align:center;color:var(--muted)}
+.vuoto b{display:block;color:var(--strong);font-size:15px;margin-bottom:6px}
+.carica{display:inline-block;width:12px;height:12px;border:2px solid var(--line2);border-top-color:var(--accent);
+  border-radius:50%;animation:gira .8s linear infinite;vertical-align:-2px}
+@keyframes gira{to{transform:rotate(360deg)}}
+
+/* barra della memoria */
+.barra{height:44px;border-radius:6px;overflow:hidden;display:flex;background:var(--inset);border:1px solid var(--line)}
+.fetta{height:100%;display:flex;flex-direction:column;justify-content:center;overflow:hidden;white-space:nowrap;
+  min-width:0;font-family:var(--mono);font-size:10px;transition:width .4s}
+.fetta i{padding:0 9px;font-style:normal;overflow:hidden;text-overflow:ellipsis;font-weight:600;letter-spacing:.03em}
+.fetta u{padding:0 9px;text-decoration:none;opacity:.78}
+.libero{flex:1;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden}
+.tetto{position:absolute;top:-6px;bottom:-6px;width:0;border-left:1px dashed var(--warn);pointer-events:none}
+.righello{display:flex;justify-content:space-between;margin-top:9px;padding-top:7px;border-top:1px solid var(--line)}
+.righello span{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+/* tabella dei modelli */
+.intesta,.mriga{display:grid;grid-template-columns:110px minmax(0,1fr) 100px 86px 90px;gap:12px;align-items:center}
+.intesta{padding:0 16px 7px}
+.mriga{position:relative;padding:12px 16px;border-top:1px solid var(--line);cursor:pointer}
+.mriga:hover{background:var(--inset)}
+.mriga.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.mriga .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mriga .i{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.num{font-family:var(--mono);font-size:11.5px;text-align:right}
+.chiedi{cursor:help}
+
+/* inspector */
+#insp .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 10px;flex:none}
+#insp .tabs button{border-bottom:2px solid transparent;border-radius:0;min-height:40px;color:var(--muted)}
+#insp .tabs button.on{color:var(--accent-ink);border-bottom-color:var(--accent);margin-bottom:-1px}
+#insp .cont{flex:1;overflow-y:auto;padding:16px 16px 22px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.specs{display:grid;grid-template-columns:max-content 1fr;border:1px solid var(--line);border-radius:8px;
+  overflow:hidden;flex:none}
+.specs>div{padding:9px 11px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+.specs>div:nth-child(odd){font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);background:var(--inset)}
+.specs>div:nth-child(even){font-family:var(--mono);font-size:11px;color:var(--strong);border-left:1px solid var(--line)}
+.specs>div:nth-last-child(-n+2){border-bottom:0}
+.desc{border:1px solid var(--line2);border-radius:8px;padding:11px 13px;background:var(--inset)}
+.desc p{margin:0;font-size:12.5px;line-height:1.55;color:var(--body);text-wrap:pretty}
+.azioni{display:flex;flex-direction:column;gap:8px}
+.azioni .due{display:flex;gap:8px} .azioni .due button{flex:1}
+.msg{font-size:12.5px;line-height:1.5;padding:9px 12px;border:1px solid var(--line);border-radius:10px 10px 10px 2px;
+  background:var(--inset);color:var(--body);text-wrap:pretty}
+.msg.io{align-self:flex-end;max-width:88%;border-color:var(--accent);border-radius:10px 10px 2px 10px;
+  background:var(--soft);color:var(--accent-ink)}
+.md p{margin:0 0 7px} .md p:last-child{margin:0}
+.md code{font-family:var(--mono);font-size:11.5px;background:var(--surface);border:1px solid var(--line);
+  border-radius:4px;padding:1px 5px}
+.md pre{background:var(--code-bg);color:var(--code-fg);border-radius:7px;padding:10px;overflow-x:auto;margin:7px 0}
+.md pre code{background:none;border:0;padding:0;color:inherit}
+.md ul{margin:6px 0;padding-left:18px} .md li{margin:2px 0} .md strong{font-weight:650}
+
+/* piede */
+footer{height:30px;flex:none;display:flex;align-items:center;gap:14px;padding:0 12px 0 14px;
+  background:var(--surface);border-top:1px solid var(--line)}
+footer .metriche{display:flex;gap:14px;flex:1;min-width:0;overflow:hidden;align-items:baseline}
+footer .metriche span{white-space:nowrap}
+footer .metriche b{font-family:var(--mono);font-size:11px;color:var(--strong);font-weight:400}
+/* Nella finestra dell'app (1180 px) le cinque metriche non ci stanno e l'ultima
+   veniva tagliata a metà — un indirizzo troncato è peggio di un indirizzo
+   assente. Soglia e tetto sono già scritti nella scheda «Regola», quindi sono
+   loro a cedere il posto, non l'indirizzo. */
+@media(max-width:1340px){footer .opz{display:none}}
+
+/* palette */
+#velo{position:fixed;inset:0;background:oklch(0.20 0.02 245/.55);display:none;align-items:flex-start;
+  justify-content:center;padding-top:11vh;z-index:100}
+#velo.on{display:flex}
+#cmdk{width:100%;max-width:620px;background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 30px 70px oklch(0.14 0.01 245/.35);overflow:hidden}
+#cmdk .campo{display:flex;align-items:center;gap:11px;padding:14px 18px;border-bottom:1px solid var(--line)}
+#cmdk .campo input{flex:1;width:100%;min-width:0;border:0;background:none;font-size:15px;min-height:0;padding:0}
+#cmdk .campo input:focus{box-shadow:none}
+#cmdk .capito{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:9px 18px;
+  border-bottom:1px solid var(--line);background:var(--inset)}
+#cmdk .capito .v{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent-ink);background:var(--soft);padding:4px 8px;border-radius:4px;white-space:nowrap}
+#cmdk .prop{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}
+#cmdk .prop b{display:block;font-size:13px;color:var(--strong)}
+#cmdk .prop .c{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.5}
+#cmdk .prop .w{font-size:11.5px;color:var(--warn-ink);margin-top:5px}
+#cmdk .vedo{padding:10px 18px 12px;border-bottom:1px solid var(--line)}
+#cmdk .vedo button{display:flex;width:100%;text-align:left;gap:9px;align-items:flex-start;padding:6px 0;min-height:0}
+#cmdk .vedo .fr{color:var(--accent-ink);font-family:var(--mono);font-size:11px;padding-top:3px;flex:none}
+#cmdk .vedo b{display:block;font-size:13px;color:var(--strong);font-weight:500}
+#cmdk .vedo i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:1px}
+#cmdk .lista{max-height:280px;overflow-y:auto;padding:6px}
+#cmdk .lista button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:8px 12px;
+  border-radius:7px;font-weight:400;font-size:13px}
+#cmdk .lista button:hover,#cmdk .lista button.sel{background:var(--soft);color:var(--accent-ink)}
+#cmdk .lista button .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#cmdk .piede{display:flex;gap:18px;padding:9px 18px;border-top:1px solid var(--line);background:var(--inset);
+  font-size:10px;color:var(--muted)}
+#cmdk .piede span{white-space:nowrap}
+svg.ico{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+
+/* finestre piccole: prima cade l'inspector, poi la colonna di sinistra.
+   Le media query stanno in fondo perché vincano sulle regole base. */
+@media(max-width:1180px){main{grid-template-columns:224px minmax(0,1fr)} #insp{display:none}}
+@media(max-width:820px){main{grid-template-columns:minmax(0,1fr)} #lato{display:none}
+  header .titolo span{display:none} #apri-cmdk{width:auto;min-width:120px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titolo">
+    <b>theLAAP</b>
+    <span id="che-cos-e">The local AI admin panel</span>
+  </div>
+  <div class="sp"></div>
+  <button id="apri-cmdk" onclick="apriCmdk(true)">
+    <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+    <span id="cmdk-invito">Ask or command</span><kbd>⌘K</kbd>
+  </button>
+  <div class="seg" id="seg-modo"></div>
+  <button class="b3" style="min-width:32px;padding:0 8px" onclick="vaiTab('aiuto')" id="btn-aiuto" title="Help">
+    <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3v1.7"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+  </button>
+</header>
+
+<main>
+  <nav id="lato"></nav>
+  <section id="centro"><div class="vuoto"><span class="carica"></span></div></section>
+  <aside id="insp">
+    <div class="tabs">
+      <button id="tab-modello" class="on" onclick="vaiTab('modello')">Model</button>
+      <button id="tab-aiuto" onclick="vaiTab('aiuto')">Help</button>
+    </div>
+    <div class="cont" id="insp-corpo"></div>
+  </aside>
+</main>
+
+<footer>
+  <div class="metriche" id="metriche"></div>
+  <div class="seg mini" id="seg-tema"></div>
+  <div class="seg mini" id="seg-lingua"></div>
+</footer>
+
+<div id="velo" onclick="if(event.target===this)apriCmdk(false)">
+  <div id="cmdk">
+    <div class="campo">
+      <svg class="ico" viewBox="0 0 24 24" style="color:var(--muted)"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+      <input id="q" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" oninput="disegnaCmdk()" onkeydown="tastiCmdk(event)">
+      <kbd>esc</kbd>
+    </div>
+    <div id="cmdk-corpo"></div>
+    <div class="piede" id="cmdk-piede"></div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   1. lingua e testi. Inglese di default, italiano a un clic.
+   ════════════════════════════════════════════════════════════════ */
+const L = {
+en:{whatItIs:"The local AI admin panel",ask:"Ask or command",guided:"Guided",expert:"Expert",
+  readyNow:"Ready now",models:"Models",machine:"Machine",catalog:"Catalog and files",
+  memory:"Unified memory",memorySub:"On Apple Silicon, RAM and VRAM are one pool.",
+  programs:"Programs",maintenance:"Maintenance",config:"Config files",archive:"Archive",
+  smallModel:"Local small model",smallModelWhat:"Describes models, explains errors, turns what you type into a command.",
+  ramUnified:"Unified RAM",used:"used",free:"free",readNow:"read now",stale:"numbers frozen for",
+  ceiling:"ceiling for one model",ceilingShort:"single ceiling",threshold:"coexistence threshold",
+  measured:"measured on processes, not files",
+  reading:"Machine reading",readingNote:"written by the code, no model",
+  rule:"Rule",ruleClick:"Every label below is clickable.",states:"States",classes:"Classes",
+  colState:"State",colModel:"Model",colClass:"Class",colWeight:"Weight",colSpeed:"Speed",
+  allModels:"All models",fAll:"All",fCo:"Coexisting",fEx:"Exclusive",fOff:"Off",fRem:"Remote",
+  modelsSub:"What each one does, whether it fits, and what to do with it.",seeModels:"See the models",
+  noneHere:"Nothing in this group",noneHereWhy:"Try another filter, or All to see every model.",
+  addHF:"Add from HuggingFace",describeAll:"Describe all with the small model",
+  stopAll:"Stop everything",startAll:"Start everything",pressAgain:"Press again to confirm",
+  stopAllTitle:"Stop everything frees the memory now",
+  stopAllBody:"Every program goes down and the models stop answering until you start them again. The panel stays open.",
+  programsSub:"They load the models. Read from the config file.",
+  on:"on",off:"off",restart:"Restart",turnOn:"Start",turnOff:"Stop",
+  capSingle:"unloads one model",capAll:"stop only",
+  cacheTitle:"The server caches the config",cacheBody:"Restart it after editing the file, with",
+  maintenanceSub:"Each command says what it does and how long it takes.",
+  run:"Run",output:"Output",clear:"Clear",
+  hfSub:"Only MLX formats this Mac can run. 8-bit first.",search:"Search",searchPh:"qwen coder, gemma, deepseek",
+  fits:"fits in",download:"Download",onDisk:"already here",noRoom:"no room now",
+  configSub:"theLAAP and the client files. Checked and backed up on save.",
+  save:"Save",format:"Format",check:"Check",reload:"Reload",validJSON:"valid JSON",invalidJSON:"not valid JSON",
+  archiveSub:"Removed models keep path and config. Restore puts them back.",restore:"Restore",del:"Delete",
+  tabModel:"Model",tabHelp:"Help",describedBy:"Described by the small model",
+  ifLoaded:"If you load it now",makeReady:"Make it the ready model",isReady:"Already the ready model",
+  testTime:"Test and time it",freeRAM:"Free RAM",namesClients:"Names and clients",archiveBtn:"Archive",
+  askPh:"Ask the small model",send:"Send",
+  cmdkPh:"A command, or what you want: free 40 gb",
+  understood:"Understood",fromWhatISee:"From what I see",commands:"Commands",alsoThese:"Also these",
+  confirm:"Confirm",footChoose:"up down to pick",footRun:"enter to run",footClose:"esc to close",footLocal:"read here, no network",
+  themeAuto:"Auto",themeLight:"Light",themeDark:"Dark",
+  kClass:"class",kWeight:"weight",kInRam:"in ram",kSpeed:"speed",kCtx:"context",kProg:"program",kReason:"reasons",kClients:"clients",
+  yes:"yes, before answering",no:"no, answers straight",none:"in none",notMeasured:"not measured",notWeighed:"not measured",silent:"silent",
+  elsewhere:"runs elsewhere",heldMore:"the process holds more",port:"port",
+  yourName:"Your own name",menuName:"Name in the client menus",serverId:"Id for the server",idWarn:"getting it wrong makes it silent",
+  inPi:"in the Pi menu",inOC:"in the OpenCode menu",saveChanges:"Save changes",unsaved:"unsaved changes",
+  keyLabel:"Provider key",keyEnds:"key ending",keyNew:"new key",keySave:"Save and check",
+  keyNote:"The current key is never shown, only its last four digits.",
+  noModels:"No model configured",noModelsWhy:"Add one from HuggingFace, or write it by hand in the config file.",
+  noTools:"No maintenance script found",noToolsWhy:"Declare them under strumenti in the config file.",
+  noArchive:"Nothing archived",noArchiveWhy:"Models you remove from disk end up here, with their path and config.",
+  offline:"The panel cannot reach the server",offlineWhy:"Start it with avvia-server.command, then reload this page.",
+  noCommands:"No command declared",noCommandsWhy:"Tools, regimes and programs all come from the config file.",
+  available:"free for a new model",reserved:"kept for the system",ceilingUnknown:"the program does not declare one",
+  alreadyIn:"Already in memory",alreadyInWhy:"It answers without loading time. Free RAM takes it out.",
+  unknownWeight:"Weight never measured",describing:"asking the small model",
+  st:{pronto:"ready","in-memoria":"in memory",spento:"off","in-arrivo":"incoming",guasto:"faulty",remoto:"remote"},
+  cl:{convivente:"coexisting",esclusivo:"exclusive",residente:"resident",remoto:"remote"}},
+it:{whatItIs:"Il pannello di amministrazione dell'AI locale",ask:"Chiedi o comanda",guided:"Guidato",expert:"Esperto",
+  readyNow:"Pronto adesso",models:"Modelli",machine:"Macchina",catalog:"Catalogo e file",
+  memory:"Memoria unificata",memorySub:"Su Apple Silicon RAM e VRAM sono un unico spazio.",
+  programs:"Programmi",maintenance:"Manutenzione",config:"Configurazioni",archive:"Archivio",
+  smallModel:"Modellino locale",smallModelWhat:"Descrive i modelli, spiega gli errori, traduce quello che scrivi in un comando.",
+  ramUnified:"RAM unificata",used:"occupati",free:"liberi",readNow:"letta ora",stale:"numeri fermi da",
+  ceiling:"tetto per un solo modello",ceilingShort:"tetto singolo",threshold:"soglia convivenza",
+  measured:"misurata sui processi, non sui file",
+  reading:"Lettura della macchina",readingNote:"scritta dal codice, senza modello",
+  rule:"Regola",ruleClick:"Ogni etichetta qui sotto è cliccabile.",states:"Stati",classes:"Classi",
+  colState:"Stato",colModel:"Modello",colClass:"Classe",colWeight:"Peso",colSpeed:"Velocità",
+  allModels:"Tutti i modelli",fAll:"Tutti",fCo:"Conviventi",fEx:"Esclusivi",fOff:"Spenti",fRem:"Remoti",
+  modelsSub:"Cosa fa ognuno, se ci sta, e cosa farci.",seeModels:"Vedi i modelli",
+  noneHere:"In questo gruppo non c'è niente",noneHereWhy:"Prova un altro filtro, o Tutti per vederli tutti.",
+  addHF:"Aggiungi da HuggingFace",describeAll:"Fai descrivere tutto al modellino",
+  stopAll:"Ferma tutto",startAll:"Riaccendi tutto",pressAgain:"Premi di nuovo per confermare",
+  stopAllTitle:"Ferma tutto libera la memoria adesso",
+  stopAllBody:"Tutti i programmi vanno giù e i modelli non rispondono più finché non li riaccendi. Il pannello resta aperto.",
+  programsSub:"Caricano i modelli. Letti dal file di configurazione.",
+  on:"acceso",off:"spento",restart:"Riavvia",turnOn:"Accendi",turnOff:"Spegni",
+  capSingle:"scarica un modello",capAll:"solo stop",
+  cacheTitle:"Il server tiene la configurazione in cache",cacheBody:"Riavvialo dopo aver modificato il file, con",
+  maintenanceSub:"Ogni comando dice cosa fa e quanto ci mette.",
+  run:"Esegui",output:"Output",clear:"Pulisci",
+  hfSub:"Solo i formati MLX che questo Mac sa eseguire. 8 bit in testa.",search:"Cerca",searchPh:"qwen coder, gemma, deepseek",
+  fits:"ci sta in",download:"Scarica",onDisk:"già qui",noRoom:"non ci sta ora",
+  configSub:"theLAAP e i file dei client. Controllati e salvati con copia.",
+  save:"Salva",format:"Formatta",check:"Controlla",reload:"Ricarica",validJSON:"JSON valido",invalidJSON:"JSON non valido",
+  archiveSub:"I modelli rimossi conservano percorso e configurazione. Ripristina li rimette.",restore:"Ripristina",del:"Elimina",
+  tabModel:"Modello",tabHelp:"Aiuto",describedBy:"Descritto dal modellino",
+  ifLoaded:"Se lo carichi adesso",makeReady:"Rendilo il modello pronto",isReady:"È già il modello pronto",
+  testTime:"Cronometra",freeRAM:"Libera RAM",namesClients:"Nomi e client",archiveBtn:"Archivia",
+  askPh:"Chiedi al modellino",send:"Invia",
+  cmdkPh:"Un comando, o cosa vuoi: libera 40 giga",
+  understood:"Capito",fromWhatISee:"Da quello che vedo",commands:"Comandi",alsoThese:"Anche questi",
+  confirm:"Conferma",footChoose:"su giù per scegliere",footRun:"invio per eseguire",footClose:"esc per chiudere",footLocal:"letto qui, senza rete",
+  themeAuto:"Auto",themeLight:"Chiaro",themeDark:"Scuro",
+  kClass:"classe",kWeight:"peso",kInRam:"in ram",kSpeed:"velocità",kCtx:"contesto",kProg:"programma",kReason:"ragiona",kClients:"client",
+  yes:"sì, prima di rispondere",no:"no, risponde diretto",none:"in nessuno",notMeasured:"non misurata",notWeighed:"non misurato",silent:"muto",
+  elsewhere:"gira altrove",heldMore:"il processo ne tiene di più",port:"porta",
+  yourName:"Come lo chiami tu",menuName:"Nome nei menu dei client",serverId:"Id per il server",idWarn:"sbagliarlo lo rende muto",
+  inPi:"nel menu di Pi",inOC:"nel menu di OpenCode",saveChanges:"Salva le modifiche",unsaved:"modifiche non salvate",
+  keyLabel:"Chiave del provider",keyEnds:"chiave che finisce",keyNew:"chiave nuova",keySave:"Salva e verifica",
+  keyNote:"La chiave attuale non si mostra mai, solo le ultime quattro cifre.",
+  noModels:"Nessun modello configurato",noModelsWhy:"Aggiungine uno da HuggingFace, o scrivilo a mano nel file di configurazione.",
+  noTools:"Nessuno script di manutenzione trovato",noToolsWhy:"Dichiarali sotto strumenti nel file di configurazione.",
+  noArchive:"Archivio vuoto",noArchiveWhy:"I modelli che togli dal disco finiscono qui, con percorso e configurazione.",
+  offline:"Il pannello non raggiunge il server",offlineWhy:"Avvialo con avvia-server.command, poi ricarica questa pagina.",
+  noCommands:"Nessun comando dichiarato",noCommandsWhy:"Strumenti, regimi e programmi vengono tutti dal file di configurazione.",
+  available:"liberi per un modello nuovo",reserved:"tenuti per il sistema",ceilingUnknown:"il programma non lo dichiara",
+  alreadyIn:"Già in memoria",alreadyInWhy:"Risponde senza tempo di caricamento. Libera RAM lo tira fuori.",
+  unknownWeight:"Peso mai misurato",describing:"lo chiedo al modellino",
+  st:{pronto:"pronto","in-memoria":"in memoria",spento:"spento","in-arrivo":"in arrivo",guasto:"guasto",remoto:"remoto"},
+  cl:{convivente:"convivente",esclusivo:"esclusivo",residente:"residente",remoto:"remoto"}}
+};
+/* La lingua: quella scelta, altrimenti quella del browser, altrimenti inglese.
+   Non è pignoleria: `cosa`, `nota` e gli avvisi arrivano dal server e dalla
+   configurazione, e sono scritti in italiano. Partire in inglese su una
+   macchina italiana dà una schermata mista — metà tradotta, metà no. Chi ha un
+   browser in un'altra lingua vede l'inglese, e il pulsante IT/EN resta lì. */
+let LINGUA = localStorage.getItem('lingua')
+  || (String(navigator.language||'').toLowerCase().startsWith('it') ? 'it' : 'en');
+const T = () => L[LINGUA];
+const IT = () => LINGUA === 'it';
+
+/* Il glossario: una riga per voce, la stessa che il pannello mostra.
+   Le chiavi sono quelle del server (stati.go), non un secondo vocabolario. */
+const LESSICO = {
+pronto:{tipo:'st',en:"Answers now with no wait: already loaded and pinned at the top. There is only ever one ready model.",it:"Risponde adesso senza attese: già caricato e in cima. Di modelli pronti ce n'è sempre uno solo."},
+'in-memoria':{tipo:'st',en:"Loaded by its program but not the one on top. It uses RAM even while idle.",it:"Caricato dal suo programma ma non è quello in cima. Usa RAM anche mentre non lo usi."},
+spento:{tipo:'st',en:"Declared and usable, not loaded. The first question pays the loading time.",it:"Dichiarato e usabile, non caricato. La prima domanda paga il caricamento."},
+'in-arrivo':{tipo:'st',en:"Downloading in the background. Restart its program at the end so it sees the files.",it:"Sta scaricando in sottofondo. Riavvia il suo programma alla fine perché veda i file."},
+guasto:{tipo:'st',en:"The program is on but does not know this id. Usually a wrong name in the config.",it:"Il programma è acceso ma non conosce questo id. Di solito è un nome sbagliato in configurazione."},
+convivente:{tipo:'cl',en:"Under the threshold, so it can stay in RAM together with others.",it:"Sotto la soglia, quindi può stare in RAM insieme ad altri."},
+esclusivo:{tipo:'cl',en:"Fits alone, not next to another. The panel stops the other programs first, then widens the memory margins.",it:"Da solo ci sta, accanto a un altro no. Il pannello ferma prima gli altri programmi, poi allarga i margini."},
+residente:{tipo:'cl',en:"Its program keeps it loaded on purpose: it costs little and serves a constant job.",it:"Il suo programma lo tiene caricato per scelta: costa poco e serve a un lavoro continuo."},
+remoto:{tipo:'cl',en:"Runs on a provider server. No unified memory used, and no stopping it from here.",it:"Gira sul server di un provider. Non usa memoria unificata e da qui non si ferma."}
+};
+
+/* ════════════════════════════════════════════════════════════════
+   2. plumbing: token, fetch, escape. Come nella versione precedente:
+   il token viaggia solo con le richieste che cambiano stato.
+   ════════════════════════════════════════════════════════════════ */
+const TOKEN = (document.querySelector('meta[name="thelaap-token"]')||{}).content || '';
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const gb = v => (Number(v)||0).toFixed(1).replace('.', IT()?',':'.');
+const $ = id => document.getElementById(id);
+function conToken(o){
+  o = o || {};
+  if(!o.method || o.method.toUpperCase()==='GET') return o;
+  o.headers = Object.assign({'Content-Type':'application/json','X-theLAAP-Token':TOKEN}, o.headers||{});
+  return o;
+}
+async function api(p,o){
+  const r = await fetch(p, conToken(o));
+  const testo = await r.text();
+  let dati = null; try{ dati = testo ? JSON.parse(testo) : null; }catch(e){}
+  if(!r.ok){ const e = new Error((dati&&dati.errore)||testo||('HTTP '+r.status)); e.status=r.status; throw e; }
+  return dati;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   3. stato del pannello. Tutto quello che arriva dal server sta qui.
+   ════════════════════════════════════════════════════════════════ */
+const S = {
+  schermo:'memoria', filtro:'tutti', sel:null, tab:'modello',
+  modo: localStorage.getItem('modo')||'guidato',
+  tema: localStorage.getItem('tema')||'auto',
+  armato:'', cambiato:false, offline:false,
+  mem:null, mod:null, modelli:[], runtime:[], capacita:{}, provider:{}, cred:{},
+  regimi:[], strumenti:[], comandi:[], aiuto:null, descrivendo:'', provando:'',
+  esitoProva:'', avvisoProva:'', nomiAperti:null,
+  archivio:[], documenti:[], doc:null, docRev:'', hf:[], scarichi:[],
+  chat:[], domande:[], console:['ready.']
+};
+
+/* ────────────────────────────────────────────────────────────────
+   I numeri della macchina e il giudizio sui modelli arrivano da
+   /api/modelli (stati.go), che li calcola dove stanno già le misure.
+   Qui NON si ricalcola niente: se la pagina rifacesse la soglia a modo
+   suo, direbbe «convivente» su un modello che l'arbitro rifiuta.
+   ──────────────────────────────────────────────────────────────── */
+const M = () => S.mod || {};
+const totaleGB = () => M().totaleGB || 0;
+const occupatiGB = () => M().occupatiGB || 0;
+const liberiGB = () => M().liberiGB || 0;           /* totale meno occupati: la barra */
+const disponibiliGB = () => M().disponibiliGB || 0; /* tolta la riserva: ci sta o no  */
+const riservaGB = () => M().riservaGB || 0;
+const sogliaGB = () => Math.round(M().sogliaGB || 0);
+const tettoGB  = () => Math.round(M().tettoGB || 0); /* 0 = il programma non lo dichiara */
+
+/* la macchina a stati: una lettura, non un calcolo */
+const statoDi = m => m.stato || 'spento';
+const classeDi = m => m.classe || 'convivente';
+const remotoDi = m => m.classe==='remoto' || m.stato==='remoto';
+/* «un modello ready e basta»: lo sceglie il server, e ce n'è sempre uno solo. */
+function prontoId(){ const p = S.modelli.find(m => m.pronto); return p ? p.id : null; }
+
+/* «se lo carico adesso, ci sta?» — risponde l'arbitro di budget.go, che è lo
+   stesso che risponde al preflight. Senza verdetto il modello è già in RAM,
+   oppure non ne conosciamo il peso, e la domanda non ha senso. */
+const haVerdetto = m => !!m.verdetto;
+const ciSta = m => !m.verdetto || !!m.verdetto.ammesso;
+const mancanoGB = m => m.verdetto ? (m.verdetto.mancanoByte||0)/1e9 : 0;
+const daFermare = m => (m.verdetto && m.verdetto.daLiberare) || [];
+const nomeRuntime = k => { const r = S.runtime.find(x=>x.chiave===k); return (r&&r.nome)||k; };
+
+const titoloDi = m => m.etichetta || m.nome || (String(m.id).split('/').pop()||m.id);
+/* Per i pulsanti. I nomi nei file dei client sono frasi intere — «CHAT-FAST —
+   Gemma 4 26B-A4B MLX 8-bit (MoE, 4B attivi) · 86,5 tok/s misurati · per la
+   chat quotidiana» — e dentro un pulsante diventano un paragrafo. Nelle righe
+   ci pensa il CSS con l'ellissi; qui no, perché il pulsante si allarga. */
+const breve = (t, n) => { t = String(t||''); n = n||30; return t.length>n ? t.slice(0,n-1).trimEnd()+'…' : t; };
+/* La parte che distingue: dopo l'ultimo `/` oppure `--`, perché i pacchetti MLX
+   usano il doppio trattino dove HuggingFace usa la barra —
+   «lmstudio-community--gemma-4-E2B-it-MLX-8bit» è 43 caratteri di cui i primi 20
+   sono il publisher, e tagliando solo sulla barra restava tutto e veniva troncato
+   proprio dove inizia l'informazione. */
+const cortoDi = m => {
+  let s = String(m.id);
+  const i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('--')+1);
+  if(i > 0) s = s.slice(i+1);
+  return s.length>30 ? s.slice(0,29)+'…' : s;
+};
+const modelloSel = () => S.modelli.find(m => m.id===S.sel) || S.modelli[0] || null;
+
+/* ════════════════════════════════════════════════════════════════
+   4. NLP: dalle parole al comando, e dallo stato alle parole.
+   Deterministico, nessun modello, nessuna rete. ~90 righe.
+   ════════════════════════════════════════════════════════════════ */
+/* VERBI: le sole azioni che questa pagina implementa da sé. Nessuna di queste
+   finisce in una shell: sono navigazioni e chiamate alle rotte già esistenti. */
+const VERBI = [
+{id:'libera',gruppo:'memory',en:"Free memory",it:"Libera memoria",
+  cen:"Unloads as much as needed, starting from the biggest.",cit:"Scarica quanto serve, partendo dal più grande.",
+  p:['libera','liberare','svuota','spazio','servono','giga','gb','free','space','room','need']},
+{id:'pronto',gruppo:'models',en:"Make a model ready",it:"Rendi pronto un modello",
+  cen:"Loads it and pins it as the ready model.",cit:"Lo carica e lo mette come modello pronto.",
+  p:['pronto','carica','usa','attiva','voglio','passa a','ready','load','use','want','switch']},
+{id:'prova',gruppo:'models',en:"Test a model",it:"Prova un modello",
+  cen:"Sends a real question and times the answer.",cit:"Manda una domanda vera e cronometra la risposta.",
+  p:['prova','misura','velocita','cronometra','test','bench','speed','how fast']},
+{id:'hf',gruppo:'catalog',en:"Search HuggingFace",it:"Cerca su HuggingFace",
+  cen:"Only MLX formats this Mac can run.",cit:"Solo i formati MLX che questo Mac sa eseguire.",
+  p:['huggingface','hf','scarica','cerca modello','trova','download','search model','find']},
+{id:'config',gruppo:'files',en:"Open the config files",it:"Apri le configurazioni",
+  cen:"theLAAP and the client files, JSON or YAML, with a backup on save.",cit:"theLAAP e i file dei client, JSON o YAML, con copia al salvataggio.",
+  p:['config','configurazione','json','yaml','file','modifica','edit']},
+{id:'chiedi',gruppo:'help',en:"Ask the small model",it:"Chiedi al modellino",
+  cen:"The small model here answers, with the live state in front of it.",cit:"Risponde il modellino che gira qui, con lo stato reale davanti.",
+  p:['perche','spiega','come faccio','aiuto','why','explain','what does','how do i','help']}
+];
+const nomeCmd = c => (IT() ? c.it : c.en) || c.en || c.it;
+const cosaCmd = c => (IT() ? c.cit : c.cen) || '';
+
+/* parole per cercare un comando che la pagina non conosce: si ricavano dall'id
+   e dal nome che ha scritto chi ha compilato la configurazione. Scrivere qui un
+   elenco di id sarebbe il difetto del 16/08/2026 ripetuto.
+
+   Dalla descrizione NON si prende niente: è prosa, e le sue parole generiche
+   («modello», «memoria») fanno vincere il comando sbagliato — provato, «voglio
+   il modello per il codice» finiva sul controllo completo perché la sua
+   descrizione conteneva «modello». Per la stessa ragione le parole troppo
+   comuni si scartano anche quando compaiono nel nome. */
+const SENZA_ACCENTI = t => String(t||'').toLowerCase()
+  .replace(/[àèéìòùç]/g, c => ({'à':'a','è':'e','é':'e','ì':'i','ò':'o','ù':'u','ç':'c'}[c]));
+const TROPPO_COMUNI = new Set(['modello','modelli','model','models','programma','programmi',
+  'program','programs','memoria','memory','regime','questo','questa','come','ogni','tutti',
+  'tutto','tutte','serve','senza','della','delle','degli','sono','anche','dopo','prima',
+  'oltre','quello','quella','with','from','that','this','only','more']);
+function paroleDi(c){
+  const grezze = SENZA_ACCENTI(c.id+' '+(c.nome||''))
+    .split(/[^a-z0-9]+/).filter(w => w.length > 3 && !TROPPO_COMUNI.has(w));
+  return Array.from(new Set(grezze));
+}
+
+/* Il registro: i verbi della pagina più i comandi che il server dichiara in
+   /api/comandi. Una fonte sola per gli id eseguibili — la stessa che legge la
+   voce nella barra dei menu. */
+function registro(){
+  const dal = (S.comandi||[]).map(c => {
+    let nome = c.nome;
+    if(c.gruppo === 'regime'){
+      const g = S.regimi.find(x => 'regime:'+x.chiave === c.id);
+      if(g) nome = (g.attivo ? (IT()?'Esci da ':'Leave ') : (IT()?'Entra in ':'Enter ')) + g.nome;
+    }
+    return {id:c.id, gruppo:c.gruppo, cmd:c, en:nome, it:nome,
+      cen:c.cosa||'', cit:c.cosa||'', pericolo:c.rischio?1:0, p:paroleDi(c)};
+  });
+  return VERBI.concat(dal);
+}
+
+function interpreta(testo){
+  const t = SENZA_ACCENTI(testo).trim();
+  const reg = registro();
+  if(!t) return {vuoto:true, lista:reg.slice(0,6), lettura:[]};
+  const num = t.match(/(\d+(?:[.,]\d+)?)\s*(?:gb|giga|g\b)?/);
+  const quanti = num ? parseFloat(num[1].replace(',','.')) : null;
+  let mod=null, best=0;
+  S.modelli.forEach(m => {
+    const campi=[titoloDi(m).toLowerCase(), String(m.id).toLowerCase(), String(m.runtime||'')];
+    let p=0;
+    t.split(/\s+/).forEach(w => { if(w.length>2) campi.forEach(c => { if(c.includes(w)) p+=w.length; }); });
+    if(p>best){ best=p; mod=m; }
+  });
+  const prog = S.runtime.find(r => t.includes(SENZA_ACCENTI(r.chiave)) || t.includes(SENZA_ACCENTI(r.nome)));
+  const punteggi = reg.map(c => {
+    let p=0; c.p.forEach(w => { if(w && t.includes(w)) p += w.length+2; });
+    return {c,p};
+  }).sort((a,b)=>b.p-a.p);
+  const top = punteggi[0].p>0 ? punteggi[0].c
+    : (mod && best>2 ? reg.find(c=>c.id==='pronto') : reg.find(c=>c.id==='chiedi'));
+  const lettura = [(IT()?'azione · ':'action · ')+nomeCmd(top).toLowerCase()];
+  if(quanti!==null && top.id==='libera') lettura.push((IT()?'quantità · ':'amount · ')+quanti+' GB');
+  if(mod && best>2) lettura.push((IT()?'modello · ':'model · ')+titoloDi(mod).toLowerCase());
+  if(prog) lettura.push((IT()?'programma · ':'program · ')+String(prog.nome||prog.chiave).toLowerCase());
+
+  const pr = {id:top.id, nome:nomeCmd(top), cosa:cosaCmd(top), pericolo:top.pericolo, extra:{}};
+  if(top.id==='libera'){
+    const q = quanti || Math.max(1, Math.ceil(liberiGB()>0 ? liberiGB()/2 : 1));
+    pr.nome = (IT()?'Libera ':'Free ')+q+' GB'; pr.extra={gb:q};
+    const s = piuGrosso();
+    if(s) pr.avviso = IT() ? 'Fermo '+s.nome+', '+gb(s.g)+' GB. È chi ne tiene più di tutti.'
+                           : 'Stops '+s.nome+', '+gb(s.g)+' GB. It holds the most.';
+  }
+  if(top.id==='pronto' && mod){
+    pr.nome = (IT()?'Rendi pronto ':'Make ready ')+breve(titoloDi(mod),40); pr.extra={id:mod.id};
+    /* l'avviso è il verdetto dell'arbitro, non una stima della pagina */
+    if(!ciSta(mod)) pr.avviso = motivoVerdetto(mod);
+    else if(classeDi(mod)==='esclusivo') pr.avviso = IT()
+      ? 'Classe esclusivo, '+gb(mod.gb)+' GB su '+gb(totaleGB())+': sopra i '+sogliaGB()+' GB di soglia se ne tiene uno alla volta.'
+      : 'Exclusive class, '+gb(mod.gb)+' GB of '+gb(totaleGB())+': above the '+sogliaGB()+' GB threshold only one at a time.';
+  }
+  if(top.id==='prova' && mod){ pr.nome=(IT()?'Prova ':'Test ')+breve(titoloDi(mod),40); pr.extra={id:mod.id}; }
+  if(top.id==='chiedi'){ pr.nome=nomeCmd(top)+': '+String(testo).trim(); pr.extra={testo:String(testo).trim()}; }
+  const resto = punteggi.filter(x=>x.p>0 && x.c.id!==top.id).map(x=>x.c)
+    .concat(reg.filter(c => c.id!==top.id && !punteggi.some(x=>x.p>0 && x.c.id===c.id)));
+  return {proposta:pr, lettura, lista:resto.slice(0,5)};
+}
+
+function piuGrosso(){
+  const p = ((S.mem&&S.mem.processi)||[]).map(x=>({nome:x.nome,chiave:x.chiave,g:(x.correnteByte||0)/1e9}))
+    .sort((a,b)=>b.g-a.g)[0];
+  return (p && p.g>0.5) ? p : null;
+}
+
+/* motivoVerdetto: il «no» dell'arbitro detto nella lingua della pagina, ma coi
+   suoi numeri e coi suoi nomi. Il campo `motivo` del server è italiano: qui si
+   usano i campi strutturati, così l'inglese non diventa una schermata mista. */
+function motivoDi(v, peso){
+  if(!v) return '';
+  const chi = (v.daLiberare||[]).map(nomeRuntime).join(', ');
+  const disp = (v.disponibileByte||0)/1e9, manca = (v.mancanoByte||0)/1e9;
+  if(v.ammesso) return IT() ? 'Ci sta: servono '+gb(peso)+' GB e ce ne sono '+gb(disp)+' liberi, tenendone '+gb(riservaGB())+' per il sistema.'
+                            : 'It fits: it needs '+gb(peso)+' GB and '+gb(disp)+' are free, keeping '+gb(riservaGB())+' for the system.';
+  if(!peso) return IT() ? 'Non so quanto occupa: senza il peso non posso dire se ci sta. Provalo una volta e lo misuro.'
+                        : 'I do not know its weight: without it I cannot say whether it fits. Test it once and I will measure it.';
+  if(!chi) return IT() ? 'Non ci sta: servono '+gb(peso)+' GB e ce ne sono '+gb(disp)+'. Non c\'è niente da liberare.'
+                       : 'It does not fit: it needs '+gb(peso)+' GB and '+gb(disp)+' are free. There is nothing to free.';
+  return IT() ? 'Servono '+gb(peso)+' GB e ce ne sono '+gb(disp)+': ne mancano '+gb(manca)+'. Fermando '+chi+' entra.'
+              : 'It needs '+gb(peso)+' GB and '+gb(disp)+' are free: '+gb(manca)+' missing. Stopping '+chi+' makes room.';
+}
+const motivoVerdetto = m => motivoDi(m.verdetto, m.gb);
+
+/* i modelli spenti che l'arbitro rifiuta, dal più grosso. Non è la pagina a
+   decidere chi non entra: è il verdetto che arriva con la scheda. */
+const nonEntrano = () => S.modelli.filter(m => haVerdetto(m) && !ciSta(m) && m.gb > 0)
+  .slice().sort((a,b)=>(b.gb||0)-(a.gb||0));
+
+/* la direzione opposta: dallo stato alle frasi. */
+function frasi(){
+  const out=[], tot=totaleGB(), occ=occupatiGB(), lib=liberiGB();
+  const dentro = S.modelli.filter(m => ['pronto','in-memoria'].includes(statoDi(m)));
+  if(!tot) return out;
+  if(dentro.length){
+    const elenco = dentro.map(m => titoloDi(m)+' ('+(m.runtime||'')+')').join(', ');
+    out.push(IT() ? dentro.length+(dentro.length===1?' modello occupa ':' modelli occupano ')+gb(occ)+' GB dei '+gb(tot)+': '+elenco+'.'
+                  : dentro.length+(dentro.length===1?' model is using ':' models are using ')+gb(occ)+' GB of '+gb(tot)+': '+elenco+'.');
+  } else {
+    out.push(IT() ? 'Nessun modello in memoria. Si caricano alla prima domanda, che paga il caricamento.'
+                  : 'No model in memory. They load on the first question, which pays the loading time.');
+  }
+  /* liberi e disponibili sono due numeri diversi, e vale la pena dirlo: la
+     riserva al sistema è ciò che ha evitato il secondo kernel panic. */
+  if(riservaGB()>0) out.push(IT() ? gb(lib)+' GB liberi, ma per un modello nuovo ce ne sono '+gb(disponibiliGB())+': '+gb(riservaGB())+' restano al sistema.'
+                                  : gb(lib)+' GB free, but only '+gb(disponibiliGB())+' for a new model: '+gb(riservaGB())+' stay with the system.');
+  const acceso = S.regimi.find(g=>g.attivo);
+  if(acceso) out.push(IT() ? 'Il regime «'+acceso.nome+'» è attivo: gli altri programmi restano spenti.'
+                           : '"'+acceso.nome+'" is active: the other programs stay off.');
+  const mancanti = nonEntrano();
+  if(mancanti.length){
+    const g0=mancanti[0], chi=daFermare(g0).map(nomeRuntime).join(', ');
+    out.push(IT() ? titoloDi(g0)+' non entra adesso: gli servono '+gb(g0.gb)+' GB'
+                    +(chi ? ', e basta fermare '+chi+'.'
+                          : ', e anche fermando tutto non basterebbe: è troppo grande per questa macchina.')
+                  : titoloDi(g0)+' does not fit right now: it needs '+gb(g0.gb)+' GB'
+                    +(chi ? ', and stopping '+chi+' is enough.'
+                          : ', and stopping everything would not be enough: it is too big for this machine.'));
+  } else if(S.modelli.some(m=>haVerdetto(m))){
+    out.push(IT() ? 'Ci entra qualunque modello spento dell\'elenco, esclusivi compresi.'
+                  : 'Every model in the list fits right now, exclusive ones included.');
+  }
+  const guasti = S.modelli.filter(m=>statoDi(m)==='guasto');
+  if(guasti.length) out.push(IT() ? guasti.length+(guasti.length===1?' modello non risponde':' modelli non rispondono')+' all\'id in configurazione: '+guasti.map(cortoDi).join(', ')+'.'
+                                  : guasti.length+(guasti.length===1?' model is silent':' models are silent')+' on the id in the config: '+guasti.map(cortoDi).join(', ')+'.');
+  S.scarichi.filter(x=>x.stato==='in corso').forEach(x => out.push(
+    IT() ? 'In arrivo '+x.repo+', '+gb(x.gb)+' GB arrivati.' : 'Incoming '+x.repo+', '+gb(x.gb)+' GB so far.'));
+  return out;
+}
+
+function suggeriti(){
+  const out=[];
+  /* Si propone di liberare solo per un modello che l'arbitro dice recuperabile:
+     se `daLiberare` è vuoto, fermare qualcosa non basterebbe comunque, e
+     «Libera 158 GB» su una macchina da 137 sarebbe un pulsante che mente. */
+  const g0 = nonEntrano().find(m => daFermare(m).length > 0);
+  if(g0){
+    const serve = Math.max(1, Math.ceil(mancanoGB(g0)));
+    out.push({nome:(IT()?'Libera ':'Free ')+serve+' GB',
+      motivo:(IT()?'è quanto manca per far entrare ':'that is what is missing to fit ')+breve(titoloDi(g0),40)
+        +(IT()?', fermando ':', by stopping ')+daFermare(g0).map(nomeRuntime).join(', '),
+      fa:()=>esegui('libera',{gb:serve, daFermare:daFermare(g0)})});
+  }
+  const acceso = S.regimi.find(g=>g.attivo);
+  if(acceso) out.push({nome:(IT()?'Esci da ':'Leave ')+acceso.nome,
+    motivo:IT()?'i programmi normali sono spenti da quando è attivo':'the normal programs have been off since it started',
+    fa:()=>cambiaRegime(acceso.chiave)});
+  if(S.modelli.some(m=>statoDi(m)==='guasto')) out.push({nome:T().config,
+    motivo:IT()?'un id scritto male rende muto il modello':'a wrong id keeps the model silent', fa:()=>vai('config')});
+  /* modelli mai misurati: senza il peso l'arbitro non può dire se ci stanno.
+     Si propone di provarne uno — un'azione che questa pagina sa fare — invece
+     di indovinare quale comando di manutenzione, su questa macchina, misuri. */
+  const mai = S.modelli.filter(m=>!m.misurato && !remotoDi(m) && statoDi(m)!=='guasto' && statoDi(m)!=='in-arrivo');
+  if(mai.length) out.push({nome:(IT()?'Prova ':'Test ')+breve(titoloDi(mai[0])),
+    motivo:IT()?mai.length+(mai.length===1?' modello non è mai stato misurato':' modelli non sono mai stati misurati')+': senza il peso non si sa se ci stanno'
+              :mai.length+(mai.length===1?' model was never measured':' models were never measured')+': without a weight we cannot tell whether they fit',
+    fa:()=>prova(mai[0].id)});
+  if(!out.length && S.modelli.some(m=>!m.note && !remotoDi(m)))
+    out.push({nome:T().describeAll, motivo:IT()?'ci sono modelli senza descrizione':'some models have no description',
+      fa:()=>etichetteAuto(true)});
+  return out.slice(0,3);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   5. azioni. I verbi li fa la pagina; ogni altro id arriva da
+   /api/comandi con la rotta scritta dentro, e si esegue quella.
+   ════════════════════════════════════════════════════════════════ */
+async function esegui(id, extra){
+  extra = extra || {};
+  apriCmdk(false);
+  if(id==='hf') return vai('hf');
+  if(id==='config') return vai('config');
+  if(id==='chiedi') return chiedi(extra.testo||'');
+  if(id==='libera'){
+    /* si libera partendo da chi ne tiene più di tutti, ed è la stessa scelta
+       che fa l'arbitro quando dice cosa fermare. Se il verdetto nomina un
+       runtime preciso, si dà retta a lui. */
+    const chiave = (extra.daFermare && extra.daFermare[0]) || (piuGrosso()||{}).chiave;
+    if(!chiave) return;
+    const cap = S.capacita[chiave]||{};
+    const dentro = (((S.mem&&S.mem.processi)||[]).find(p=>p.chiave===chiave)||{}).modelli||[];
+    if(cap.scaricaSingoloModello && dentro.length){
+      vai('manutenzione');
+      scriviConsole('> '+(IT()?'scarico ':'unload ')+dentro[0]);
+      try{
+        const r = await api('/api/modello/libera-memoria',{method:'POST',body:JSON.stringify({runtime:chiave,modello:dentro[0]})});
+        log((r&&r.output)||'ok');
+      }catch(e){ log('! '+e.message); }
+      return aggiorna();
+    }
+    return servizio(chiave,'stop');
+  }
+  if(id==='pronto'){
+    const m = S.modelli.find(x=>x.id===extra.id) || modelloSel(); if(!m) return;
+    /* un esclusivo vuole la macchina libera: se esiste un regime che tiene
+       acceso proprio il suo programma, si passa da lì. */
+    if(classeDi(m)==='esclusivo'){
+      const g = S.regimi.find(x => x.runtimeAttivo===m.runtime) || S.regimi[0];
+      if(g && !g.attivo) return cambiaRegime(g.chiave);
+    }
+    return prova(m.id);
+  }
+  if(id==='prova') return prova(extra.id || (modelloSel()||{}).id);
+  /* tutto il resto è un comando del registro, e si esegue sulla rotta che il
+     registro dichiara. Indovinarla qui è il difetto del 16/08/2026. */
+  const c = (S.comandi||[]).find(x=>x.id===id), corpo = (c&&c.corpo)||{};
+  if(c && c.rotta==='/api/regime') return cambiaRegime(corpo.chiave);
+  if(c && c.rotta==='/api/servizio') return servizio(corpo.servizio, corpo.azione||'restart');
+  if(c && c.rotta==='/api/esegui'){ vai('manutenzione'); return streaming('/api/esegui',{cmd:corpo.cmd||c.id}); }
+  /* fuori registro: solo gli strumenti già in elenco, che vengono dalla stessa
+     configurazione. Se non c'è nemmeno lì, si dice invece di fingere. */
+  if(S.strumenti.some(s=>s.id===id)){ vai('manutenzione'); return streaming('/api/esegui',{cmd:id}); }
+  if(String(id).startsWith('regime:')) return cambiaRegime(String(id).slice(7));
+  if(String(id).startsWith('riavvia:')) return servizio(String(id).slice(8),'restart');
+  return log('! '+(IT()?'comando non dichiarato: ':'command not declared: ')+id);
+}
+
+/* L'output si legge dall'alto verso il basso, come in un terminale: il comando,
+   quello che ha detto, e in fondo l'esito. Al contrario, l'intestazione di una
+   corsa finirebbe sotto le sue stesse righe.
+
+   Le sequenze ANSI vanno via: gli script di manutenzione colorano per il
+   terminale, e qui uscirebbero come `[92m` in mezzo alle frasi. */
+const senzaAnsi = t => String(t??'').replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, '').replace(/\x1b/g, '');
+const TETTO_CONSOLE = 400;
+function scriviConsole(t){
+  S.console.push(senzaAnsi(t));
+  if(S.console.length > TETTO_CONSOLE) S.console.splice(0, S.console.length - TETTO_CONSOLE);
+}
+function log(t){ scriviConsole(t); disegnaCentro(); }
+
+async function streaming(url, corpo){
+  scriviConsole('> '+(corpo.cmd||corpo.chiave||''));
+  disegnaCentro();
+  let r;
+  try{ r = await fetch(url, conToken({method:'POST',body:JSON.stringify(corpo)})); }
+  catch(e){ return log('! '+e.message); }
+  if(!r.ok){ return log('! '+(await r.text()||r.status)); }
+  const lettore = r.body.getReader(), dec = new TextDecoder();
+  let resto='';
+  for(;;){
+    let x; try{ x = await lettore.read(); }catch(e){ log('! '+e.message); break; }
+    if(x.done) break;
+    resto += dec.decode(x.value,{stream:true});
+    const pezzi = resto.split('\n\n'); resto = pezzi.pop();
+    for(const p of pezzi){
+      const riga = p.startsWith('data: ') ? p.slice(6) : p;
+      if(riga==='__FINE__'){ log('> '+(IT()?'fatto':'done')); await aggiorna(); return; }
+      if(riga.startsWith('__ERRORE__')){ log('! '+riga.slice(10).trim()); await aggiorna(); return; }
+      scriviConsole(riga); disegnaCentro();
+    }
+  }
+  log('> '+(IT()?'interrotto':'interrupted'));
+  aggiorna();
+}
+
+async function servizio(chiave, azione){
+  vai('manutenzione');
+  scriviConsole('> '+azione+' '+chiave);
+  try{
+    const r = await api('/api/servizio',{method:'POST',body:JSON.stringify({servizio:chiave,azione})});
+    log((r&&r.output)||(r&&r.errore)||'ok');
+  }catch(e){ log('! '+e.message); }
+  setTimeout(aggiorna, 1800);
+}
+
+async function cambiaRegime(chiave){
+  const g = S.regimi.find(x=>x.chiave===chiave); if(!g) return;
+  /* Entrare ferma altri programmi: si dice PRIMA quali, e si conferma. */
+  if(!g.attivo && S.armato!=='regime:'+chiave){
+    S.armato = 'regime:'+chiave; vai('memoria'); return;
+  }
+  S.armato = '';
+  vai('manutenzione');
+  streaming('/api/regime',{chiave, azione: g.attivo?'off':'on'});
+}
+
+async function prova(id){
+  const m = S.modelli.find(x=>x.id===id); if(!m) return;
+  const rt = S.runtime.find(r=>r.chiave===m.runtime);
+  if(m.gb>0){
+    try{
+      const v = await api('/api/preflight',{method:'POST',body:JSON.stringify({modello:m.id,pesoGB:m.gb})});
+      if(v && v.verdetto && !v.verdetto.ammesso){ S.avvisoProva = motivoDi(v.verdetto, m.gb); disegnaInsp(); return; }
+    }catch(e){}
+  }
+  S.avvisoProva=''; S.provando=id; disegnaInsp();
+  try{
+    const r = await api('/api/prova',{method:'POST',body:JSON.stringify({porta:(rt?rt.porta:0),modello:m.id,runtime:m.runtime})});
+    S.esitoProva = r && !r.errore
+      ? gb(r.tokS)+' tok/s, '+(r.reasoning?(IT()?'ragiona':'reasons'):(IT()?'diretto':'straight'))
+      : (IT()?'non ha risposto: ':'no answer: ')+((r&&r.errore)||'');
+  }catch(e){ S.esitoProva = String(e.message); }
+  S.provando=''; disegnaInsp(); aggiorna();
+}
+
+async function chiedi(testo){
+  if(!testo) return;
+  S.tab='aiuto'; S.chat.push({io:1,testo}); disegnaInsp();
+  const attesa = {io:0,testo:'…'}; S.chat.push(attesa); disegnaInsp();
+  try{
+    const r = await api('/api/spiega',{method:'POST',body:JSON.stringify({domanda:testo})});
+    attesa.testo = (r&&r.ok) ? r.risposta : (IT()?'il modellino non risponde':'the small model is not answering');
+  }catch(e){ attesa.testo = String(e.message); }
+  disegnaInsp();
+}
+
+/* il glossario risponde senza modello: definizione più i numeri di adesso. */
+function spiega(k){
+  const v = LESSICO[k]; if(!v) return;
+  const quali = S.modelli.filter(m => v.tipo==='st' ? statoDi(m)===k : classeDi(m)===k);
+  const eti = (v.tipo==='st' ? T().st[k] : T().cl[k]) || k;
+  const testa = v.tipo==='st' ? (IT()?'Stato. ':'State. ') : (IT()?'Classe di convivenza. ':'Coexistence class. ');
+  const coda = quali.length ? (IT()?' Adesso: ':' Right now: ')+quali.map(titoloDi).join(', ')+'.'
+                            : (IT()?' Adesso nessun modello.':' No model right now.');
+  S.tab='aiuto';
+  S.chat.push({io:1,testo:IT()?'Cosa vuol dire «'+eti+'»?':'What does "'+eti+'" mean?'});
+  S.chat.push({io:0,testo:testa+(IT()?v.it:v.en)+coda});
+  disegnaInsp();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   6. tema. In automatico lo chiede al Mac: in modalità app il
+   browser riporta "light" anche col sistema in scuro.
+   ════════════════════════════════════════════════════════════════ */
+async function applicaTema(){
+  let eff = S.tema;
+  if(eff==='auto'){
+    try{ const r = await api('/api/tema'); eff = r && r.scuro ? 'dark' : 'light'; }
+    catch(e){ eff = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+  } else eff = (eff==='scuro') ? 'dark' : 'light';
+  document.documentElement.dataset.theme = eff;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   7. caricamento dati. Una tornata sola, e si fermano da soli
+   quando la finestra non si vede: un pannello aperto e fermo
+   non deve tenere sveglia la macchina.
+   ════════════════════════════════════════════════════════════════ */
+let TIMER=null;
+async function aggiorna(){
+  try{
+    /* /api/modelli porta in una richiesta i numeri della macchina, lo stato,
+       la classe e il verdetto di ogni modello: sono già calcolati dove stanno
+       le misure, e la pagina non li rifà. */
+    const [mem, mod, runtime] = await Promise.all([
+      api('/api/memoria'), api('/api/modelli'), api('/api/runtime')
+    ]);
+    S.offline=false;
+    S.mem = mem || null;
+    S.mod = mod || null;
+    S.modelli = (mod && Array.isArray(mod.modelli)) ? mod.modelli : [];
+    S.runtime = Array.isArray(runtime)?runtime:[];
+    if(!S.sel && S.modelli.length) S.sel = prontoId() || S.modelli[0].id;
+  }catch(e){ S.offline=true; }
+  disegnaTutto();
+}
+/* le liste che cambiano solo quando si cambia configurazione: una volta sola.
+   Alcune rotte rispondono `null` quando non c'è niente, non `[]`: il `|| def`
+   non è pignoleria, è la differenza fra una lista vuota e la pagina che cade. */
+async function caricaLento(){
+  const uno = async (p, dove, def) => { try{ const v = await api(p); S[dove] = v || def; }catch(e){ S[dove] = def; } };
+  const mappa = async (p, dove) => { try{ (await api(p) || []).forEach(x => S[dove][x.chiave||x.provider] = x); }catch(e){} };
+  await Promise.all([
+    uno('/api/regimi','regimi',[]),
+    uno('/api/strumenti','strumenti',[]),
+    uno('/api/comandi','comandi',[]),
+    uno('/api/modelli/archivio','archivio',[]),
+    uno('/api/documenti','documenti',[]),
+    uno('/api/hf/stato','scarichi',[]),
+    uno('/api/domande','domande',[]),
+    uno('/api/aiuto','aiuto',null),
+    mappa('/api/capacita','capacita'),
+    mappa('/api/provider','provider'),
+    mappa('/api/credenziali','cred')
+  ]);
+  disegnaTutto();
+}
+function avviaPolling(){
+  clearInterval(TIMER);
+  TIMER = setInterval(()=>{ if(!document.hidden) aggiorna(); }, 5000);
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) aggiorna(); });
+
+/* ════════════════════════════════════════════════════════════════
+   8. disegno. innerHTML, niente framework.
+   ════════════════════════════════════════════════════════════════ */
+const pillStato = s => ({pronto:'p-ok','in-memoria':'p-acc',spento:'p-neutro','in-arrivo':'p-acc',guasto:'p-bad',remoto:'p-acc'}[s]||'p-neutro');
+const STATI = ['pronto','in-memoria','spento','in-arrivo','guasto'];
+const CLASSI = ['convivente','esclusivo','residente','remoto'];
+const ICO = {
+  modelli:'<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>',
+  memoria:'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1.5" x2="9" y2="4"/><line x1="15" y1="1.5" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="22.5"/><line x1="15" y1="20" x2="15" y2="22.5"/>',
+  programmi:'<rect x="3" y="4" width="18" height="16" rx="2"/><polyline points="7,9 10,12 7,15"/><line x1="12.5" y1="15" x2="17" y2="15"/>',
+  manutenzione:'<line x1="3" y1="8" x2="21" y2="8"/><line x1="3" y1="16" x2="21" y2="16"/><circle cx="9" cy="8" r="2.4"/><circle cx="16" cy="16" r="2.4"/>',
+  hf:'<circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>',
+  config:'<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8.5" y1="8" x2="15.5" y2="8"/><line x1="8.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="16" x2="13" y2="16"/>'
+};
+const ico = k => '<svg class="ico" viewBox="0 0 24 24">'+ICO[k]+'</svg>';
+
+function vai(s, filtro){ S.schermo=s; if(filtro) S.filtro=filtro; S.armato=''; disegnaTutto(); }
+function vaiTab(t){ S.tab=t; disegnaInsp(); }
+function scegli(id){ S.sel=id; S.tab='modello'; S.esitoProva=''; S.avvisoProva=''; disegnaInsp(); }
+
+function disegnaTutto(){ disegnaTestata(); disegnaLato(); disegnaCentro(); disegnaInsp(); disegnaPiede(); }
+
+function disegnaTestata(){
+  $('che-cos-e').textContent = T().whatItIs;
+  $('cmdk-invito').textContent = T().ask;
+  $('q').placeholder = T().cmdkPh;
+  $('btn-aiuto').title = T().tabHelp;
+  $('seg-modo').innerHTML =
+    ['guidato','esperto'].map(m => '<button class="'+(S.modo===m?'on':'')+'" onclick="setModo(\''+m+'\')">'
+      +esc(m==='guidato'?T().guided:T().expert)+'</button>').join('');
+}
+function setModo(m){ S.modo=m; localStorage.setItem('modo',m); disegnaTutto(); }
+
+function disegnaLato(){
+  const conta = (k) => S.modelli.filter(m => k==='spento'
+    ? ['spento','guasto','in-arrivo'].includes(statoDi(m)) : classeDi(m)===k).length;
+  const p = S.modelli.find(m=>m.pronto);
+  let h = '<div class="k gruppo">'+esc(T().readyNow)+'</div>';
+  h += p ? '<button id="pronto-card" onclick="scegli('+JSON.stringify(p.id)+')">'
+      +'<span style="display:flex;align-items:center;gap:7px;min-width:0"><span class="dot vivo" style="background:var(--ok)"></span>'
+      +'<span class="t">'+esc(titoloDi(p))+'</span></span>'
+      +'<span class="i">'+esc(cortoDi(p))+'</span>'
+      +'<span class="mono" style="font-size:11px;color:var(--strong);display:flex;gap:12px">'
+      +(p.misurato?'<span>'+gb(p.tokS)+' <span class="k">tok/s</span></span>':'')
+      +(p.gb?'<span>'+gb(p.gb)+' <span class="k">GB</span></span>':'')+'</span></button>'
+    : '<div style="padding:0 11px 10px;font-size:12px;color:var(--muted)">'
+      +esc(IT()?'nessun modello caricato':'no model loaded')+'</div>';
+
+  /* MODELLI porta all'elenco, non alla memoria: sono due schermate diverse.
+     Prima erano la stessa, e cambiare filtro cambiava solo la tabella in
+     fondo — per vedere gli esclusivi bisognava scorrere oltre la barra, i
+     processi, la lettura e la regola. Ogni volta. */
+  h += '<div class="k gruppo">'+esc(T().models)+'</div>';
+  h += voce(S.schermo==='modelli'&&S.filtro==='tutti','modelli',T().fAll,S.modelli.length,"vai('modelli','tutti')");
+  [['convivente',T().fCo],['esclusivo',T().fEx],['spento',T().fOff],['remoto',T().fRem]].forEach(([k,n])=>{
+    h += voce(k===S.filtro && S.schermo==='modelli', 'modelli', n, conta(k), "vai('modelli','"+k+"')");
+  });
+  h += voce(S.schermo==='archivio','modelli',T().archive,S.archivio.length,"vai('archivio')");
+  h += '<div class="k gruppo">'+esc(T().machine)+'</div>';
+  h += voce(S.schermo==='memoria','memoria',T().memory,'',"vai('memoria')");
+  h += voce(S.schermo==='programmi','programmi',T().programs,S.runtime.filter(r=>r.attivo).length,"vai('programmi')");
+  h += voce(S.schermo==='manutenzione','manutenzione',T().maintenance,'',"vai('manutenzione')");
+  h += '<div class="k gruppo">'+esc(T().catalog)+'</div>';
+  h += voce(S.schermo==='hf','hf','HuggingFace','',"vai('hf')");
+  h += voce(S.schermo==='config','config',T().config,'',"vai('config')");
+  /* il modellino: chi è lo dice il server (/api/aiuto), il peso e lo stato si
+     leggono dalla sua scheda. Niente nome cablato, o cambiando Mac mentirebbe. */
+  const a = S.aiuto && S.aiuto.modello ? S.modelli.find(m => String(m.id)===String(S.aiuto.modello)) : null;
+  h += '<div class="sp"></div><div style="border-top:1px solid var(--line);padding:11px 11px 2px;display:flex;flex-direction:column;gap:6px">'
+    +'<span class="k">'+esc(T().smallModel)+'</span>'
+    +(S.aiuto && S.aiuto.modello
+      ? '<span style="display:flex;align-items:center;gap:7px;min-width:0">'
+        +'<span class="dot" style="background:'+(a && ['pronto','in-memoria'].includes(statoDi(a))?'var(--ok)':'var(--line2)')+'"></span>'
+        +'<span class="mono" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+        +esc(cortoDi({id:S.aiuto.modello}))
+        +(S.aiuto.parametriB?' · '+gb(S.aiuto.parametriB)+'B':'')
+        +(a&&a.gb?' · '+gb(a.gb)+' GB':'')+'</span></span>'
+      : '')
+    /* Se non c'era niente di piccolo si è preso quello che c'era: va detto, non
+       nascosto. Un 26B che scrive etichette occupa memoria che serve altrove. */
+    +(S.aiuto && S.aiuto.ripiego
+      ? '<span style="font-size:11.5px;color:var(--warn-ink);line-height:1.45">'
+        +esc(IT()?'Nessun modello piccolo fra quelli serviti: uso questo, ma pesa. Dichiarane uno con «modelloAiuto» in configurazione.'
+                 :'No small model among those served: using this one, but it is heavy. Name one with «modelloAiuto» in the config.')+'</span>'
+      : '')
+    +'<span style="font-size:11.5px;color:var(--muted);line-height:1.45">'+esc(T().smallModelWhat)+'</span></div>';
+  $('lato').innerHTML = h;
+}
+function voce(on, icona, nome, n, onclick){
+  return '<button class="voce'+(on?' on':'')+'" onclick="'+onclick+'">'+ico(icona)
+    +'<span class="nome">'+esc(nome)+'</span>'+(n||n===0?'<span class="n">'+n+'</span>':'')+'</button>';
+}
+
+function disegnaCentro(){
+  if(S.offline){
+    $('centro').innerHTML = '<div class="vuoto"><b>'+esc(T().offline)+'</b>'+esc(T().offlineWhy)+'</div>';
+    return;
+  }
+  const f = {memoria:vistaMemoria, modelli:vistaModelli, programmi:vistaProgrammi,
+             manutenzione:vistaManutenzione, hf:vistaHF, config:vistaConfig,
+             archivio:vistaArchivio}[S.schermo] || vistaMemoria;
+  $('centro').innerHTML = f();
+  /* Cambiando schermata si torna in cima. Solo cambiando: questa funzione gira
+     anche ogni cinque secondi col polling, e riportare su la pagina mentre
+     qualcuno legge sarebbe peggio del problema che risolve. */
+  const dove = S.schermo+'|'+S.filtro;
+  if(dove !== ultimoDisegno){ ultimoDisegno = dove; $('centro').scrollTop = 0; }
+  /* l'output cresce in fondo, e in fondo deve restare l'occhio. Non
+     scrollIntoView: sposterebbe anche la pagina intorno. */
+  const u = $('uscita'); if(u) u.scrollTop = u.scrollHeight;
+}
+let ultimoDisegno = '';
+
+function vistaMemoria(){
+  const tot=totaleGB(), occ=occupatiGB(), lib=liberiGB(), tet=tettoGB(), sog=sogliaGB();
+  const proc = ((S.mem&&S.mem.processi)||[]).filter(p=>(p.correnteByte||0)/1e9>0.2);
+  const COL=['var(--s1)','var(--s2)','var(--s3)','var(--s4)'];
+  const reg = S.regimi[0];
+  let h = '<div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:16px">'
+    +'<div style="flex:1;min-width:250px"><h1>'+esc(T().memory)+'</h1><p class="sub" style="margin:0">'+esc(T().memorySub)+'</p></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +(reg?'<button class="b2" onclick="cambiaRegime(\''+esc(reg.chiave)+'\')">'
+      +esc(S.armato==='regime:'+reg.chiave?T().pressAgain:(reg.attivo?(IT()?'Esci da ':'Leave ')+reg.nome:reg.nome))+'</button>':'')
+    +'<button class="'+(S.armato==='ferma'?'bx':'bx')+'" onclick="fermaTutto()">'
+      +esc(S.armato==='ferma'?T().pressAgain:T().stopAll)+'</button></div></div>';
+
+  if(S.armato==='ferma') h += nota('n-bad', T().stopAllTitle, T().stopAllBody+' '+T().pressAgain+'.');
+  if(S.armato.startsWith('regime:') && reg) h += nota('n-warn',
+    reg.nome, (IT()?'Fermerà ':'It will stop ')+((reg.fermera||[]).join(', ')||(IT()?'niente':'nothing'))
+    +(IT()?', poi allargherà i margini di memoria. ':', then widen the memory margins. ')+T().pressAgain+'.');
+  ((S.mem&&S.mem.avvisi)||[]).forEach(a => h += nota('n-warn','',a));
+  if(S.mem && S.mem.etaSecondi>30) h += nota('n-warn','', T().stale+' '+S.mem.etaSecondi+'s');
+
+  h += '<div class="card"><div class="testa">'
+    +metrica(T().ramUnified, gb(tot)+' GB')+metrica(T().used, gb(occ)+' GB')+metrica(T().free, gb(lib)+' GB')
+    +metrica(T().available, gb(disponibiliGB())+' GB')
+    +'<div class="sp"></div><span style="display:inline-flex;align-items:center;gap:7px;font-size:11.5px">'
+    +'<span class="dot vivo" style="background:var(--ok)"></span>'+esc(T().readNow)+'</span></div><div class="corpo">'
+    +'<div style="position:relative"><div class="barra">';
+  proc.forEach((p,i)=>{
+    const g=(p.correnteByte||0)/1e9, w=g/Math.max(tot,1)*100;
+    const dich=(p.pesoByte||0)/1e9;
+    const tit=p.nome+' '+gb(g)+' GB'+(dich&&Math.abs(dich-g)>2?' ('+(IT()?'file ':'files ')+gb(dich)+' GB, '+T().heldMore+')':'');
+    h += '<div class="fetta" title="'+esc(tit)+'" style="width:'+w.toFixed(2)+'%;background:'+COL[i%4]
+      +';color:'+(i<2?'var(--on-fill)':'var(--on-pale)')+'">'
+      +(w>=13?'<i>'+esc(p.nome)+'</i><u>'+gb(g)+' GB</u>':'')+'</div>';
+  });
+  h += '<div class="libero">'+gb(lib)+' GB '+esc(T().free)+'</div></div>'
+    /* il tetto lo disegna solo chi lo dichiara: zero vuol dire «non lo so»,
+       non «nessun limite», e una riga tratteggiata a zero sarebbe una bugia. */
+    +(tot&&tet?'<div class="tetto" style="left:'+(tet/tot*100).toFixed(2)+'%"></div>':'')+'</div>'
+    +'<div class="righello">'+[0,tot/4,tot/2,tot*3/4,tot].map(v=>'<span>'+Math.round(v)+' GB</span>').join('')+'</div>'
+    +'<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:11px">'
+    +'<span class="k" style="color:var(--warn-ink)">'+(tet?'┆ '+esc(T().ceiling)+' · '+tet+' GB'
+      :esc(T().ceiling)+' · '+esc(T().ceilingUnknown))+'</span>'
+    +'<span class="k">'+esc(T().measured)+'</span></div></div>';
+  proc.forEach((p,i)=>{
+    const g=(p.correnteByte||0)/1e9, cap=S.capacita[p.chiave]||{};
+    const dentro=(p.modelli||[]).join(', ');
+    h += '<div class="riga"><span class="dot" style="border-radius:2px;background:'+COL[i%4]+'"></span>'
+      +'<span style="font-weight:500;color:var(--strong);flex:none">'+esc(p.nome)+'</span>'
+      +'<span class="mono" style="font-size:11px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+      +gb(g)+' GB'+(dentro?' · '+esc(dentro):'')+'</span><div class="sp"></div>'
+      +(cap.scaricaSingoloModello?'':'<span style="font-size:11.5px;color:var(--warn-ink);text-align:right;max-width:32ch">'+esc(cap.nota||T().capAll)+'</span>')
+      +'<button class="b2 sm" onclick="esegui(\'libera\',{daFermare:['+JSON.stringify(p.chiave)+']})">'
+      +esc(cap.scaricaSingoloModello?T().freeRAM:(IT()?'Ferma ':'Stop ')+p.nome)+'</button></div>';
+  });
+  h += '</div>';
+
+  const fr = frasi(), sug = suggeriti();
+  if(fr.length){
+    h += '<div class="card"><div class="corpo" style="display:flex;flex-direction:column;gap:8px">'
+      +'<div style="display:flex;align-items:center;gap:12px"><span class="k" style="color:var(--accent-ink)">'+esc(T().reading)+'</span>'
+      +'<span style="flex:1;height:1px;background:var(--line)"></span><span class="k">'+esc(T().readingNote)+'</span></div>'
+      +fr.map(p=>'<p style="margin:0;font-size:13px;line-height:1.55;text-wrap:pretty">'+esc(p)+'</p>').join('')
+      +(sug.length?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:3px">'
+        +sug.map((s,i)=>'<button class="b2 sm" title="'+esc(s.motivo)+'" onclick="SUG['+i+']()">'+esc(s.nome)+'</button>').join('')
+        +'</div>':'')
+      +'</div></div>';
+    window.SUG = sug.map(s=>s.fa);
+  }
+
+  h += '<div style="display:flex;gap:16px;padding:14px 17px;border:1px solid var(--line2);border-radius:10px;'
+    +'background:var(--inset);margin-bottom:18px;align-items:flex-start">'
+    +'<span class="k" style="color:var(--accent-ink);flex:none;padding-top:2px">'+esc(T().rule)+'</span><div style="font-size:13px;line-height:1.55">'
+    +'<div style="color:var(--strong);font-weight:500;margin-bottom:5px">'
+    +esc(IT()?'Un modello convive sotto '+sog+' GB. Da lì in su, vuole la macchina libera.'
+             :'A model coexists under '+sog+' GB. From there up, it wants the machine to itself.')+'</div>'
+    /* la soglia è una sola, dichiarata in configurazione: la stessa che usa
+       l'arbitro per rifiutare due modelli grandi insieme. Dirlo qui evita che
+       qualcuno la reinventi nella pagina. */
+    +'<div>'+esc(IT()?'È la soglia scritta in configurazione, e serve a due cose insieme: l\'etichetta che leggi qui e il rifiuto quando provi a caricare il secondo modello grande. '
+                     +(tet?'Il tetto di '+tet+' GB per un solo modello lo impone il programma, non la RAM. ':'Il tetto per un solo modello questo programma non lo dichiara. ')
+                     +'Al sistema restano sempre '+gb(riservaGB())+' GB.'
+                     :'It is the threshold written in the config, and it does two jobs at once: the label you read here, and the refusal when you try to load a second large model. '
+                     +(tet?'The '+tet+' GB ceiling for a single model comes from the program, not the RAM. ':'This program does not declare a ceiling for a single model. ')
+                     +'The system always keeps '+gb(riservaGB())+' GB.')+'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:7px;margin-top:12px">'
+    +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="k" style="width:54px">'+esc(T().states)+'</span>'
+    +STATI.map(k=>'<button class="pill '+pillStato(k)+' chiedi" onclick="spiega(\''+k+'\')">'+esc(T().st[k])+'</button>').join('')+'</div>'
+    +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="k" style="width:54px">'+esc(T().classes)+'</span>'
+    +CLASSI.map(k=>'<button class="tag chiedi" onclick="spiega(\''+k+'\')">'+esc(T().cl[k])+'</button>').join('')+'</div>'
+    +'<div style="font-size:11.5px;color:var(--muted)">'+esc(T().ruleClick)+'</div></div></div></div>';
+
+  /* Da qui si va all'elenco: la memoria racconta la macchina, i modelli sono
+     un'altra schermata. Tenerli insieme voleva dire scorrere tutto questo per
+     arrivare alla tabella. */
+  h += '<div style="display:flex;gap:9px;flex-wrap:wrap">'
+    +'<button class="b2" onclick="vai(\'modelli\',\'tutti\')">'+esc(T().seeModels)+' ('+S.modelli.length+')</button>'
+    +'</div>';
+  return h;
+}
+
+/* ── i modelli: l'elenco e nient'altro sopra ──────────────────────────────
+   In cima solo una riga coi tre numeri, che porta alla memoria per chi li
+   vuole vedere disegnati. Il titolo e i filtri restano a portata d'occhio
+   anche quando la lista è lunga. */
+function vistaModelli(){
+  const nomiFiltri = {tutti:T().allModels,convivente:T().fCo,esclusivo:T().fEx,spento:T().fOff,remoto:T().fRem};
+  const visibili = S.modelli.filter(m => S.filtro==='tutti' ? true
+    : S.filtro==='spento' ? ['spento','guasto','in-arrivo'].includes(statoDi(m)) : classeDi(m)===S.filtro);
+
+  let h = '<div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:14px">'
+    +'<div style="flex:1;min-width:250px"><h1>'+esc(nomiFiltri[S.filtro])+'</h1>'
+    +'<p class="sub" style="margin:0">'+esc(T().modelsSub)+'</p></div>'
+    +'<div class="seg">'
+    +Object.keys(nomiFiltri).map(k=>'<button class="'+(S.filtro===k?'on':'')+'" onclick="vai(\'modelli\',\''+k+'\')">'
+      +esc(k==='tutti'?T().fAll:nomiFiltri[k])+'</button>').join('')+'</div></div>';
+
+  /* i tre numeri in una riga sola: qui serve il contesto, non il disegno */
+  if(totaleGB()) h += '<button class="b3" onclick="vai(\'memoria\')" style="display:flex;align-items:center;gap:16px;'
+    +'width:100%;justify-content:flex-start;padding:9px 14px;margin-bottom:14px;border:1px solid var(--line);'
+    +'border-radius:8px;background:var(--surface);min-height:0;flex-wrap:wrap">'
+    +metrica(T().used, gb(occupatiGB())+' / '+gb(totaleGB())+' GB')
+    +metrica(T().available, gb(disponibiliGB())+' GB')
+    +'<span class="sp"></span><span class="k" style="color:var(--accent-ink)">'+esc(T().memory)+' →</span></button>';
+
+  if(!S.modelli.length){
+    return h+'<div class="card"><div class="vuoto"><b>'+esc(T().noModels)+'</b>'+esc(T().noModelsWhy)+'</div></div>';
+  }
+  if(!visibili.length){
+    h += '<div class="card"><div class="vuoto"><b>'+esc(T().noneHere)+'</b>'+esc(T().noneHereWhy)+'</div></div>';
+  } else {
+    h += '<div class="intesta">'+[T().colState,T().colModel,T().colClass,T().colWeight,T().colSpeed]
+      .map((x,i)=>'<span class="k"'+(i>2?' style="text-align:right"':'')+'>'+esc(x)+'</span>').join('')+'</div>'
+      +'<div class="card" style="margin-bottom:14px">'
+      +visibili.map(m=>{
+        const st=statoDi(m), cl=classeDi(m);
+        /* in arrivo si mostra quanto è già scaricato: è l'unica cosa che si
+           muove, e viene dallo stesso elenco che alimenta lo stato. */
+        const dl = st==='in-arrivo' ? S.scarichi.find(x=>String(x.repo).toLowerCase()===String(m.id).toLowerCase()) : null;
+        const sotto = S.modo==='esperto'
+          ? m.id+' · '+(m.runtime||'')+' · '+Math.round((m.context||0)/1024)+'k'
+          : (dl ? gb(dl.gb)+' GB' : (m.runtime||''));
+        return '<div class="mriga'+(m.id===S.sel?' on':'')+'" onclick="scegli('+JSON.stringify(m.id)+')">'
+          +'<button class="pill '+pillStato(st)+' chiedi" onclick="event.stopPropagation();spiega(\''+st+'\')">'+esc(T().st[st])+'</button>'
+          +'<span style="min-width:0"><span class="t" style="font-weight:500;color:var(--strong);display:block">'+esc(titoloDi(m))+'</span>'
+          +'<span class="i">'+esc(sotto)+'</span></span>'
+          +'<button class="tag chiedi" onclick="event.stopPropagation();spiega(\''+cl+'\')">'+esc(T().cl[cl])+'</button>'
+          /* peso zero non è «zero GB»: è «non lo sappiamo». Scriverlo 0,0
+             sarebbe l'unica cifra falsa di tutta la tabella. */
+          +'<span class="num">'+(remotoDi(m)?'-':(m.gb?gb(m.gb)+' GB':'—'))+'</span>'
+          +'<span class="num" style="color:var(--muted)">'+(m.misurato?gb(m.tokS)+' tok/s':(st==='guasto'?esc(T().silent):esc(T().notMeasured)))+'</span></div>';
+      }).join('')+'</div>';
+  }
+  h += '<div style="display:flex;gap:9px;flex-wrap:wrap">'
+    +'<button class="b2" onclick="vai(\'hf\')">'+esc(T().addHF)+'</button>'
+    +'<button class="b3" onclick="etichetteAuto(true)">'+esc(T().describeAll)+'</button>'
+    +(S.cambiato?'<span class="pill p-warn" style="align-self:center">'+esc(T().unsaved)+'</span>'
+      +'<button class="b1" onclick="salva()">'+esc(T().saveChanges)+'</button>':'')+'</div>';
+  return h;
+}
+const metrica = (k,v,cl) => '<span class="'+(cl||'')+'" style="white-space:nowrap"><span class="k">'+esc(k)+'</span> <b class="mono" style="font-weight:400;font-size:12px;color:var(--strong)">'+esc(v)+'</b></span>';
+const nota = (c,t,b) => '<div class="nota '+c+'"><div>'+(t?'<b>'+esc(t)+'</b>':'')+'<span>'+esc(b)+'</span></div></div>';
+
+function fermaTutto(){
+  if(S.armato==='ferma'){ S.armato=''; esegui('ferma-tutto'); return; }
+  S.armato='ferma'; vai('memoria');
+}
+
+function vistaProgrammi(){
+  let h = '<h1>'+esc(T().programs)+'</h1><p class="sub">'+esc(T().programsSub)+'</p>';
+  h += '<div class="card">'+S.runtime.map(r=>{
+    const cap=S.capacita[r.chiave]||{};
+    const dentro=(((S.mem&&S.mem.processi)||[]).find(p=>p.chiave===r.chiave)||{}).modelli||[];
+    const meta=[r.cosa||'', S.modo==='esperto'?T().port+' '+r.porta:'', dentro.join(', ')].filter(Boolean).join(' · ');
+    return '<div class="riga">'
+      +'<span style="display:inline-flex;align-items:center;gap:7px;width:86px;flex:none;font-size:11.5px">'
+      +'<span class="dot" style="background:'+(r.attivo?'var(--ok)':'var(--bad)')+'"></span>'+esc(r.attivo?T().on:T().off)+'</span>'
+      +'<span class="cresci"><span class="t">'+esc(r.nome||r.chiave)+'</span><span class="m">'+esc(meta)+'</span></span>'
+      +'<span class="tag grigio">'+esc(cap.scaricaSingoloModello?T().capSingle:T().capAll)+'</span>'
+      +(r.puoRiavviare?'<button class="b3 sm" onclick="servizio(\''+esc(r.chiave)+'\',\'restart\')">'+esc(T().restart)+'</button>':'')
+      +((r.attivo?r.puoFermare:r.puoAvviare)
+        ?'<button class="b2 sm" onclick="servizio(\''+esc(r.chiave)+'\',\''+(r.attivo?'stop':'start')+'\')">'
+        +esc(r.attivo?T().turnOff:T().turnOn)+'</button>':'')
+      +'</div>';
+  }).join('')+'</div>';
+  h += nota('n-info', T().cacheTitle, T().cacheBody+' avvia-server.command');
+  return h;
+}
+
+function vistaManutenzione(){
+  let h = '<h1>'+esc(T().maintenance)+'</h1><p class="sub">'+esc(T().maintenanceSub)+'</p>';
+  h += S.strumenti.length
+    ? '<div class="card">'+S.strumenti.map(s=>'<div class="riga" style="align-items:flex-start">'
+        +'<span class="cresci"><span class="t">'+esc(s.nome)+'</span><span class="m">'+esc(s.cosa||'')+'</span>'
+        +(S.modo==='esperto'&&s.comando?'<span class="mono" style="display:block;font-size:10.5px;color:var(--accent-ink);margin-top:5px">'+esc(s.comando)+'</span>':'')
+        +'</span><span class="tag grigio">'+esc(s.durata||'')+'</span>'
+        +'<button class="'+(s.rischio?'bx':'b2')+' sm" onclick="esegui(\''+esc(s.id)+'\')">'+esc(T().run)+'</button></div>').join('')+'</div>'
+    : '<div class="card"><div class="vuoto"><b>'+esc(T().noTools)+'</b>'+esc(T().noToolsWhy)+'</div></div>';
+  h += '<div style="display:flex;align-items:center;gap:10px;margin:16px 0 8px">'
+    +'<span class="k">'+esc(T().output)+'</span><div style="flex:1;height:1px;background:var(--line)"></div>'
+    +'<button class="b3 sm" onclick="S.console=[\'ready.\'];disegnaCentro()">'+esc(T().clear)+'</button></div>'
+    +'<pre class="out" id="uscita">'+S.console.map(r=>esc(r)).join('\n')+'</pre>';
+  return h;
+}
+
+function vistaHF(){
+  let h = '<h1>HuggingFace</h1><p class="sub">'+esc(T().hfSub)+'</p>'
+    +'<div style="display:flex;gap:9px;margin-bottom:13px">'
+    +'<input id="hfq" type="search" placeholder="'+esc(T().searchPh)+'" onkeydown="if(event.key===\'Enter\')cerca()">'
+    +'<button class="b1" onclick="cerca()">'+esc(T().search)+'</button></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
+    +'<span class="pill p-acc">MLX 8 bit</span><span class="pill p-neutro">MLX 4 bit</span>'
+    +'<span class="pill p-neutro">'+esc(T().fits)+' '+gb(disponibiliGB())+' GB</span></div>';
+  S.scarichi.forEach(x => { h += nota(x.stato==='errore'?'n-bad':(x.stato==='in corso'?'n-info':'n-ok'),
+    x.repo, x.stato==='in corso' ? gb(x.gb)+' GB' : (x.errore||'ok')); });
+  h += S.hf.length ? '<div class="card">'+S.hf.map((t,i)=>{
+      const grosso = (t.gb||0)>sogliaGB();
+      return '<div class="riga"><span class="cresci">'
+        +'<span class="mono" style="font-size:11.5px;color:var(--strong);word-break:break-all">'+esc(t.id)+'</span>'
+        +'<span class="m">'+[t.gb?gb(t.gb)+' GB':'', t.formato, t.downloads?t.downloads.toLocaleString(IT()?'it':'en'):'' ].filter(Boolean).map(esc).join(' · ')+'</span></span>'
+        +'<span class="pill '+(grosso?'p-warn':'p-acc')+'">'+esc(grosso?T().cl.esclusivo:T().cl.convivente)+'</span>'
+        +(t.giaPresente?'<span class="pill p-ok">'+esc(T().onDisk)+'</span>'
+          :'<button class="b2 sm" onclick="scarica('+i+')">'+esc((t.gb||0)>disponibiliGB()?T().noRoom:T().download)+'</button>')
+        +'</div>';
+    }).join('')+'</div>' : '';
+  return h;
+}
+async function cerca(){
+  const q = ($('hfq')||{}).value || '';
+  if(!q.trim()) return;
+  try{ S.hf = await api('/api/hf/cerca?q='+encodeURIComponent(q)) || []; }catch(e){ S.hf=[]; }
+  disegnaCentro();
+}
+async function scarica(i){
+  const t = S.hf[i]; if(!t) return;
+  try{ await api('/api/modello/installa',{method:'POST',body:JSON.stringify({repo:t.id})}); }catch(e){ log('! '+e.message); }
+  try{ S.scarichi = await api('/api/hf/stato') || []; }catch(e){}
+  disegnaCentro();
+}
+
+function vistaConfig(){
+  const d = S.doc;
+  /* si apre il primo file da sé: un editor vuoto con tre pulsanti sopra non
+     dice cosa sta guardando. Si carica una volta, non a ogni ridisegno. */
+  if(!d && S.documenti.length && !S.docInCorso){
+    const i = S.documenti.findIndex(x=>x.esiste);
+    if(i>=0){ S.docInCorso = true; apriDoc(i).then(()=>{ S.docInCorso = false; }); }
+  }
+  let h = '<h1>'+esc(T().config)+'</h1><p class="sub">'+esc(T().configSub)+'</p><div class="card">'
+    +'<div class="testa" style="gap:6px;background:var(--inset)">'
+    +S.documenti.map((x,i)=>'<button class="'+(d&&d.id===x.id?'b2':'b3')+' sm" onclick="apriDoc('+i+')"'
+      +(x.esiste?'':' disabled')+'>'+esc(x.nome)+'</button>').join('')
+    +'<div class="sp"></div>'
+    +'<button class="b3 sm" onclick="formatta()">'+esc(T().format)+'</button>'
+    +'<button class="b3 sm" onclick="salvaDoc(false)">'+esc(T().check)+'</button>'
+    +'<button class="b1 sm" onclick="salvaDoc(true)">'+esc(T().save)+'</button></div>'
+    +'<textarea id="editor" spellcheck="false">'+esc(d?d.contenuto:'')+'</textarea>'
+    +'<div class="riga" style="justify-content:space-between"><span class="mono" style="font-size:10px;color:var(--muted)">'
+    +esc(d?d.file:'')+'</span><span id="valido" style="font-size:11.5px"></span></div></div>';
+  return h;
+}
+async function apriDoc(i){
+  const x = S.documenti[i]; if(!x) return;
+  try{
+    S.doc = await api('/api/documento?id='+encodeURIComponent(x.id)+'&formato='+encodeURIComponent(x.formato||'json'));
+    S.docRev = S.doc.revisione||'';
+  }catch(e){ log('! '+e.message); }
+  disegnaCentro();
+}
+function formatta(){
+  const t = $('editor'); if(!t) return;
+  try{ t.value = JSON.stringify(JSON.parse(t.value), null, 2)+'\n'; $('valido').textContent=T().validJSON; }
+  catch(e){ $('valido').textContent = T().invalidJSON; }
+}
+async function salvaDoc(scrivi){
+  if(!S.doc) return;
+  const corpo = {contenuto:$('editor').value, formato:S.doc.formato, revisione:S.docRev, soloValida:!scrivi};
+  try{
+    const r = await api('/api/documento?id='+encodeURIComponent(S.doc.id),{method:'POST',body:JSON.stringify(corpo)});
+    S.docRev = r.revisione || S.docRev;
+    $('valido').textContent = r.messaggio || T().validJSON;
+    if(scrivi) aggiorna();
+  }catch(e){ $('valido').textContent = String(e.message); }
+}
+
+function vistaArchivio(){
+  let h = '<h1>'+esc(T().archive)+'</h1><p class="sub">'+esc(T().archiveSub)+'</p>';
+  if(!S.archivio.length) return h+'<div class="card"><div class="vuoto"><b>'+esc(T().noArchive)+'</b>'+esc(T().noArchiveWhy)+'</div></div>';
+  h += '<div class="card">'+S.archivio.map((a,i)=>'<div class="riga">'
+    +'<span class="cresci"><span class="t">'+esc(a.modello)+'</span>'
+    +'<span class="m">'+[a.gb?gb(a.gb)+' GB':'', a.creato, a.runtime].filter(Boolean).map(esc).join(' · ')+'</span></span>'
+    +(a.ripristinabile?'<button class="b2 sm" onclick="ripristina('+i+')">'+esc(T().restore)+'</button>':'')
+    +'<button class="'+(S.armato==='del:'+i?'bx':'bxq')+' sm" onclick="elimina('+i+')">'
+    +esc(S.armato==='del:'+i?T().pressAgain:T().del)+'</button></div>').join('')+'</div>';
+  return h;
+}
+async function ripristina(i){
+  const a = S.archivio[i]; if(!a) return;
+  try{ await api('/api/modello/ripristina',{method:'POST',body:JSON.stringify({id:a.id})}); }catch(e){ log('! '+e.message); }
+  caricaLento(); aggiorna();
+}
+async function elimina(i){
+  const a = S.archivio[i]; if(!a) return;
+  if(S.armato!=='del:'+i){ S.armato='del:'+i; return disegnaCentro(); }
+  S.armato='';
+  try{ await api('/api/modello/elimina',{method:'POST',body:JSON.stringify({id:a.id,conferma:'ELIMINA '+a.id})}); }
+  catch(e){ log('! '+e.message); }
+  caricaLento();
+}
+
+/* ── inspector ── */
+function disegnaInsp(){
+  $('tab-modello').textContent = T().tabModel; $('tab-aiuto').textContent = T().tabHelp;
+  $('tab-modello').className = S.tab==='modello'?'on':''; $('tab-aiuto').className = S.tab==='aiuto'?'on':'';
+  $('insp-corpo').innerHTML = S.tab==='aiuto' ? inspAiuto() : inspModello();
+  if(S.tab==='aiuto'){ const c=$('insp-corpo'); c.scrollTop=c.scrollHeight; }
+}
+function inspModello(){
+  const m = modelloSel();
+  if(!m) return '<div class="vuoto"><b>'+esc(T().noModels)+'</b>'+esc(T().noModelsWhy)+'</div>';
+  const st=statoDi(m), cl=classeDi(m), tet=tettoGB(), remoto=remotoDi(m);
+  const cr=S.cred[m.runtime]||{}, pr=S.provider[m.runtime]||{};
+  const rt=S.runtime.find(r=>r.chiave===m.runtime)||{};
+  /* «se lo carichi adesso»: la risposta è del verdetto che arriva con la
+     scheda, non di un conto rifatto qui. Le due cose che il verdetto non sa —
+     è remoto, non risponde all'id — le decide lo stato, che viene dallo stesso
+     posto. */
+  let v, vc;
+  if(remoto){ vc='n-info'; v=[IT()?'Non passa da questa memoria':'It does not touch this memory',
+      IT()?'Gira sul server del provider: non occupa RAM e da qui non si ferma.':'Runs on the provider server: no RAM used, no stopping it from here.']; }
+  /* «guasto» ha tre cause diverse, e dirle insieme non aiuta nessuno: il
+     programma non è dichiarato, è dichiarato ma spento, oppure è acceso e non
+     conosce l'id. Sono tutte leggibili da quello che abbiamo già. */
+  else if(st==='guasto'){ vc='n-bad';
+    if(!rt.chiave) v=[IT()?'Il suo programma non è dichiarato qui':'Its program is not declared here',
+      IT()?'«'+(m.runtime||'?')+'» non è fra i runtime in configurazione: il pannello non lo interroga, quindi non può dire se il modello c\'è. Aggiungilo, o togli la voce dai client.'
+         :'"'+(m.runtime||'?')+'" is not among the runtimes in the config: the panel never asks it, so it cannot tell whether the model is there. Add it, or drop the entry from the clients.'];
+    else if(!rt.attivo) v=[IT()?(rt.nome||m.runtime)+' è spento':(rt.nome||m.runtime)+' is off',
+      IT()?'Finché il programma non è acceso nessuno serve questo modello. Accendilo dalla scheda Programmi.'
+         :'While the program is off nobody serves this model. Start it from the Programs tab.'];
+    else v=[IT()?'Non risponde a questo id':'Silent on this id',
+      IT()?'Il programma è acceso ma non conosce l\'identificativo. Controlla il nome in configurazione.':'The program is on but does not know the id. Check the name in the config.']; }
+  else if(st==='in-arrivo'){ vc='n-info'; v=[IT()?'Sta scaricando':'Downloading now',
+      IT()?'Alla fine riavvia il suo programma, perché veda i file nuovi.':'Restart its program at the end so it sees the new files.']; }
+  else if(st==='pronto'||st==='in-memoria'){ vc='n-ok'; v=[T().alreadyIn, T().alreadyInWhy]; }
+  else if(!haVerdetto(m)){ vc='n-warn'; v=[T().unknownWeight,
+      IT()?'Non è mai stato misurato: senza il peso non posso dire se ci sta. Provalo una volta.'
+         :'It was never measured: without a weight I cannot say whether it fits. Test it once.']; }
+  else if(tet && (m.gb||0)>tet){ vc='n-bad'; v=[IT()?'Oltre il tetto per un solo modello':'Over the single model ceiling',
+      IT()?'Servono '+gb(m.gb)+' GB, il tetto è '+tet+'. È il margine del programma, non la RAM.':'It needs '+gb(m.gb)+' GB, the ceiling is '+tet+'. That is the program margin, not the RAM.']; }
+  else if(ciSta(m)){ vc='n-ok'; v=[IT()?'Ci sta adesso':'It fits now', motivoVerdetto(m)
+      +(cl==='esclusivo'?(IT()?' Resta classe esclusivo.':' Still exclusive class.'):'')]; }
+  else { vc='n-warn'; v=[mancanoGB(m)>0 ? (IT()?'Mancano ':'Missing ')+gb(mancanoGB(m))+' GB'
+      : (IT()?'Non ci sta adesso':'It does not fit now'), motivoVerdetto(m)]; }
+
+  const specs = [
+    [T().kClass, T().cl[cl]+(cl==='esclusivo'?' · ≥ '+sogliaGB()+' GB':cl==='convivente'?' · < '+sogliaGB()+' GB':'')],
+    [T().kWeight, remoto?T().elsewhere:(m.gb?gb(m.gb)+' GB':T().notWeighed)],
+    [T().kSpeed, m.misurato?gb(m.tokS)+' tok/s'+(m.provato?' · '+m.provato:''):T().notMeasured],
+    [T().kCtx, Math.round((m.context||0)/1024)+'k token'],
+    [T().kProg, (rt.nome||m.runtime||'')+(S.modo==='esperto'&&rt.porta?' · '+T().port+' '+rt.porta:'')],
+    [T().kReason, m.reasoning?T().yes:T().no],
+    [T().kClients, [m.inPi?'Pi':null, m.inOC?'OpenCode':null].filter(Boolean).join(' · ')||T().none]
+  ];
+  let h = '<div><span class="pill '+pillStato(st)+'">'+esc(T().st[st])+'</span>'
+    +'<h2 style="margin:9px 0 4px;line-height:1.25">'+esc(titoloDi(m))+'</h2>'
+    +'<div class="mono" style="font-size:10px;color:var(--accent-ink);word-break:break-all">'+esc(m.id)+'</div></div>';
+  /* la descrizione la scrive il modellino UNA volta e resta in profili.json:
+     il riquadro c'è sempre, e se è vuoto dice come riempirlo. */
+  if(!remoto) h += '<div class="desc"><div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'
+    +'<span class="k" style="flex:1">'+esc(T().describedBy)+'</span>'
+    +'<button class="b3 sm" style="min-height:24px;padding:0 8px;font-size:11px" onclick="ridescrivi('+JSON.stringify(m.id)+')"'
+    +(S.descrivendo?' disabled':'')+'>'+(S.descrivendo===m.id?'<span class="carica"></span>':'↻')+'</button></div>'
+    +'<p>'+(m.note?esc(m.note):'<span style="color:var(--muted)">'+esc(IT()?'Ancora nessuna: premi ↻ e la scrive il modellino.'
+       :'None yet: press ↻ and the small model writes it.')+'</span>')+'</p></div>';
+  h += '<div class="specs">'+specs.map(([k,x])=>'<div>'+esc(k)+'</div><div>'+esc(x)+'</div>').join('')+'</div>';
+  h += '<div><div class="k" style="margin-bottom:7px">'+esc(T().ifLoaded)+'</div>'+nota(vc,v[0],v[1])+'</div>';
+  if(S.avvisoProva) h += nota('n-warn','',S.avvisoProva);
+  if(S.esitoProva) h += nota('n-ok','',S.esitoProva);
+  if(remoto) h += '<div style="border:1px solid var(--line);border-radius:8px;padding:11px 13px;display:flex;flex-direction:column;gap:7px">'
+    +'<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><span class="k">'+esc(T().keyLabel)+'</span>'
+    +'<span class="mono" style="font-size:11px">'+esc(cr.coda?T().keyEnds+' '+cr.coda:(IT()?'nessuna':'none'))+'</span>'
+    +'<div class="sp"></div><span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px">'
+    +'<span class="dot" style="background:'+(pr.risponde?'var(--ok)':'var(--bad)')+'"></span>'
+    +esc(pr.risponde?(IT()?'risponde':'answering'):(pr.errore||(IT()?'non risponde':'not answering')))+'</span></div>'
+    +'<div style="display:flex;gap:8px"><input id="chiave" type="password" placeholder="'+esc(T().keyNew)+'">'
+    +'<button class="b2 sm" onclick="salvaChiave(\''+esc(m.runtime)+'\')">'+esc(T().keySave)+'</button></div>'
+    +'<div style="font-size:11.5px;color:var(--muted);line-height:1.45">'+esc(T().keyNote)+'</div></div>';
+  h += '<div class="azioni">'
+    +'<button class="b1" onclick="esegui(\'pronto\',{id:'+JSON.stringify(m.id)+'})"'+(st==='pronto'?' disabled':'')+'>'
+      +esc(st==='pronto'?T().isReady:T().makeReady)+'</button>'
+    +'<div class="due"><button class="b2 sm" onclick="prova('+JSON.stringify(m.id)+')"'+(S.provando?' disabled':'')+'>'
+      +(S.provando===m.id?'<span class="carica"></span> ':'')+esc(T().testTime)+'</button>'
+    +'<button class="b2 sm" onclick="esegui(\'libera\',{daFermare:'+JSON.stringify(daFermare(m))+'})">'+esc(T().freeRAM)+'</button></div>'
+    +'<div class="due"><button class="b3 sm" onclick="apriNomi()">'+esc(T().namesClients)+'</button>'
+    +'<button class="'+(S.armato==='arch:'+m.id?'bx':'b3 bxq')+' sm" onclick="archivia('+JSON.stringify(m.id)+')">'
+    +esc(S.armato==='arch:'+m.id?T().pressAgain:T().archiveBtn)+'</button></div></div>';
+  if(S.nomiAperti===m.id) h += formNomi(m);
+  return h;
+}
+function formNomi(m){
+  return '<div style="border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px">'
+    +campo(T().yourName, 'et', m.etichetta||'')
+    +campo(T().menuName, 'nm', m.nome||'')
+    +campo(T().serverId, 'idm', m.id, T().idWarn)
+    +'<label style="display:flex;gap:8px;align-items:center;font-size:12.5px"><input type="checkbox" id="cpi" '+(m.inPi?'checked':'')+' style="width:auto;min-height:0"> '+esc(T().inPi)+'</label>'
+    +'<label style="display:flex;gap:8px;align-items:center;font-size:12.5px"><input type="checkbox" id="coc" '+(m.inOC?'checked':'')+' style="width:auto;min-height:0"> '+esc(T().inOC)+'</label>'
+    +'<button class="b1 sm" onclick="applicaNomi('+JSON.stringify(m.id)+')">'+esc(T().saveChanges)+'</button></div>';
+}
+const campo = (etichetta,id,valore,aiuto) => '<label style="display:flex;flex-direction:column;gap:4px">'
+  +'<span class="k">'+esc(etichetta)+'</span><input id="'+id+'" type="text" value="'+esc(valore)+'">'
+  +(aiuto?'<span style="font-size:11px;color:var(--muted)">'+esc(aiuto)+'</span>':'')+'</label>';
+function apriNomi(){ const m=modelloSel(); S.nomiAperti = S.nomiAperti===m.id?null:m.id; disegnaInsp(); }
+async function applicaNomi(id){
+  const m = S.modelli.find(x=>x.id===id); if(!m) return;
+  const et=($('et')||{}).value||'', nm=($('nm')||{}).value||'', nuovo=($('idm')||{}).value||m.id;
+  if(et!==m.etichetta){ try{ await api('/api/etichetta',{method:'POST',body:JSON.stringify({runtime:m.runtime,id:m.id,etichetta:et})}); m.etichetta=et; }catch(e){} }
+  m.nome=nm; m.id=nuovo; m.inPi=($('cpi')||{}).checked; m.inOC=($('coc')||{}).checked;
+  S.cambiato=true; S.nomiAperti=null; S.sel=nuovo;
+  disegnaTutto();
+}
+async function salva(){
+  try{
+    await api('/api/config',{method:'POST',body:JSON.stringify(S.modelli.filter(m=>m.inPi||m.inOC))});
+    S.cambiato=false;
+    /* si ricarica invece di fidarsi della risposta: /api/config torna le voci
+       nude, senza stato né classe, e assegnarle svuoterebbe la tabella. */
+    return aggiorna();
+  }catch(e){ log('! '+e.message); }
+  disegnaTutto();
+}
+async function archivia(id){
+  const m = S.modelli.find(x=>x.id===id); if(!m) return;
+  if(S.armato!=='arch:'+id){ S.armato='arch:'+id; return disegnaInsp(); }
+  S.armato='';
+  try{ await api('/api/modello/rimuovi',{method:'POST',body:JSON.stringify({id:m.id,runtime:m.runtime})}); }
+  catch(e){ log('! '+e.message); }
+  caricaLento(); aggiorna();
+}
+async function salvaChiave(provider){
+  const v = (($('chiave')||{}).value||'').trim(); if(!v) return;
+  try{
+    const r = await api('/api/credenziale',{method:'POST',body:JSON.stringify({provider,chiave:v})});
+    log((r&&r.verifica)||'ok');
+  }catch(e){ log('! '+e.message); }
+  caricaLento();
+}
+/* nomi e descrizioni: le scrive il modellino e finiscono in profili.json, una
+   volta. Senza `tutte` riempie solo i buchi; con un id rifà quel modello. */
+async function etichetteAuto(tutte){
+  vai('manutenzione');
+  scriviConsole('> '+(IT()?'faccio descrivere i modelli al modellino':'asking the small model to describe the models'));
+  try{
+    const r = await api('/api/etichetta-auto'+(tutte?'?tutte=1':''),{method:'POST'});
+    ((r&&r.fatte)||[]).forEach(f => log('  '+f.id+(f.etichetta?' → '+f.etichetta:'')));
+    log('> '+(IT()?'fatto, ':'done, ')+((r&&r.quante)||0));
+  }catch(e){ log('! '+e.message); }
+  aggiorna();
+}
+async function ridescrivi(id){
+  if(S.descrivendo) return;
+  S.descrivendo = id; disegnaInsp();
+  try{ await api('/api/etichetta-auto?id='+encodeURIComponent(id),{method:'POST'}); }
+  catch(e){ log('! '+e.message); }
+  S.descrivendo = ''; await aggiorna();
+}
+
+function inspAiuto(){
+  const sugg = (S.domande||[]).slice(0,3);
+  let h = S.chat.length ? S.chat.map(m=>'<div class="msg'+(m.io?' io':' md')+'">'+(m.io?esc(m.testo):md(m.testo))+'</div>').join('')
+    : '<div class="msg md">'+esc(IT()?'Vedo cosa sta facendo il Mac adesso. Chiedi cosa c\'è in memoria, perché un modello non parte, o cosa fa un comando.'
+        :'I can see what the Mac is doing right now. Ask what is in memory, why a model will not start, or what a command does.')+'</div>';
+  h += '<div class="sp"></div><div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +sugg.map(q=>'<button class="b3 sm" style="border:1px solid var(--line);font-size:10.5px" onclick="chiedi('+JSON.stringify(q)+')">'
+      +esc(q.length>34?q.slice(0,32)+'…':q)+'</button>').join('')+'</div>'
+    +'<div style="display:flex;gap:8px"><input id="domanda" type="text" placeholder="'+esc(T().askPh)+'" '
+    +'onkeydown="if(event.key===\'Enter\'){chiedi(this.value);this.value=\'\'}">'
+    +'<button class="b1 sm" onclick="var d=$(\'domanda\');chiedi(d.value);d.value=\'\'">'+esc(T().send)+'</button></div>';
+  return h;
+}
+/* markdown minimo: le risposte del modellino arrivano in MD */
+function md(t){
+  let s = esc(t);
+  const blocchi=[];
+  s = s.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,l,c)=>{blocchi.push(c);return '\uE000'+(blocchi.length-1)+'\uE000';});
+  s = s.replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  s = s.replace(/(?:^[-*] .+\n?)+/gm,b=>'<ul>'+b.trim().split('\n').map(r=>'<li>'+r.replace(/^[-*] /,'')+'</li>').join('')+'</ul>');
+  s = s.split(/\n{2,}/).map(p=>/^<(ul|pre)/.test(p.trim())?p:'<p>'+p.replace(/\n/g,'<br>')+'</p>').join('');
+  return s.replace(/\uE000(\d+)\uE000/g,(_,i)=>'<pre><code>'+blocchi[i]+'</code></pre>');
+}
+
+function disegnaPiede(){
+  /* l'indirizzo è quello da cui la pagina è arrivata: la porta la decide la
+     configurazione, e scriverla qui la farebbe mentire su un'altra macchina. */
+  const dove = '<span class="k">'+esc(location.host||'127.0.0.1')+'</span>';
+  $('metriche').innerHTML = totaleGB()
+    ? metrica(T().used, gb(occupatiGB())+' / '+gb(totaleGB())+' GB')
+      +metrica(T().available, gb(disponibiliGB())+' GB')
+      +metrica(T().threshold, sogliaGB()+' GB', 'opz')
+      +metrica(T().ceilingShort, tettoGB()?tettoGB()+' GB':'—', 'opz')
+      +dove
+    : dove;
+  $('seg-tema').innerHTML = [['auto',T().themeAuto],['chiaro',T().themeLight],['scuro',T().themeDark]]
+    .map(([k,n])=>'<button class="'+(S.tema===k?'on':'')+'" onclick="setTema(\''+k+'\')">'+esc(n)+'</button>').join('');
+  $('seg-lingua').innerHTML = ['en','it']
+    .map(k=>'<button class="'+(LINGUA===k?'on':'')+'" onclick="setLingua(\''+k+'\')">'+k.toUpperCase()+'</button>').join('');
+}
+function setTema(k){ S.tema=k; localStorage.setItem('tema',k); applicaTema(); disegnaPiede(); }
+function setLingua(k){ LINGUA=k; localStorage.setItem('lingua',k); document.documentElement.lang=k; S.chat=[]; disegnaTutto(); }
+
+/* ── palette ── */
+function apriCmdk(v){
+  $('velo').classList.toggle('on', !!v);
+  if(v){ $('q').value=''; disegnaCmdk(); setTimeout(()=>$('q').focus(),30); }
+}
+let CMDK = {lista:[], sel:0, proposta:null};
+function disegnaCmdk(){
+  const r = interpreta($('q').value);
+  CMDK.lista = r.lista || []; CMDK.proposta = r.proposta || null; CMDK.sel = 0;
+  const sug = suggeriti();
+  let h='';
+  if(r.lettura && r.lettura.length) h += '<div class="capito"><span class="k">'+esc(T().understood)+'</span>'
+    +r.lettura.map(x=>'<span class="v">'+esc(x)+'</span>').join('')+'</div>';
+  if(r.proposta) h += '<div class="prop"><div style="flex:1;min-width:0"><b>'+esc(r.proposta.nome)+'</b>'
+    +'<div class="c">'+esc(r.proposta.cosa)+'</div>'
+    +(r.proposta.avviso?'<div class="w">'+esc(r.proposta.avviso)+'</div>':'')+'</div>'
+    +'<button class="'+(r.proposta.pericolo?'bx':'b1')+' sm" onclick="eseguiProposta()">'+esc(T().confirm)+' ⏎</button></div>';
+  if(r.vuoto && sug.length){
+    window.SUGK = sug.map(s=>s.fa);
+    h += '<div class="vedo"><div class="k" style="color:var(--accent-ink);margin-bottom:3px">'+esc(T().fromWhatISee)+'</div>'
+      +sug.map((s,i)=>'<button onclick="SUGK['+i+']();apriCmdk(false)"><span class="fr">→</span><span style="flex:1;min-width:0">'
+        +'<b>'+esc(s.nome)+'</b><i>'+esc(s.motivo)+'</i></span></button>').join('')+'</div>';
+  }
+  h += '<div class="lista"><div class="k" style="padding:7px 12px 3px">'+esc(r.vuoto?T().commands:T().alsoThese)+'</div>'
+    +CMDK.lista.map((c,i)=>'<button class="'+(i===CMDK.sel?'sel':'')+'" onclick="esegui(\''+esc(c.id)+'\')">'
+      +'<span class="nm">'+esc(nomeCmd(c))+'</span><kbd>'+esc(c.gruppo)+'</kbd></button>').join('')+'</div>';
+  $('cmdk-corpo').innerHTML = h;
+  $('cmdk-piede').innerHTML = ['footChoose','footRun','footClose'].map(k=>'<span>'+esc(T()[k])+'</span>').join('')
+    +'<span style="margin-left:auto">'+esc(T().footLocal)+'</span>';
+}
+function eseguiProposta(){ if(CMDK.proposta) esegui(CMDK.proposta.id, CMDK.proposta.extra); }
+function tastiCmdk(e){
+  if(e.key==='Enter'){ e.preventDefault(); return eseguiProposta(); }
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    CMDK.sel = Math.max(0, Math.min(CMDK.lista.length-1, CMDK.sel + (e.key==='ArrowDown'?1:-1)));
+    const b = document.querySelectorAll('#cmdk .lista button');
+    b.forEach((x,i)=>x.classList.toggle('sel', i===CMDK.sel));
+  }
+}
+addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); apriCmdk(true); }
+  if(e.key==='Escape') apriCmdk(false);
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='s' && S.schermo==='config'){ e.preventDefault(); salvaDoc(true); }
+});
+addEventListener('beforeunload', e=>{ if(S.cambiato){ e.preventDefault(); e.returnValue=''; } });
+
+/* ── avvio ── */
+document.documentElement.lang = LINGUA;
+applicaTema();
+setInterval(()=>{ if(S.tema==='auto' && !document.hidden) applicaTema(); }, 30000);
+disegnaTutto();
+aggiorna().then(()=>{ caricaLento(); avviaPolling(); });
+</script>
+</body>
+</html>
