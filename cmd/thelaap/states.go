@@ -1,6 +1,6 @@
 package main
 
-// stati.go — la macchina a stati dei modelli, in un posto solo.
+// states.go — la macchina a stati dei modelli, in un posto solo.
 //
 // Perché sta qui e non nella pagina: stato e classe li devono leggere il
 // pannello, la voce nella barra dei menu e qualunque script. Calcolati nella

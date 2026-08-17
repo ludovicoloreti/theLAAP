@@ -161,7 +161,7 @@ var (
 
 // scarichiInCorso: i repo che stiamo scaricando adesso.
 //
-// Sta qui, accanto alla mappa, perché la fonte deve essere una: stati.go la usa
+// Sta qui, accanto alla mappa, perché la fonte deve essere una: states.go la usa
 // per dire "in-arrivo" e /api/hf/stato per disegnare l'avanzamento. Se le due
 // cose leggessero due posti diversi, un modello potrebbe risultare spento
 // mentre la barra del download cresce.

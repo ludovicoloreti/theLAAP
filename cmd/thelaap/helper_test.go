@@ -1,6 +1,6 @@
 package main
 
-// aiuto_test.go — le due regole che decidono chi scrive le etichette e come si
+// helper_test.go — le due regole che decidono chi scrive le etichette e come si
 // chiamano i modelli. Sono le parti che si possono provare senza far girare il
 // modellino: la scelta della taglia e il rifiuto dei doppioni.
 //

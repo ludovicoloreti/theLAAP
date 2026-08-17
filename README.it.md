@@ -87,7 +87,7 @@ Ogni etichetta è cliccabile e si spiega da sé, con l'elenco di chi ci sta dent
 in quel momento. Le due parole non sono sinonimi: un modello può essere `spento`
 e `esclusivo`, cioè non caricato e tale che, caricandolo, pretende la macchina.
 
-**Stato e classe li calcola il server, in `stati.go`.** La pagina li legge da
+**Stato e classe li calcola il server, in `states.go`.** La pagina li legge da
 `/api/modelli` e non li rifà: la soglia oltre la quale un modello è `esclusivo` è
 la stessa `SogliaGrandeByte` che `budget.go` usa per rifiutare il secondo modello
 grande. Con due calcoli separati il pannello finirebbe per scrivere «convivente»
@@ -116,7 +116,7 @@ sue voci da `/api/comandi` ed esegue sulla rotta che ogni voce dichiara. Nello
 Swift non c'è nessun id e nessuna rotta: prima ce n'erano quattro, tenuti
 allineati al sorgente Go da un test statico. Tenere allineati due elenchi è
 meglio che non farlo, ma resta un elenco di troppo. Ora
-`menubar_contratto_test.go` verifica il contrario — che nello Swift non
+`menubar_contract_test.go` verifica il contrario — che nello Swift non
 ricompaia nessun id — e che il registro venga chiesto davvero.
 
 Effetto collaterale utile: i regimi compaiono nel menu della barra, dove non
@@ -154,7 +154,7 @@ Cliccando una riga, la colonna di destra: la descrizione, la tabella delle carat
 
 I parametri si leggono dal nome, e sono quelli **totali** a contare. In `gemma-4-26b-a4b` la sigla «a4b» sono i parametri *attivi* di un modello a esperti: dicono la velocità, non il peso — in memoria ce ne stanno 26. Ignorata anche la quantizzazione, perché `-8bit` non sono 8 miliardi. Un nome che dichiara solo gli attivi vale zero e non è eleggibile: contarlo vorrebbe dire chiamare 3B un modello che può pesarne trenta.
 
-Chi non sa conversare è escluso — OCR, embedding, trascrizione, diffusione — e a dirlo è `indizi()` in `profili.go`, la stessa tabella che l'interfaccia mostra accanto al modello: un secondo elenco di parole chiave qui divergerebbe dal primo.
+Chi non sa conversare è escluso — OCR, embedding, trascrizione, diffusione — e a dirlo è `indizi()` in `profiles.go`, la stessa tabella che l'interfaccia mostra accanto al modello: un secondo elenco di parole chiave qui divergerebbe dal primo.
 
 Se fra i modelli serviti non c'è niente di piccolo si usa quello che c'è — senza aiuto il pannello perde le descrizioni e la chat — ma **la barra laterale lo scrive**, invece di mostrare un 26B come se fosse normale. Per non lasciarlo decidere alla macchina: `"modelloAiuto": "id-del-modello"` in configurazione, che ha la precedenza.
 
@@ -283,8 +283,8 @@ numeri diversi vorrebbero dire un pannello che promette ciò che il server nega.
 | servizi | `launchctl` | `systemctl --user` | comandi diretti |
 | voce nella barra | sì (Swift) | no, solo il pannello | no, solo il pannello |
 
-Sono file separati con un vincolo di compilazione (`sistema_darwin.go`,
-`sistema_linux.go`, `sistema_windows.go`): il resto del programma non sa su cosa
+Sono file separati con un vincolo di compilazione (`system_darwin.go`,
+`system_linux.go`, `system_windows.go`): il resto del programma non sa su cosa
 sta girando. Verificato con la compilazione incrociata per macOS arm64, Linux
 amd64 e arm64, Windows amd64.
 
@@ -328,7 +328,7 @@ passare. È quello che fa ora `eseguiComando()`. Il **pannello web non era inter
 usa gli id dinamici e fa POST col token.
 
 **Lezione**: due programmi che si parlano via HTTP hanno un contratto, e un contratto non
-verificato marcisce. Ora c'è `menubar_contratto_test.go`, che legge il sorgente Swift e
+verificato marcisce. Ora c'è `menubar_contract_test.go`, che legge il sorgente Swift e
 controlla metodo, id e etichette. Validato reintroducendo i cinque difetti uno per uno —
 la prima versione era da buttare perché chiamava `comandoAmmesso`, che nei test legge una
 `cfg()` vuota: falliva sempre, quindi non distingueva il codice giusto da quello rotto.
@@ -424,7 +424,7 @@ punto solo: falliscono entrambi.
 un'altra voce che non faceva niente: «Riavvia» nel menu della barra costruiva la
 sua `curl` a mano, senza `Origin` e senza token. Il pannello rispondeva **403**,
 l'output finiva in `/dev/null`, e la notifica diceva comunque «Riavvio in corso,
-ci vuole qualche secondo». `menubar_contratto_test.go` non l'ha presa perché
+ci vuole qualche secondo». `menubar_contract_test.go` non l'ha presa perché
 controllava che nello Swift non ricomparissero **id di comando**, e quella riga
 non ne cablava uno: cablava una rotta e un corpo. Ora il riavvio viene dal
 registro come tutto il resto, cercato per servizio, e se il registro non ce l'ha
@@ -462,17 +462,17 @@ team Go.
 | `probe.go` | prova un modello: velocità e rilevamento del ragionamento |
 | `memory.go` | memoria da `vm_stat`, tetto da oMLX, modelli caricati; con cache e monitor in sottofondo |
 | `services.go` | accensione dei servizi e comandi in lista chiusa, con output in diretta |
-| `regimi.go` | configurazioni di macchina che si accendono e spengono tutte insieme |
+| `regimes.go` | configurazioni di macchina che si accendono e spengono tutte insieme |
 | `internal/budget/budget.go` | l'arbitro: decide se un modello ci sta, prima di caricarlo. Nessun I/O, imposto dal compilatore |
-| `stati.go` | stato e classe di ogni modello, e il registro dei comandi eseguibili: `/api/modelli` e `/api/comandi` |
+| `states.go` | stato e classe di ogni modello, e il registro dei comandi eseguibili: `/api/modelli` e `/api/comandi` |
 | `footprint*.go` | quanto occupa davvero un processo, per sistema operativo |
-| `adattatori.go` | cosa sa fare ogni programma: scarico per modello, o solo stop |
-| `sicurezza.go` | guardia delle rotte: localhost, `Host`, Origin e token |
+| `runtimes.go` | cosa sa fare ogni programma: scarico per modello, o solo stop |
+| `security.go` | guardia delle rotte: localhost, `Host`, Origin e token |
 | `hf.go` | ricerca e scaricamento da HuggingFace |
-| `modelli.go` | esame, archiviazione, ripristino ed eliminazione sicura dei modelli sul disco |
+| `models.go` | esame, archiviazione, ripristino ed eliminazione sicura dei modelli sul disco |
 | `rag.go` | il manuale dell'app + la fotografia dello stato, per il modello che risponde |
-| `spiega.go` | quale modellino risponde (il più piccolo che conversa) e le regole di risposta |
-| `etichette.go` | nomi e descrizioni scritti dal modellino, distinti fra loro e senza gergo |
+| `explain.go` | quale modellino risponde (il più piccolo che conversa) e le regole di risposta |
+| `labels.go` | nomi e descrizioni scritti dal modellino, distinti fra loro e senza gergo |
 | `menubar/theLAAP.swift` | la voce nella barra di stato, la finestra vera e il menu in alto |
 | `ui.html` | tutta l'interfaccia, incorporata nel binario |
 | `build.sh` | compila, firma, e crea l'app per macOS |
@@ -484,11 +484,11 @@ rompendo la regola prima di scriverla:
 | Test | Cosa difende |
 |---|---|
 | `budget_test.go` | lo scenario del kernel panic del 27/07/2026 |
-| `stati_test.go` | stato, classe e registro dei comandi: una fonte sola |
-| `aiuto_test.go` | la taglia si legge dai parametri totali; i nomi sono distinti e non gergo |
-| `menubar_contratto_test.go` | la barra dei menu non cabla id, legge il registro, e dice lo stesso numero del pannello |
-| `sicurezza_test.go` | localhost, `Host`, Origin, token, solo POST; e le rotte di configurazione chiuse anche in lettura |
-| `editor_test.go` `config_test.go` `modelli_test.go` `regimi_test.go` `misura_test.go` `server_test.go` | editor, configurazioni, disco, regimi, misure, rotte |
+| `states_test.go` | stato, classe e registro dei comandi: una fonte sola |
+| `helper_test.go` | la taglia si legge dai parametri totali; i nomi sono distinti e non gergo |
+| `menubar_contract_test.go` | la barra dei menu non cabla id, legge il registro, e dice lo stesso numero del pannello |
+| `security_test.go` | localhost, `Host`, Origin, token, solo POST; e le rotte di configurazione chiuse anche in lettura |
+| `editor_test.go` `config_test.go` `models_test.go` `regimes_test.go` `measure_test.go` `server_test.go` | editor, configurazioni, disco, regimi, misure, rotte |
 
 ## Cosa non entra nel repository
 

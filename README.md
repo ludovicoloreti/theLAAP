@@ -74,7 +74,7 @@ class    coexisting · exclusive · resident · remote
 They are not synonyms. A model can be `off` and `exclusive`: not loaded, and such that
 loading it demands the machine to itself.
 
-Both come from `/api/modelli`, computed in `stati.go`. The threshold above which a
+Both come from `/api/modelli`, computed in `states.go`. The threshold above which a
 model is `exclusive` is **the same** `SogliaGrandeByte` the arbiter uses to refuse the
 second large model. With two separate numbers the panel would label a model
 "coexisting" while the preflight rejects it, and nobody would notice.
@@ -160,7 +160,7 @@ NSWindow + WKWebView           127.0.0.1:7070, localhost only
         +--------- HTTP + token -------+
                        |
         +--------------+--------------+
-    budget.go       stati.go      memory.go
+    budget.go       states.go      memory.go
     the arbiter    state/class    the measure
 ```
 
@@ -202,10 +202,10 @@ does not tell correct code from broken code is not a test.
 | | |
 |---|---|
 | `budget_test.go` | the 27/07/2026 kernel panic scenario, without risking the machine |
-| `stati_test.go` | state, class and the command registry: one source |
-| `aiuto_test.go` | size read from total parameters; names distinct and jargon free |
-| `menubar_contratto_test.go` | the menu bar hardcodes no id, reads the registry, and reports the same number as the panel |
-| `sicurezza_test.go` | localhost, `Host`, Origin, token, POST only; config routes closed to unauthenticated reads |
+| `states_test.go` | state, class and the command registry: one source |
+| `helper_test.go` | size read from total parameters; names distinct and jargon free |
+| `menubar_contract_test.go` | the menu bar hardcodes no id, reads the registry, and reports the same number as the panel |
+| `security_test.go` | localhost, `Host`, Origin, token, POST only; config routes closed to unauthenticated reads |
 
 ```bash
 go test ./...

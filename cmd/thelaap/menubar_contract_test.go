@@ -13,7 +13,7 @@ import (
 // che erano scollegati da tempo, in tre modi diversi e tutti silenziosi:
 //
 //   1. lo Swift chiamava /api/esegui in GET, ma la rotta accetta solo POST da
-//      quando è stata chiusa la falla CSRF (vedi services.go e sicurezza_test.go);
+//      quando è stata chiusa la falla CSRF (vedi services.go e security_test.go);
 //   2. mandava cmd=laguna-on / laguna-off, mentre gli strumenti registrati si
 //      chiamano modello-grande-on / modello-grande-off;
 //   3. mandava cmd=stoppa-tutto, mentre comandoAmmesso conosce ferma-tutto.
@@ -62,7 +62,7 @@ func TestMenubarNonCablaNessunComando(t *testing.T) {
 			ammessi[m[1]] = true
 		}
 	}
-	for _, b := range mustRead(t, "configurazione.go") {
+	for _, b := range mustRead(t, "setup.go") {
 		for _, m := range regexp.MustCompile(`ID:\s*"([a-z0-9-]+)"`).FindAllStringSubmatch(b, -1) {
 			ammessi[m[1]] = true
 		}

@@ -35,7 +35,7 @@ var (
 	PI_CFG = home(".pi/agent/models.json")
 	OC_CFG = home(".config/opencode/opencode.json")
 	// Accanto alla configurazione, per la stessa ragione di PROFILI in
-	// profili.go: dentro la cartella del progetto — che qui sta sul Desktop —
+	// profiles.go: dentro la cartella del progetto — che qui sta sul Desktop —
 	// ogni accesso passa da TCC, e da una .app quello si traduce in un blocco
 	// silenzioso. Qui il danno sarebbe più insidioso che all'avvio: il backup
 	// si scrive appena prima di sovrascrivere una configurazione.

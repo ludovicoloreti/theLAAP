@@ -1,15 +1,15 @@
 package main
 
-// stati_test.go — la macchina a stati provata sui casi che sono già costati
+// states_test.go — la macchina a stati provata sui casi che sono già costati
 // qualcosa su questa macchina, senza toccare la macchina.
 //
-// Il metro l'ha stabilito menubar_contratto_test.go: un test che non distingue
+// Il metro l'ha stabilito menubar_contract_test.go: un test che non distingue
 // il codice giusto da quello rotto non serve. Per questo il registro dei comandi
 // si prova con una configurazione finta caricata a mano — con cfg() vuota
 // comandi() non restituisce niente e il test passerebbe senza guardare nulla.
 //
 // Lo scenario dei due modelli grandi insieme (27/07/2026) sta già in
-// budget_test.go: qui si prova che stati.go usa QUELLA soglia, non una sua.
+// budget_test.go: qui si prova che states.go usa QUELLA soglia, non una sua.
 
 import (
 	"encoding/json"

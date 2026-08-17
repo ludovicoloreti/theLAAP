@@ -421,7 +421,7 @@ const T = () => L[LINGUA];
 const IT = () => LINGUA === 'it';
 
 /* Il glossario: una riga per voce, la stessa che il pannello mostra.
-   Le chiavi sono quelle del server (stati.go), non un secondo vocabolario. */
+   Le chiavi sono quelle del server (states.go), non un secondo vocabolario. */
 const LESSICO = {
 pronto:{tipo:'st',en:"Answers now with no wait: already loaded and pinned at the top. There is only ever one ready model.",it:"Risponde adesso senza attese: già caricato e in cima. Di modelli pronti ce n'è sempre uno solo."},
 'in-memoria':{tipo:'st',en:"Loaded by its program but not the one on top. It uses RAM even while idle.",it:"Caricato dal suo programma ma non è quello in cima. Usa RAM anche mentre non lo usi."},
@@ -486,7 +486,7 @@ const S = {
 
 /* ────────────────────────────────────────────────────────────────
    I numeri della macchina e il giudizio sui modelli arrivano da
-   /api/modelli (stati.go), che li calcola dove stanno già le misure.
+   /api/modelli (states.go), che li calcola dove stanno già le misure.
    Qui NON si ricalcola niente: se la pagina rifacesse la soglia a modo
    suo, direbbe «convivente» su un modello che l'arbitro rifiuta.
    ──────────────────────────────────────────────────────────────── */

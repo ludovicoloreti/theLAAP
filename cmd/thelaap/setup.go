@@ -68,7 +68,7 @@ type Config struct {
 	FermaTutto     string         `json:"fermaTutto,omitempty"`
 	RiaccendiTutto string         `json:"riaccendiTutto,omitempty"`
 	// Configurazioni di macchina che si accendono e si spengono tutte insieme.
-	// Vedi regimi.go.
+	// Vedi regimes.go.
 	Regimi []RegimeCfg `json:"regimi,omitempty"`
 	// Quanta memoria lasciare al sistema operativo, in GB. Sotto questa soglia
 	// il Mac comincia a comprimere e poi a scrivere su disco, e da lì al blocco
@@ -237,7 +237,7 @@ type candidato struct {
 	comandi  []string // eseguibili da cercare nel PATH
 	caricati string   // comando che elenca i modelli in memoria
 	// Su macOS l'etichetta launchd NON si dichiara: cambia da installazione a
-	// installazione e viene scoperta (etichettaLaunchd in sistema_darwin.go).
+	// installazione e viene scoperta (etichettaLaunchd in system_darwin.go).
 	unitaLinux string // unità systemd --user, se usa systemd
 	// Come togliere UN solo modello dalla memoria. {modello} = il nome.
 	// Vuoto = non sa farlo, e `notaScarico` spiega perché.

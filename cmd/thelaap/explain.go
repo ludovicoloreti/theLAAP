@@ -55,7 +55,7 @@ func parametriMiliardi(id string) float64 {
 // I mestieri che non sono conversare. Un OCR o un embedding non sanno rispondere
 // a una domanda, e proporglielo è farli fallire.
 //
-// I tratti li deduce indizi() in profili.go, la stessa tabella che l'interfaccia
+// I tratti li deduce indizi() in profiles.go, la stessa tabella che l'interfaccia
 // mostra accanto al modello. Scrivere qui un secondo elenco di parole chiave
 // voleva dire tenerne due allineati a mano — e il primo tentativo non conosceva
 // «bge-», che è una delle famiglie di embedding più diffuse: l'avrebbe proposto

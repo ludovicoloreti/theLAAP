@@ -45,7 +45,7 @@ func trunc(s string, n int) string {
 
 func sprint(v any) string { return fmt.Sprint(v) }
 
-// La guardia delle rotte sta in sicurezza.go: localhost per tutto, piu'
+// La guardia delle rotte sta in security.go: localhost per tutto, piu'
 // Origin/Referer e token per ciò che muta stato.
 
 // rotte: la tabella delle rotte, una sola.
@@ -113,7 +113,7 @@ func rotte(pagina string) *http.ServeMux {
 	mux.HandleFunc("/api/modello/ripristina", guardia(soloPost(apiRipristinaModello)))
 	mux.HandleFunc("/api/modello/elimina", guardia(soloPost(apiEliminaArchivio)))
 	mux.HandleFunc("/api/schede", guardia(apiSchede))
-	// Stato, classe e verdetto calcolati dove stanno già i numeri (stati.go).
+	// Stato, classe e verdetto calcolati dove stanno già i numeri (states.go).
 	// La pagina li legge, non li rifà: con due calcoli separati il pannello
 	// finirebbe per dire «convivente» su un modello che l'arbitro rifiuta.
 	mux.HandleFunc("/api/modelli", guardia(apiModelli))
