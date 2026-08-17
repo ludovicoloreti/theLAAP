@@ -13,7 +13,7 @@ before it takes the machine down. Two axes per model, computed once on the serve
 [![Swift](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white)](#-install)
 [![Dependencies](https://img.shields.io/badge/dependencies-1-brightgreen)](go.mod)
-[![Tests](https://img.shields.io/badge/tests-65-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-73-success)](#-tests)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **English** · [Italiano](README.it.md)
@@ -205,7 +205,7 @@ does not tell correct code from broken code is not a test.
 | `stati_test.go` | state, class and the command registry: one source |
 | `aiuto_test.go` | size read from total parameters; names distinct and jargon free |
 | `menubar_contratto_test.go` | the menu bar hardcodes no id, reads the registry, and reports the same number as the panel |
-| `sicurezza_test.go` | localhost, Origin, token, POST only |
+| `sicurezza_test.go` | localhost, `Host`, Origin, token, POST only; config routes closed to unauthenticated reads |
 
 ```bash
 go test ./...
@@ -252,11 +252,23 @@ The long version, with the call graphs and the numbers, is in the
 
 - Listens on `127.0.0.1` only and refuses anything that does not come from localhost.
   Services get restarted from here.
-- Executable commands are a closed list. No user text ever reaches a shell.
-- Model names come from third party repositories: always escaped before they reach the
-  page, never placed inside an `onclick`.
+- **`Host` is checked on every request, reads included.** Checking the source address is
+  not enough: it is the user's own browser making the request, so it stays `127.0.0.1`
+  whichever page asked. A domain that resolves to `127.0.0.1` would otherwise become
+  same origin with the panel and get to read its answers.
+- Anything that mutates state needs `Origin` plus a token, regenerated at every start
+  and never written to disk.
+- **The routes that return client config files ask for the token in reads too.** Those
+  files are where the panel writes provider keys.
+- Executable commands are a closed list, resolved from local config by id. No text from
+  a request ever reaches a shell.
+- Model names come from third party repositories. Inside an `onclick` they are escaped
+  for both parsers, the HTML attribute and the JavaScript string: escaping for one only
+  is what left ten buttons dead, silently, until someone tried to click them.
 - Config writes go through a backup, a temporary file and a rename, and refuse to
   overwrite an external change in silence.
+- Archive deletion resolves the path against the archive root, rejecting `..`, absolute
+  paths and a symlink in any component.
 - Provider keys are read to make the request and never leave the process. The panel
   shows the last four digits and nothing else.
 

@@ -14,7 +14,7 @@ volta sola sul server.
 [![Swift](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white)](#-installazione)
 [![Dipendenze](https://img.shields.io/badge/dipendenze-1-brightgreen)](go.mod)
-[![Test](https://img.shields.io/badge/test-65-success)](#i-file)
+[![Test](https://img.shields.io/badge/test-73-success)](#i-file)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-blue)](LICENSE)
 
 [English](README.md) · **Italiano**
@@ -295,14 +295,18 @@ messaggio che dice cosa fare.
 ## Sicurezza
 
 - Ascolta **solo** su `127.0.0.1` e rifiuta le richieste che non arrivano da localhost: da qui si riavviano servizi.
-- I comandi eseguibili sono una lista chiusa; nessun testo scritto dall'utente finisce in una shell.
-- I nomi dei modelli arrivano da repository di terzi: vengono sempre ripuliti prima di finire nella pagina, e non vengono mai messi dentro un `onclick`.
+- **L'intestazione `Host` è controllata su ogni richiesta, letture comprese.** Guardare l'indirizzo di partenza non basta: è il browser dell'utente a mandare la richiesta, quindi resta `127.0.0.1` qualunque pagina l'abbia chiesta. Un dominio che risolve a `127.0.0.1` diventerebbe altrimenti same-origin col pannello e potrebbe leggerne le risposte.
+- Tutto ciò che muta stato pretende `Origin` più un token, rigenerato a ogni avvio e mai scritto su disco.
+- **Le rotte che restituiscono i file dei client chiedono il token anche in lettura**: è lì che il pannello scrive le chiavi dei provider.
+- I comandi eseguibili sono una lista chiusa, risolta per id dalla configurazione locale; nessun testo della richiesta finisce in una shell.
+- I nomi dei modelli arrivano da repository di terzi. Dentro un `onclick` sono sfuggiti per **entrambi** i parser, l'attributo HTML e la stringa JavaScript: sfuggirli per uno solo è ciò che ha lasciato dieci pulsanti morti, in silenzio, fino a che qualcuno non ha provato a cliccarli.
+- La cancellazione dall'archivio risolve il percorso dentro la radice dell'archivio, rifiutando `..`, i percorsi assoluti e un symlink in qualunque componente.
 - Prima di scrivere le configurazioni fa una copia di sicurezza, scrive su file temporaneo e poi rinomina. Rifiuta JSON/YAML non valido e non sovrascrive in silenzio modifiche esterne. Una lista modelli vuota è consentita: serve per poter rimuovere anche l'ultimo modello.
 - Lo stato operativo resta nei file di Pi e OpenCode; theLAAP conserva soltanto etichette/misure e i manifesti necessari a ripristinare i modelli archiviati.
 
 ## Note tecniche imparate a caro prezzo
 
-Nove note, e la numero 3 è la correzione di quello che questa stessa sezione affermava.
+Dieci note, e la numero 3 è la correzione di quello che questa stessa sezione affermava.
 Lasciarla riscritta invece di cancellarla è il punto: la diagnosi sbagliata era plausibile,
 ed è per questo che è costata mesi.
 
@@ -391,6 +395,41 @@ freno di due minuti.
 
 **8. `lms ps` costa 4 secondi** — è Node e riparte ogni volta. Con la pagina che si aggiorna ogni 5 secondi teneva la richiesta sempre in attesa. Ora un lavoratore in sottofondo tiene pronta la fotografia: **da 4100 ms a 0 ms**. E ogni comando esterno ha un tetto di tempo, perché uno che si impianta non deve bloccare il resto.
 
+**9. Sfuggire il testo per un parser solo lascia i pulsanti morti in silenzio.**
+La pagina costruisce i gestori come testo HTML, quindi un argomento che finisce
+dentro `onclick="..."` deve sopravvivere prima al parser degli attributi e poi a
+quello di JavaScript. `JSON.stringify` emette virgolette **doppie**, e
+`onclick="scegli('+JSON.stringify(m.id)+')"` viene reso come:
+
+```
+onclick="scegli("coder")"
+```
+
+Il browser chiude l'attributo alla seconda virgoletta: il gestore diventa
+`scegli(` e accanto compare un attributo parassita chiamato `coder")"`. Non è un
+errore, non finisce in console, non si vede nel sorgente: è solo un elemento che
+al clic non risponde. Dieci punti, fra cui **ogni riga della tabella dei
+modelli** e le domande suggerite nel pannello di aiuto.
+
+Non l'avevo visto perché nelle verifiche chiamavo le funzioni da JavaScript
+invece di cliccare: `scegli('coder')` funziona benissimo: è l'attributo che non
+arriva mai a chiamarla. **Lezione**: una interfaccia si prova cliccandola. Il
+resto verifica il modello, non la pagina.
+
+Ora c'è `arg()`, che mette gli apici singoli e sfugge per entrambi i contesti, e
+due test che leggono la pagina incorporata. Validati rimettendo il difetto in un
+punto solo: falliscono entrambi.
+
+**Corollario, e ricaduta della nota 0.** Cercando i gestori rotti è venuta fuori
+un'altra voce che non faceva niente: «Riavvia» nel menu della barra costruiva la
+sua `curl` a mano, senza `Origin` e senza token. Il pannello rispondeva **403**,
+l'output finiva in `/dev/null`, e la notifica diceva comunque «Riavvio in corso,
+ci vuole qualche secondo». `menubar_contratto_test.go` non l'ha presa perché
+controllava che nello Swift non ricomparissero **id di comando**, e quella riga
+non ne cablava uno: cablava una rotta e un corpo. Ora il riavvio viene dal
+registro come tutto il resto, cercato per servizio, e se il registro non ce l'ha
+la voce resta inerte invece di promettere.
+
 ## I file
 
 ```
@@ -416,7 +455,7 @@ team Go.
 
 | File | Cosa fa |
 |---|---|
-| `main.go` | server, rotte, guardia localhost, pagina incorporata |
+| `main.go` | server, tabella delle rotte (`rotte()`, quella vera anche per i test), pagina incorporata |
 | `discovery.go` | interroga i quattro programmi in parallelo |
 | `config.go` | legge e scrive le configurazioni di Pi e OpenCode, traducendo fra i due formati |
 | `editor.go` | editor sicuro JSON/YAML, conversione, validazione, backup e controllo dei conflitti |
@@ -428,7 +467,7 @@ team Go.
 | `stati.go` | stato e classe di ogni modello, e il registro dei comandi eseguibili: `/api/modelli` e `/api/comandi` |
 | `footprint*.go` | quanto occupa davvero un processo, per sistema operativo |
 | `adattatori.go` | cosa sa fare ogni programma: scarico per modello, o solo stop |
-| `sicurezza.go` | guardia delle rotte: localhost, Origin e token |
+| `sicurezza.go` | guardia delle rotte: localhost, `Host`, Origin e token |
 | `hf.go` | ricerca e scaricamento da HuggingFace |
 | `modelli.go` | esame, archiviazione, ripristino ed eliminazione sicura dei modelli sul disco |
 | `rag.go` | il manuale dell'app + la fotografia dello stato, per il modello che risponde |
@@ -448,7 +487,7 @@ rompendo la regola prima di scriverla:
 | `stati_test.go` | stato, classe e registro dei comandi: una fonte sola |
 | `aiuto_test.go` | la taglia si legge dai parametri totali; i nomi sono distinti e non gergo |
 | `menubar_contratto_test.go` | la barra dei menu non cabla id, legge il registro, e dice lo stesso numero del pannello |
-| `sicurezza_test.go` | localhost, Origin, token, solo POST |
+| `sicurezza_test.go` | localhost, `Host`, Origin, token, solo POST; e le rotte di configurazione chiuse anche in lettura |
 | `editor_test.go` `config_test.go` `modelli_test.go` `regimi_test.go` `misura_test.go` `server_test.go` | editor, configurazioni, disco, regimi, misure, rotte |
 
 ## Cosa non entra nel repository

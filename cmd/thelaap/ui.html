@@ -450,10 +450,15 @@ const arg = v => "'" + String(v ?? '')
   .replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n')
   .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + "'";
 const $ = id => document.getElementById(id);
+/* Il token va anche sulle GET: /api/grezzo, /api/documento e /api/documenti
+   restituiscono i file di configurazione, e quelli lo chiedono in lettura.
+   Prima le GET ne erano escluse, e con quelle rotte aperte bastava farsi
+   passare per same-origin per leggere le chiavi dei provider. */
 function conToken(o){
   o = o || {};
-  if(!o.method || o.method.toUpperCase()==='GET') return o;
-  o.headers = Object.assign({'Content-Type':'application/json','X-theLAAP-Token':TOKEN}, o.headers||{});
+  const h = {'X-theLAAP-Token':TOKEN};
+  if(o.method && o.method.toUpperCase()!=='GET') h['Content-Type']='application/json';
+  o.headers = Object.assign(h, o.headers||{});
   return o;
 }
 async function api(p,o){

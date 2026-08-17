@@ -54,9 +54,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <dict>
 	<key>CFBundleName</key><string>theLAAP</string>
 	<key>CFBundleDisplayName</key><string>theLAAP</string>
-	<!-- Senza queste due, le voci di menu che AppKit aggiunge da sé (Annulla,
-	     Ripristina, Schermo intero, Chiudi tutto, Emoji e simboli) escono in
-	     inglese in mezzo a un menu scritto in italiano. -->
+	<!-- Without these two, the menu entries AppKit adds by itself (Undo, Redo,
+	     Enter Full Screen, Close All, Emoji and Symbols) come out in english in
+	     the middle of a menu written in italian. -->
 	<key>CFBundleDevelopmentRegion</key><string>it</string>
 	<key>CFBundleLocalizations</key><array><string>it</string><string>en</string></array>
 	<key>CFBundleIdentifier</key><string>com.lloreti.thelaap</string>
@@ -128,5 +128,5 @@ echo
 if [ "$BARRA" = 1 ]; then
   echo "Open it: the icon appears in the menu bar. The full panel opens from there."
 else
-  echo "Aprila: si apre il pannello su http://127.0.0.1:$PORTA"
+  echo "Open it: the panel comes up on http://127.0.0.1:$PORTA"
 fi

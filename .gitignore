@@ -1,5 +1,6 @@
 # compiled binaries, rebuilt by ./build.sh
 /aipanel
+/thelaap
 /menubar/theLAAP
 /theLAAP.app/
 /AiPanel.app/

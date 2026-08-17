@@ -48,19 +48,12 @@ func sprint(v any) string { return fmt.Sprint(v) }
 // La guardia delle rotte sta in sicurezza.go: localhost per tutto, piu'
 // Origin/Referer e token per ciò che muta stato.
 
-func main() {
-	porta := flag.Int("porta", 0, "porta di ascolto (0 = quella della configurazione)")
-	flag.Parse()
-
-	caricaConfig() // per prima: tutto il resto ne dipende
-	generaToken()  // subito dopo: serve per costruire la pagina
-	caricaProfili()
-	avviaMonitorMemoria() // la prima fotografia costa ~4s: falla ora, non alla prima richiesta
-
-	// Il token finisce nella pagina una volta sola, all'avvio: il corpo è
-	// costante e non c'è motivo di ricomporlo a ogni richiesta.
-	pagina := strings.Replace(UI, "__TOKEN__", tokenSessione, 1)
-
+// rotte: la tabella delle rotte, una sola.
+//
+// Sta qui e non nei test perche' era copiata a mano la': due elenchi da tenere
+// allineati, e i test finivano per verificare un instradamento diverso da
+// quello spedito. Ora sbagliare una protezione qui fa fallire i test.
+func rotte(pagina string) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", guardia(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -134,12 +127,29 @@ func main() {
 		scuro := strings.TrimSpace(sh("defaults read -g AppleInterfaceStyle 2>/dev/null")) == "Dark"
 		scriviJSON(w, map[string]any{"scuro": scuro})
 	}))
-	mux.HandleFunc("/api/documenti", guardia(apiDocumenti))
-	mux.HandleFunc("/api/documento", guardia(apiDocumento))
-	mux.HandleFunc("/api/grezzo", guardia(apiGrezzo))
+	mux.HandleFunc("/api/documenti", guardia(letturaRiservata(apiDocumenti)))
+	mux.HandleFunc("/api/documento", guardia(letturaRiservata(apiDocumento)))
+	mux.HandleFunc("/api/grezzo", guardia(letturaRiservata(apiGrezzo)))
 	mux.HandleFunc("/api/hf/cerca", guardia(apiHFCerca))
 	mux.HandleFunc("/api/modello/installa", guardia(soloPost(apiHFScarica)))
 	mux.HandleFunc("/api/hf/stato", guardia(apiHFStato))
+	return mux
+}
+
+func main() {
+	porta := flag.Int("porta", 0, "porta di ascolto (0 = quella della configurazione)")
+	flag.Parse()
+
+	caricaConfig() // per prima: tutto il resto ne dipende
+	generaToken()  // subito dopo: serve per costruire la pagina
+	caricaProfili()
+	avviaMonitorMemoria() // la prima fotografia costa ~4s: falla ora, non alla prima richiesta
+
+	// Il token finisce nella pagina una volta sola, all'avvio: il corpo è
+	// costante e non c'è motivo di ricomporlo a ogni richiesta.
+	pagina := strings.Replace(UI, "__TOKEN__", tokenSessione, 1)
+
+	mux := rotte(pagina)
 
 	p := *porta
 	if p == 0 {

@@ -425,12 +425,6 @@ final class Barra: NSObject, NSApplicationDelegate {
         esegui("open -a Terminal \"\(script)\"")
     }
 
-    @objc func riavvia(_ v: NSMenuItem) {
-        guard let chiave = v.representedObject as? String else { return }
-        let corpo = "{\"servizio\":\"\(chiave)\",\"azione\":\"restart\"}"
-        esegui("curl -s -m 30 -X POST \(BASE)/api/servizio -H 'Content-Type: application/json' -d '\(corpo)' >/dev/null &")
-        avvisa("Riavvio \(chiave)", "Ci vuole qualche secondo.")
-    }
 
 
     /// Esegue una voce del registro, sulla rotta e col corpo che la voce dichiara.
@@ -555,11 +549,21 @@ extension Barra: NSMenuDelegate {
             for a in (mm.avvisi ?? []) { m.addItem(self.voceInerte("⚠︎ " + a)) }
 
             m.addItem(.separator())
+            // Il riavvio viene dal registro, cercato per servizio: la voce a
+            // mano mandava una POST senza token, il pannello rispondeva 403 e
+            // la notifica diceva comunque che era partita. Se il registro non
+            // ha il comando, la voce resta inerte invece di promettere.
             for r in rts {
-                let v = NSMenuItem(title: (r.attivo ? "● " : "○ ") + self.nomeAmichevole(r.chiave),
-                                   action: #selector(self.riavvia(_:)), keyEquivalent: "")
+                let c = cmds.first { $0.gruppo == "programs" && $0.corpo?["servizio"] == r.chiave }
+                let titolo = (r.attivo ? "● " : "○ ") + self.nomeAmichevole(r.chiave)
+                guard let c else {
+                    m.addItem(self.voceInerte(titolo))
+                    continue
+                }
+                let v = NSMenuItem(title: titolo,
+                                   action: #selector(self.comandoDelRegistro(_:)), keyEquivalent: "")
                 v.target = self
-                v.representedObject = r.chiave
+                v.representedObject = c
                 v.toolTip = r.attivo ? "In funzione sulla porta \(r.porta). Clicca per riavviarlo."
                                      : "Spento. Clicca per riavviarlo."
                 m.addItem(v)

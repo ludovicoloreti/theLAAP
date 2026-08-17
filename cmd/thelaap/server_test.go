@@ -15,33 +15,10 @@ import (
 // ripete mai: che ogni rotta risponda, che quelle che cambiano qualcosa siano
 // protette, e soprattutto che NESSUNA risposta si porti dietro una credenziale.
 
-// rotte replica il montaggio di main() sulle rotte in sola lettura.
-func rotte() *http.ServeMux {
-	m := http.NewServeMux()
-	m.HandleFunc("/api/runtime", guardia(apiRuntime))
-	m.HandleFunc("/api/memoria", guardia(apiMemoria))
-	m.HandleFunc("/api/capacita", guardia(apiCapacita))
-	m.HandleFunc("/api/regimi", guardia(apiRegimi))
-	m.HandleFunc("/api/credenziali", guardia(apiCredenziali))
-	m.HandleFunc("/api/modello/esamina", guardia(apiEsaminaModello))
-	m.HandleFunc("/api/modelli/archivio", guardia(apiArchivioModelli))
-	m.HandleFunc("/api/documenti", guardia(apiDocumenti))
-	m.HandleFunc("/api/documento", guardia(apiDocumento))
-	m.HandleFunc("/api/strumenti", guardia(func(w http.ResponseWriter, r *http.Request) {
-		if s := cfg().Strumenti; s != nil {
-			scriviJSON(w, s)
-		} else {
-			scriviJSON(w, []StrumentoCfg{})
-		}
-	}))
-	// mutanti
-	m.HandleFunc("/api/modello/rimuovi", guardia(soloPost(apiRimuoviModello)))
-	m.HandleFunc("/api/modello/ripristina", guardia(soloPost(apiRipristinaModello)))
-	m.HandleFunc("/api/modello/elimina", guardia(soloPost(apiEliminaArchivio)))
-	m.HandleFunc("/api/credenziale", guardia(soloPost(apiImpostaCredenziale)))
-	m.HandleFunc("/api/regime", guardia(soloPost(apiRegime)))
-	return m
-}
+// Le rotte sono quelle vere: rotteDiProva() sta in main.go. La copia che stava qui era
+// un secondo elenco da tenere allineato, e ha smesso di somigliare a quello
+// spedito appena una rotta ha cambiato protezione.
+func rotteDiProva() *http.ServeMux { return rotte("<pagina di prova>") }
 
 func chiedi(t *testing.T, m *http.ServeMux, metodo, percorso string, token bool) *httptest.ResponseRecorder {
 	t.Helper()
@@ -53,6 +30,8 @@ func chiedi(t *testing.T, m *http.ServeMux, metodo, percorso string, token bool)
 	}
 	r := httptest.NewRequest(metodo, percorso, corpo)
 	r.RemoteAddr = "127.0.0.1:5555"
+	// httptest mette Host: example.com, che la guardia rifiuta.
+	r.Host = "127.0.0.1:7070"
 	if token {
 		r.Header.Set("Origin", "http://127.0.0.1:7070")
 		r.Header.Set("X-theLAAP-Token", tokenSessione)
@@ -65,12 +44,12 @@ func chiedi(t *testing.T, m *http.ServeMux, metodo, percorso string, token bool)
 func TestRotteInLetturaRispondonoJSONValido(t *testing.T) {
 	tokenSessione = "prova-token"
 	portaInAscolto = 7070
-	m := rotte()
+	m := rotteDiProva()
 
 	for _, p := range []string{
 		"/api/runtime", "/api/memoria", "/api/capacita", "/api/regimi",
 		"/api/credenziali", "/api/strumenti", "/api/modello/esamina?id=inesistente",
-		"/api/modelli/archivio", "/api/documenti",
+		"/api/modelli/archivio",
 	} {
 		t.Run(p, func(t *testing.T) {
 			w := chiedi(t, m, http.MethodGet, p, false)
@@ -93,7 +72,7 @@ func TestRotteInLetturaRispondonoJSONValido(t *testing.T) {
 func TestRotteMutantiProtette(t *testing.T) {
 	tokenSessione = "prova-token"
 	portaInAscolto = 7070
-	m := rotte()
+	m := rotteDiProva()
 
 	for _, p := range []string{"/api/modello/rimuovi", "/api/modello/ripristina",
 		"/api/modello/elimina", "/api/credenziale", "/api/regime"} {
@@ -123,7 +102,7 @@ func TestRotteMutantiProtette(t *testing.T) {
 func TestNessunaRispostaContieneCredenziali(t *testing.T) {
 	tokenSessione = "prova-token"
 	portaInAscolto = 7070
-	m := rotte()
+	m := rotteDiProva()
 
 	// Le chiavi vere di questa macchina, lette dai file dei client.
 	var segreti []string
@@ -156,12 +135,34 @@ func TestNessunaRispostaContieneCredenziali(t *testing.T) {
 }
 
 func TestGuardiaRifiutaDallaRete(t *testing.T) {
-	m := rotte()
+	m := rotteDiProva()
 	r := httptest.NewRequest(http.MethodGet, "/api/memoria", nil)
 	r.RemoteAddr = "192.168.1.99:1234"
 	w := httptest.NewRecorder()
 	m.ServeHTTP(w, r)
 	if w.Code != http.StatusForbidden {
 		t.Errorf("richiesta dalla rete accettata: codice %d", w.Code)
+	}
+}
+
+// Le tre rotte che restituiscono i file dei client chiedono il token anche in
+// lettura: e' la' che il pannello scrive la chiave dei provider (scriviChiave).
+// Restavano aperte a chiunque riuscisse a farsi passare per same-origin.
+func TestLeRotteDiConfigurazioneNonSiLeggonoSenzaToken(t *testing.T) {
+	tokenSessione = "prova-token"
+	portaInAscolto = 7070
+	m := rotteDiProva()
+
+	for _, p := range []string{"/api/documenti", "/api/documento?id=thelaap", "/api/grezzo?file=pi"} {
+		t.Run(p, func(t *testing.T) {
+			if w := chiedi(t, m, http.MethodGet, p, false); w.Code != http.StatusForbidden {
+				t.Errorf("letta senza token: codice %d", w.Code)
+			}
+			// E col token deve funzionare, o l'editor delle configurazioni resta
+			// chiuso fuori.
+			if w := chiedi(t, m, http.MethodGet, p, true); w.Code == http.StatusForbidden {
+				t.Errorf("col token giusto risponde ancora 403: %s", w.Body.String())
+			}
+		})
 	}
 }

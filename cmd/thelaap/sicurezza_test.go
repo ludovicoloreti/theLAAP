@@ -59,6 +59,8 @@ func richiestaGuardata(t *testing.T, metodo, origine, token string) *httptest.Re
 	})
 	r := httptest.NewRequest(metodo, "/api/servizio", strings.NewReader("{}"))
 	r.RemoteAddr = "127.0.0.1:54321"
+	// httptest mette Host: example.com, che la guardia ora rifiuta.
+	r.Host = "127.0.0.1:7070"
 	if origine != "" {
 		r.Header.Set("Origin", origine)
 	}
@@ -123,12 +125,91 @@ func TestGuardiaBloccaCSRF(t *testing.T) {
 		h := guardia(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 		r := httptest.NewRequest(http.MethodGet, "/api/memoria", nil)
 		r.RemoteAddr = "192.168.1.50:1234"
+		r.Host = "127.0.0.1:7070"
 		w := httptest.NewRecorder()
 		h(w, r)
 		if w.Code != http.StatusForbidden {
 			t.Errorf("richiesta dalla rete è passata: codice %d", w.Code)
 		}
 	})
+}
+
+func TestHostAmmesso(t *testing.T) {
+	casi := []struct {
+		host  string
+		porta int
+		vuole bool
+	}{
+		{"127.0.0.1:7070", 7070, true},
+		{"localhost:7070", 7070, true},
+		{"[::1]:7070", 7070, true}, // il caso che un confronto di stringhe sbaglia
+		{"127.0.0.1:9999", 7070, false},
+		{"127.0.0.1", 7070, false}, // senza porta e' la 80, mai la nostra
+		{"", 7070, false},
+		// Il DNS rebinding: il dominio dell'attaccante risolve a 127.0.0.1, ma
+		// l'Host che il browser manda resta il suo.
+		{"pannello.sito-cattivo.invalid:7070", 7070, false},
+		{"127.0.0.1.sito-cattivo.invalid:7070", 7070, false},
+	}
+	for _, c := range casi {
+		if got := hostAmmesso(c.host, c.porta); got != c.vuole {
+			t.Errorf("hostAmmesso(%q, %d) = %v, volevo %v", c.host, c.porta, got, c.vuole)
+		}
+	}
+}
+
+// Il rebinding attacca le GET, che non chiedono ne' Origin ne' token: se la
+// guardia controllasse l'Host solo sulle POST non servirebbe a niente.
+func TestLaGuardiaControllaLHostAncheInLettura(t *testing.T) {
+	portaInAscolto = 7070
+	h := guardia(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	r := httptest.NewRequest(http.MethodGet, "/api/modelli", nil)
+	r.RemoteAddr = "127.0.0.1:54321"
+	r.Host = "pannello.sito-cattivo.invalid:7070"
+	w := httptest.NewRecorder()
+	h(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("GET con Host estraneo è passata: codice %d", w.Code)
+	}
+}
+
+// /api/grezzo e /api/documento restituiscono i file dei client, dove sta la
+// chiave dei provider. In lettura non basta l'Host.
+func TestLetturaRiservataChiedeIlToken(t *testing.T) {
+	tokenSessione = "token-di-prova"
+	h := letturaRiservata(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	r := httptest.NewRequest(http.MethodGet, "/api/grezzo?file=pi", nil)
+	w := httptest.NewRecorder()
+	h(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("lettura dei file di configurazione senza token: codice %d", w.Code)
+	}
+
+	r = httptest.NewRequest(http.MethodGet, "/api/grezzo?file=pi", nil)
+	r.Header.Set("X-theLAAP-Token", "token-di-prova")
+	w = httptest.NewRecorder()
+	h(w, r)
+	if w.Code != http.StatusOK {
+		t.Errorf("lettura col token giusto rifiutata: codice %d", w.Code)
+	}
+}
+
+// La pagina deve mandare il token anche sulle GET, o le tre rotte protette qui
+// sopra rispondono 403 all'editor delle configurazioni. Prima conToken le
+// escludeva apposta.
+func TestLaPaginaMandaIlTokenAncheSulleGET(t *testing.T) {
+	i := strings.Index(UI, "function conToken(")
+	if i < 0 {
+		t.Fatal("conToken non c'è più")
+	}
+	corpo := UI[i : i+400]
+	if strings.Contains(corpo, "==='GET') return o") {
+		t.Error("conToken esclude ancora le GET dal token")
+	}
+	if !strings.Contains(corpo, "X-theLAAP-Token") {
+		t.Error("conToken non attacca più il token")
+	}
 }
 
 func TestSoloPost(t *testing.T) {
