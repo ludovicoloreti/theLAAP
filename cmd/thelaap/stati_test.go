@@ -15,6 +15,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/ludovicoloreti/theLAAP/internal/budget"
 )
 
 // La classe non è un'opinione: viene dalla soglia, e la soglia dalla macchina.
@@ -70,8 +72,8 @@ func TestLaClasseUsaLaSogliaDellArbitro(t *testing.T) {
 	if c := classeDi(Scheda{GB: 60}, soglia); c != ClasseEsclusivo {
 		t.Errorf("60 GB con soglia 50 → %s", c)
 	}
-	b := Budget{TotaleByte: gb(128), RiservaSOByte: gb(24),
-		Occupato: []OccupazioneRuntime{{Chiave: "mtplx", Nome: "MTPLX", PesoByte: gb(55)}}}
+	b := budget.Budget{TotaleByte: gb(128), RiservaSOByte: gb(24),
+		Occupato: []budget.OccupazioneRuntime{{Chiave: "mtplx", Nome: "MTPLX", PesoByte: gb(55)}}}
 	if v := b.Ammette(gb(60), politicaCorrente()); v.Ammesso {
 		t.Error("l'arbitro ammette due grandi mentre la classe li dice esclusivi: le due soglie sono divergenti")
 	}

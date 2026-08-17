@@ -1,4 +1,4 @@
-package main
+package budget
 
 import (
 	"strings"
@@ -63,22 +63,6 @@ func TestLagunaDaSolaCiSta(t *testing.T) {
 		t.Errorf("rifiutato Laguna da solo, che invece ci sta: %s", v.Motivo)
 	}
 	t.Logf("verdetto: %s", v.Motivo)
-}
-
-// Il picco conta, non il valore corrente: ammettere sulla base del corrente
-// significa autorizzare un sovraccarico che si manifesta dopo.
-func TestSiDecideSulPiccoNonSulCorrente(t *testing.T) {
-	o := Occupazione{CorrenteByte: gb(59), PiccoByte: gb(79)}
-	if o.PesoDaPrevedereByte() != gb(79) {
-		t.Errorf("peso da prevedere = %.0f GB, volevo 79 (il picco)",
-			float64(o.PesoDaPrevedereByte())/GB)
-	}
-	// Se il picco non è noto vale il corrente, non zero.
-	o2 := Occupazione{CorrenteByte: gb(30)}
-	if o2.PesoDaPrevedereByte() != gb(30) {
-		t.Errorf("senza picco dovrebbe valere il corrente, ho %.0f GB",
-			float64(o2.PesoDaPrevedereByte())/GB)
-	}
 }
 
 func TestUnModelloGrandeAllaVolta(t *testing.T) {

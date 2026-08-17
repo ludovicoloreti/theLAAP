@@ -21,7 +21,7 @@ import (
 // Nessuno dei tre dava errore visibile: la voce di menu semplicemente non faceva
 // niente. Questi test leggono il sorgente Swift e verificano il contratto.
 
-const sorgenteSwift = "menubar/theLAAP.swift"
+const sorgenteSwift = "../../menubar/theLAAP.swift"
 
 func leggiSwift(t *testing.T) string {
 	t.Helper()

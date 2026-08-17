@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/ludovicoloreti/theLAAP/internal/budget"
 )
 
 // Cosa sa fare davvero ogni programma, verificato uno per uno:
@@ -127,9 +129,9 @@ func apiScaricaModello(w http.ResponseWriter, r *http.Request) {
 // cartelle su disco: misurato su questa macchina, mtplx pesa 79 GB di picco
 // contro ~30 GB di pesi su disco. Decidere col disco avrebbe autorizzato
 // esattamente la combinazione che ha fatto panicare il Mac.
-func budgetCorrente() Budget {
+func budgetCorrente() budget.Budget {
 	m := memoriaCorrente()
-	return Budget{
+	return budget.Budget{
 		TotaleByte:    uint64(m.TotaleGB * 1e9),
 		RiservaSOByte: uint64(riservaSistemaGB() * 1e9),
 		// Già misurate dal monitor: rifarle a ogni richiesta costerebbe un
@@ -144,8 +146,8 @@ func budgetCorrente() Budget {
 // sé descrivono i pesi del modello, non la memoria che il processo tiene:
 // misurato qui, mtplx dichiara 29,3 GB e ne occupa 84,8. La differenza sono
 // KV cache e buffer, che non stanno su disco e non compaiono in `ps`.
-func occupazioniRuntime(caricati []ModelloInRAM) []OccupazioneRuntime {
-	var out []OccupazioneRuntime
+func occupazioniRuntime(caricati []ModelloInRAM) []budget.OccupazioneRuntime {
+	var out []budget.OccupazioneRuntime
 	for _, rc := range cfg().Runtime {
 		pid, err := pidInAscoltoSuPorta(rc.Porta)
 		if err != nil {
@@ -161,7 +163,7 @@ func occupazioniRuntime(caricati []ModelloInRAM) []OccupazioneRuntime {
 				modelli = append(modelli, c.Nome)
 			}
 		}
-		out = append(out, OccupazioneRuntime{
+		out = append(out, budget.OccupazioneRuntime{
 			Chiave:       rc.Chiave,
 			Nome:         rc.Nome,
 			PesoByte:     occ.PesoDaPrevedereByte(),
@@ -174,8 +176,8 @@ func occupazioniRuntime(caricati []ModelloInRAM) []OccupazioneRuntime {
 	return out
 }
 
-func politicaCorrente() Politica {
-	return Politica{
+func politicaCorrente() budget.Politica {
+	return budget.Politica{
 		UnModelloGrandeAllaVolta: true,
 		SogliaGrandeByte:         uint64(sogliaModelloGrandeGB() * 1e9),
 	}

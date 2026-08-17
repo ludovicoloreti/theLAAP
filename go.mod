@@ -1,4 +1,4 @@
-module aipanel
+module github.com/ludovicoloreti/theLAAP
 
 go 1.26.1
 

@@ -109,7 +109,7 @@ browser and no address bar.
 Other platforms build too, with a smaller feature set:
 
 ```bash
-go build -o thelaap . && ./thelaap    # then open http://127.0.0.1:7070
+go build -o thelaap ./cmd/thelaap && ./thelaap    # then open http://127.0.0.1:7070
 ```
 
 | | macOS | Linux | Windows |
@@ -163,6 +163,26 @@ NSWindow + WKWebView           127.0.0.1:7070, localhost only
     budget.go       stati.go      memory.go
     the arbiter    state/class    the measure
 ```
+
+```
+cmd/thelaap/      the program: server, routes, embedded page
+internal/budget/  the memory arbiter, no I/O
+menubar/          menu bar item and window (Swift)
+esempi/           a working example of a regime script
+```
+
+`internal/budget` is the only extracted piece, and not for symmetry: `budget.go`
+imports `fmt` and `sort` and uses nothing else from the program. Its comment
+promises "nothing is executed and nothing is read from the system here", and in a
+package the compiler enforces that promise instead of the comment.
+
+The rest is a flat `package main`, and that is measured rather than lazy: **128 of
+228 package level symbols are used outside the file that defines them** —
+`scriviJSON` from 17 files, `cfg()` from 13. Splitting would mean exporting a
+hundred identifiers or creating a `util` bag, which is worse than flat.
+Acknowledged debt: it gets paid by redesigning the boundaries, not by moving
+files. And `cmd/`/`pkg/` is not an official Go standard: the layout that goes by
+that name states itself that it is not affiliated with the Go team.
 
 - **One dependency**, `yaml.v3`, used by the config editor. Nothing else.
 - **One HTML file**, embedded in the binary. No build step, no framework, no network.

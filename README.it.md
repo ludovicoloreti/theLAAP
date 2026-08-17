@@ -237,7 +237,7 @@ il file non c'è, viene scritto guardando cosa è installato.
 ```bash
 git clone <questo repo> theLAAP && cd theLAAP
 ./build.sh --install       # macOS: crea l'app
-go build -o thelaap .      # Linux e Windows: basta il binario
+go build -o thelaap ./cmd/thelaap   # Linux e Windows: basta il binario
 ./thelaap                  # poi apri http://127.0.0.1:7070
 ```
 
@@ -393,6 +393,27 @@ freno di due minuti.
 
 ## I file
 
+```
+cmd/thelaap/      il programma: server, rotte, pagina incorporata
+internal/budget/  l'arbitro della memoria, senza I/O
+menubar/          la voce nella barra dei menu e la finestra (Swift)
+esempi/           uno script di regime, di esempio e funzionante
+```
+
+`internal/budget` è l'unico pezzo estratto, e non per simmetria: `budget.go`
+importa soltanto `fmt` e `sort` e non usa niente dal resto: il suo commento
+promette «qui non si esegue niente e non si legge niente dal sistema», e in un
+package quella promessa la impone il compilatore invece del commento.
+
+Il resto sta in un `package main` piatto, e non per pigrizia: **128 dei 228
+simboli di pacchetto sono usati fuori dal file che li definisce** — `scriviJSON`
+da 17 file, `cfg()` da 13, `errJSON` da 11. Spezzarlo vorrebbe dire esportarne
+un centinaio o creare un package-sacco `util`, che è peggio del piatto. È debito
+riconosciuto, non una scelta di stile: si paga ridisegnando i confini, non
+spostando i file. E `cmd/`/`pkg/` non è uno standard Go ufficiale — il layout
+che gira col nome di «standard» dichiara esso stesso di non essere affiliato al
+team Go.
+
 | File | Cosa fa |
 |---|---|
 | `main.go` | server, rotte, guardia localhost, pagina incorporata |
@@ -403,7 +424,7 @@ freno di due minuti.
 | `memory.go` | memoria da `vm_stat`, tetto da oMLX, modelli caricati; con cache e monitor in sottofondo |
 | `services.go` | accensione dei servizi e comandi in lista chiusa, con output in diretta |
 | `regimi.go` | configurazioni di macchina che si accendono e spengono tutte insieme |
-| `budget.go` | l'arbitro della memoria: decide se un modello ci sta, prima di caricarlo |
+| `internal/budget/budget.go` | l'arbitro: decide se un modello ci sta, prima di caricarlo. Nessun I/O, imposto dal compilatore |
 | `stati.go` | stato e classe di ogni modello, e il registro dei comandi eseguibili: `/api/modelli` e `/api/comandi` |
 | `footprint*.go` | quanto occupa davvero un processo, per sistema operativo |
 | `adattatori.go` | cosa sa fare ogni programma: scarico per modello, o solo stop |

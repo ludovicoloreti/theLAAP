@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ludovicoloreti/theLAAP/internal/budget"
 )
 
 // MemStato — fotografia della memoria unificata e di chi la sta occupando.
@@ -31,9 +33,9 @@ type MemStato struct {
 	// `Processi` dice quanta memoria tengono davvero, e le due cose
 	// differiscono parecchio: mtplx dichiara 29,3 GB e ne occupa 84,8.
 	// La barra deve disegnare questi, non quelli.
-	Processi   []OccupazioneRuntime `json:"processi"`
-	Avvisi     []string             `json:"avvisi"`
-	Aggiornato string               `json:"aggiornato"`
+	Processi   []budget.OccupazioneRuntime `json:"processi"`
+	Avvisi     []string                    `json:"avvisi"`
+	Aggiornato string                      `json:"aggiornato"`
 	// Istante della lettura, e quanti secondi ha al momento della risposta.
 	// La sola stringa "15:04:05" non permette all'interfaccia di capire se il
 	// dato è di 4 secondi o di 40 minuti fa: con un monitor morto mostrerebbe

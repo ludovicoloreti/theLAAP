@@ -20,7 +20,7 @@ PORTA=7070
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH
 
 echo "▸ compilo il pannello (Go)"
-go build -o aipanel .
+go build -o aipanel ./cmd/thelaap
 codesign -s - --force ./aipanel >/dev/null 2>&1
 echo "  ✅ aipanel ($(du -h aipanel | cut -f1))"
 

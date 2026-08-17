@@ -27,6 +27,8 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+
+	"github.com/ludovicoloreti/theLAAP/internal/budget"
 )
 
 // Stati e classi: le stringhe sono un contratto verso la pagina e verso Swift.
@@ -55,7 +57,7 @@ type SchedaStato struct {
 	Pronto bool `json:"pronto"`
 	// Verdetto se lo si carica adesso, dall'arbitro di budget.go. Solo per i
 	// modelli non caricati: per quelli già in RAM la domanda non ha senso.
-	Verdetto *Verdetto `json:"verdetto,omitempty"`
+	Verdetto *budget.Verdetto `json:"verdetto,omitempty"`
 }
 
 // RispostaModelli: tutto quello che serve a disegnare l'elenco in una richiesta
