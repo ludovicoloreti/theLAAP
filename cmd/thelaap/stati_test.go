@@ -63,7 +63,7 @@ func TestResidenteVieneDallaConfigurazioneNonDalNome(t *testing.T) {
 // modello che il preflight rifiuta: è il difetto che questo test impedisce.
 func TestLaClasseUsaLaSogliaDellArbitro(t *testing.T) {
 	conConfig(t, Config{SogliaModelloGrandeGB: 50})
-	soglia := float64(politicaCorrente().SogliaGrandeByte) / 1e9
+	soglia := float64(politicaCorrente().LargeThresholdBytes) / 1e9
 	if soglia != 50 {
 		t.Fatalf("la politica dice soglia %.1f GB, la configurazione 50", soglia)
 	}
@@ -72,9 +72,9 @@ func TestLaClasseUsaLaSogliaDellArbitro(t *testing.T) {
 	if c := classeDi(Scheda{GB: 60}, soglia); c != ClasseEsclusivo {
 		t.Errorf("60 GB con soglia 50 → %s", c)
 	}
-	b := budget.Budget{TotaleByte: gb(128), RiservaSOByte: gb(24),
-		Occupato: []budget.OccupazioneRuntime{{Chiave: "mtplx", Nome: "MTPLX", PesoByte: gb(55)}}}
-	if v := b.Ammette(gb(60), politicaCorrente()); v.Ammesso {
+	b := budget.Budget{TotalBytes: gb(128), OSReserveBytes: gb(24),
+		Used: []budget.RuntimeUsage{{Key: "mtplx", Name: "MTPLX", PeakBytes: gb(55)}}}
+	if v := b.Admits(gb(60), politicaCorrente()); v.Allowed {
 		t.Error("l'arbitro ammette due grandi mentre la classe li dice esclusivi: le due soglie sono divergenti")
 	}
 }

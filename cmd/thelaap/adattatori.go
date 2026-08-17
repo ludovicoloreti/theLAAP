@@ -132,11 +132,11 @@ func apiScaricaModello(w http.ResponseWriter, r *http.Request) {
 func budgetCorrente() budget.Budget {
 	m := memoriaCorrente()
 	return budget.Budget{
-		TotaleByte:    uint64(m.TotaleGB * 1e9),
-		RiservaSOByte: uint64(riservaSistemaGB() * 1e9),
+		TotalBytes:     uint64(m.TotaleGB * 1e9),
+		OSReserveBytes: uint64(riservaSistemaGB() * 1e9),
 		// Già misurate dal monitor: rifarle a ogni richiesta costerebbe un
 		// lsof e un footprint per runtime, mezzo secondo buttato.
-		Occupato: m.Processi,
+		Used: m.Processi,
 	}
 }
 
@@ -146,8 +146,8 @@ func budgetCorrente() budget.Budget {
 // sé descrivono i pesi del modello, non la memoria che il processo tiene:
 // misurato qui, mtplx dichiara 29,3 GB e ne occupa 84,8. La differenza sono
 // KV cache e buffer, che non stanno su disco e non compaiono in `ps`.
-func occupazioniRuntime(caricati []ModelloInRAM) []budget.OccupazioneRuntime {
-	var out []budget.OccupazioneRuntime
+func occupazioniRuntime(caricati []ModelloInRAM) []budget.RuntimeUsage {
+	var out []budget.RuntimeUsage
 	for _, rc := range cfg().Runtime {
 		pid, err := pidInAscoltoSuPorta(rc.Porta)
 		if err != nil {
@@ -163,23 +163,23 @@ func occupazioniRuntime(caricati []ModelloInRAM) []budget.OccupazioneRuntime {
 				modelli = append(modelli, c.Nome)
 			}
 		}
-		out = append(out, budget.OccupazioneRuntime{
-			Chiave:       rc.Chiave,
-			Nome:         rc.Nome,
-			PesoByte:     occ.PesoDaPrevedereByte(),
-			CorrenteByte: occ.CorrenteByte,
-			Stimato:      occ.Stimato,
-			Liberabile:   strings.TrimSpace(rc.ScaricaModello) != "",
-			Modelli:      modelli,
+		out = append(out, budget.RuntimeUsage{
+			Key:          rc.Chiave,
+			Name:         rc.Nome,
+			PeakBytes:    occ.PesoDaPrevedereByte(),
+			CurrentBytes: occ.CorrenteByte,
+			Estimated:    occ.Stimato,
+			Freeable:     strings.TrimSpace(rc.ScaricaModello) != "",
+			Models:       modelli,
 		})
 	}
 	return out
 }
 
-func politicaCorrente() budget.Politica {
-	return budget.Politica{
-		UnModelloGrandeAllaVolta: true,
-		SogliaGrandeByte:         uint64(sogliaModelloGrandeGB() * 1e9),
+func politicaCorrente() budget.Policy {
+	return budget.Policy{
+		OneLargeModelAtATime: true,
+		LargeThresholdBytes:  uint64(sogliaModelloGrandeGB() * 1e9),
 	}
 }
 
@@ -203,7 +203,7 @@ func apiPreflight(w http.ResponseWriter, r *http.Request) {
 		peso = uint64(dimensioneGB(req.Percorso) * gonfiaggioDiscoMemoria * 1e9)
 		stimato = true
 	}
-	v := budgetCorrente().Ammette(peso, politicaCorrente())
+	v := budgetCorrente().Admits(peso, politicaCorrente())
 	scriviJSON(w, map[string]any{
 		"verdetto": v,
 		"stimato":  stimato,

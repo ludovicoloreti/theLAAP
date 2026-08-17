@@ -5,186 +5,191 @@ import (
 	"sort"
 )
 
-// L'arbitro della memoria.
+// The memory arbiter.
 //
-// Perché serve: il 27/07/2026 questa macchina è andata in kernel panic con due
-// server di inferenza residenti insieme, ~154 GB su 128 GB. Nessuno dei due
-// sapeva dell'altro. Il memory guard di oMLX, interrogato, ha risposto che
-// andava bene e l'ha scritto nel proprio log:
+// Why it exists: on 27 July 2026 this machine hit a kernel panic with two
+// inference servers resident at once, ~154 GB on 128 GB. Neither knew about the
+// other. Asked whether it could admit the model, the memory guard of one of them
+// said yes, and wrote it in its own log:
 //
 //	Admitting 'Laguna-S-2.1-oQ6e' above the admission soft target
 //	with no idle model left to evict (90.82GB > 86.70GB, ceiling 102.00GB)
 //
-// Ogni server conosce solo sé stesso. La decisione di ammissione non si può
-// delegare a chi non vede la macchina intera: serve un arbitro sopra tutti, e
-// il pannello è l'unico che sta in quella posizione.
+// Every server knows only itself. An admission decision cannot be delegated to
+// something that cannot see the whole machine: it needs an arbiter above all of
+// them, and the panel is the only thing sitting in that position.
 //
-// Qui dentro non si esegue niente e non si legge niente dal sistema: solo
-// aritmetica su numeri che arrivano da fuori. Così si può provare lo scenario
-// del 27/07 senza rimetterci la macchina.
+// Nothing is executed here and nothing is read from the system: only arithmetic
+// on numbers that arrive from outside. That is what makes the 27 July scenario
+// reproducible in a test instead of on the machine.
 
-// OccupazioneRuntime: quanto pesa un programma e cosa ci si può fare.
-type OccupazioneRuntime struct {
-	Chiave string `json:"chiave"`
-	Nome   string `json:"nome"`
-	// PesoByte è il picco: è su quello che si decide. CorrenteByte è quanto
-	// occupa adesso, ed è il numero da mostrare nella barra — mostrare il
-	// picco farebbe sembrare la macchina più piena di quanto sia.
-	PesoByte     uint64   `json:"pesoByte"`
-	CorrenteByte uint64   `json:"correnteByte"`
-	Stimato      bool     `json:"stimato,omitempty"` // misura di ripiego, meno precisa
-	Liberabile   bool     `json:"liberabile"`        // false = non si può scaricare senza fermarlo
-	Modelli      []string `json:"modelli,omitempty"`
+// RuntimeUsage: how much a program weighs and what can be done about it.
+//
+// The json tags stay in Italian: they are the wire contract with the page and
+// with the menu bar app, and renaming them would buy nothing while touching
+// three programs at once.
+type RuntimeUsage struct {
+	Key  string `json:"chiave"`
+	Name string `json:"nome"`
+	// PeakBytes is the peak, and the peak is what decisions are made on.
+	// CurrentBytes is what it holds right now, and that is the number to draw in
+	// the bar: showing the peak would make the machine look fuller than it is.
+	PeakBytes    uint64   `json:"pesoByte"`
+	CurrentBytes uint64   `json:"correnteByte"`
+	Estimated    bool     `json:"stimato,omitempty"` // fallback measure, less precise
+	Freeable     bool     `json:"liberabile"`        // false = cannot be unloaded without stopping it
+	Models       []string `json:"modelli,omitempty"`
 }
 
-func (o OccupazioneRuntime) PesoGB() float64 { return float64(o.PesoByte) / 1e9 }
+func (o RuntimeUsage) PeakGB() float64 { return float64(o.PeakBytes) / 1e9 }
 
-// Budget: la fotografia su cui si decide.
+// Budget: the snapshot a decision is made on.
 type Budget struct {
-	TotaleByte    uint64
-	RiservaSOByte uint64
-	Occupato      []OccupazioneRuntime
+	TotalBytes     uint64
+	OSReserveBytes uint64
+	Used           []RuntimeUsage
 }
 
-// Verdetto: la risposta, con dentro cosa fare se è no.
-type Verdetto struct {
-	Ammesso         bool     `json:"ammesso"`
-	RichiestoByte   uint64   `json:"richiestoByte"`
-	DisponibileByte uint64   `json:"disponibileByte"`
-	MancanoByte     uint64   `json:"mancanoByte,omitempty"`
-	DaLiberare      []string `json:"daLiberare,omitempty"` // chiavi dei runtime da fermare
-	Motivo          string   `json:"motivo"`
+// Verdict: the answer, carrying what to do when it is no.
+type Verdict struct {
+	Allowed        bool     `json:"ammesso"`
+	RequestedBytes uint64   `json:"richiestoByte"`
+	AvailableBytes uint64   `json:"disponibileByte"`
+	MissingBytes   uint64   `json:"mancanoByte,omitempty"`
+	ToFree         []string `json:"daLiberare,omitempty"` // keys of the runtimes to stop
+	Reason         string   `json:"motivo"`
 }
 
-// Politica: le regole sopra all'aritmetica.
-type Politica struct {
-	// UnModelloGrandeAllaVolta: sopra SogliaGrandeByte ne resta uno solo.
-	// È la regola che l'utente ha enunciato dopo il panic — «Laguna va da dio,
-	// solo non ci deve essere altra roba» — e che l'aritmetica da sola non
-	// esprime: due modelli da 60 GB entrerebbero in 128, ma lascerebbero il
-	// sistema senza margine per crescere.
-	UnModelloGrandeAllaVolta bool
-	SogliaGrandeByte         uint64
+// Policy: the rules that sit above the arithmetic.
+type Policy struct {
+	// OneLargeModelAtATime: above LargeThresholdBytes only one stays.
+	//
+	// It is the rule the owner of this machine stated after the panic, and one
+	// that arithmetic alone does not express: two 60 GB models would fit in 128,
+	// and would leave the system no margin to grow into.
+	OneLargeModelAtATime bool
+	LargeThresholdBytes  uint64
 }
 
-// occupatoByte: quanto è già impegnato.
-func (b Budget) occupatoByte() uint64 {
+// usedBytes: how much is already committed.
+func (b Budget) usedBytes() uint64 {
 	var s uint64
-	for _, o := range b.Occupato {
-		s += o.PesoByte
+	for _, o := range b.Used {
+		s += o.PeakBytes
 	}
 	return s
 }
 
-// DisponibileByte: quanto resta per un modello nuovo, tolta la riserva del
-// sistema operativo. Mai negativo: se si è già oltre, è zero.
-func (b Budget) DisponibileByte() uint64 {
-	usato := b.occupatoByte() + b.RiservaSOByte
-	if usato >= b.TotaleByte {
+// AvailableBytes: what is left for a new model, minus the reserve kept for the
+// operating system. Never negative: if we are already past it, it is zero.
+func (b Budget) AvailableBytes() uint64 {
+	used := b.usedBytes() + b.OSReserveBytes
+	if used >= b.TotalBytes {
 		return 0
 	}
-	return b.TotaleByte - usato
+	return b.TotalBytes - used
 }
 
-// Ammette risponde alla domanda che il pannello non sapeva porsi: se carico
-// questo, ci sta?
-func (b Budget) Ammette(richiestoByte uint64, p Politica) Verdetto {
-	v := Verdetto{
-		RichiestoByte:   richiestoByte,
-		DisponibileByte: b.DisponibileByte(),
+// Admits answers the question the panel did not know how to ask itself: if I
+// load this, does it fit?
+func (b Budget) Admits(requestedBytes uint64, p Policy) Verdict {
+	v := Verdict{
+		RequestedBytes: requestedBytes,
+		AvailableBytes: b.AvailableBytes(),
 	}
-	if richiestoByte == 0 {
-		v.Ammesso = false
-		v.Motivo = "non so quanto occupa questo modello: non posso dire se ci sta"
+	if requestedBytes == 0 {
+		v.Allowed = false
+		v.Reason = "I do not know how much this model takes: I cannot say whether it fits"
 		return v
 	}
 
-	// Regola: un modello grande alla volta. Si applica prima dell'aritmetica,
-	// perché anche quando i conti tornerebbero due modelli grossi insieme non
-	// lasciano margine a nessuno dei due per crescere durante l'uso.
-	if p.UnModelloGrandeAllaVolta && richiestoByte >= p.SogliaGrandeByte {
-		var grossi []OccupazioneRuntime
-		for _, o := range b.Occupato {
-			if o.PesoByte >= p.SogliaGrandeByte {
-				grossi = append(grossi, o)
+	// The rule: one large model at a time. It applies before the arithmetic,
+	// because even when the sums would work out, two large models together leave
+	// neither of them room to grow while in use.
+	if p.OneLargeModelAtATime && requestedBytes >= p.LargeThresholdBytes {
+		var large []RuntimeUsage
+		for _, o := range b.Used {
+			if o.PeakBytes >= p.LargeThresholdBytes {
+				large = append(large, o)
 			}
 		}
-		if len(grossi) > 0 {
-			v.Ammesso = false
-			v.DaLiberare = chiaviDi(grossi)
-			v.Motivo = fmt.Sprintf(
-				"c'è già un modello grande in memoria (%s, %.0f GB). Su questa macchina se ne tiene "+
-					"uno alla volta: libera quello e poi carica questo (%.0f GB).",
-				nomiDi(grossi), sommaGB(grossi), float64(richiestoByte)/1e9)
+		if len(large) > 0 {
+			v.Allowed = false
+			v.ToFree = keysOf(large)
+			v.Reason = fmt.Sprintf(
+				"there is already a large model in memory (%s, %.0f GB). This machine keeps "+
+					"one at a time: free that one, then load this (%.0f GB).",
+				namesOf(large), sumGB(large), float64(requestedBytes)/1e9)
 			return v
 		}
 	}
 
-	if richiestoByte <= v.DisponibileByte {
-		v.Ammesso = true
-		v.Motivo = fmt.Sprintf("ci sta: servono %.0f GB e ce ne sono %.0f liberi, "+
-			"tenendo %.0f GB da parte per il sistema",
-			float64(richiestoByte)/1e9, float64(v.DisponibileByte)/1e9,
-			float64(b.RiservaSOByte)/1e9)
+	if requestedBytes <= v.AvailableBytes {
+		v.Allowed = true
+		v.Reason = fmt.Sprintf("it fits: %.0f GB needed and %.0f free, "+
+			"keeping %.0f GB aside for the system",
+			float64(requestedBytes)/1e9, float64(v.AvailableBytes)/1e9,
+			float64(b.OSReserveBytes)/1e9)
 		return v
 	}
 
-	v.Ammesso = false
-	v.MancanoByte = richiestoByte - v.DisponibileByte
-	scelti := sceltiPerLiberare(b.Occupato, v.MancanoByte)
-	v.DaLiberare = chiaviDi(scelti)
+	v.Allowed = false
+	v.MissingBytes = requestedBytes - v.AvailableBytes
+	chosen := chosenToFree(b.Used, v.MissingBytes)
+	v.ToFree = keysOf(chosen)
 
-	if len(scelti) == 0 {
-		v.Motivo = fmt.Sprintf(
-			"non ci sta: servono %.0f GB e ce ne sono %.0f. Non c'è niente da liberare: "+
-				"questo modello è troppo grande per questa macchina.",
-			float64(richiestoByte)/1e9, float64(v.DisponibileByte)/1e9)
+	if len(chosen) == 0 {
+		v.Reason = fmt.Sprintf(
+			"it does not fit: %.0f GB needed and %.0f free. There is nothing to free: "+
+				"this model is too large for this machine.",
+			float64(requestedBytes)/1e9, float64(v.AvailableBytes)/1e9)
 		return v
 	}
-	v.Motivo = fmt.Sprintf(
-		"non ci sta: servono %.0f GB e ce ne sono %.0f, ne mancano %.0f. "+
-			"Liberando %s si recuperano %.0f GB e allora entra.",
-		float64(richiestoByte)/1e9, float64(v.DisponibileByte)/1e9,
-		float64(v.MancanoByte)/1e9, nomiDi(scelti), sommaGB(scelti))
+	v.Reason = fmt.Sprintf(
+		"it does not fit: %.0f GB needed and %.0f free, %.0f missing. "+
+			"Freeing %s recovers %.0f GB and then it fits.",
+		float64(requestedBytes)/1e9, float64(v.AvailableBytes)/1e9,
+		float64(v.MissingBytes)/1e9, namesOf(chosen), sumGB(chosen))
 	return v
 }
 
-// sceltiPerLiberare: quali runtime fermare per recuperare almeno `manca`.
-// Si parte dal più pesante, così si propone il minor numero di operazioni.
-// Restituisce nil se anche liberando tutto non basta: meglio dirlo che
-// suggerire di spegnere mezza macchina per niente.
-func sceltiPerLiberare(occ []OccupazioneRuntime, manca uint64) []OccupazioneRuntime {
-	ordinati := append([]OccupazioneRuntime{}, occ...)
-	sort.SliceStable(ordinati, func(i, j int) bool {
-		return ordinati[i].PesoByte > ordinati[j].PesoByte
+// chosenToFree: which runtimes to stop to recover at least `missing`.
+//
+// It starts from the heaviest, so it proposes the smallest number of operations.
+// Returns nil when freeing everything would still not be enough: better to say
+// so than to suggest shutting down half the machine for nothing.
+func chosenToFree(used []RuntimeUsage, missing uint64) []RuntimeUsage {
+	sorted := append([]RuntimeUsage{}, used...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		return sorted[i].PeakBytes > sorted[j].PeakBytes
 	})
-	var scelti []OccupazioneRuntime
-	var recuperato uint64
-	for _, o := range ordinati {
-		if o.PesoByte == 0 {
+	var chosen []RuntimeUsage
+	var recovered uint64
+	for _, o := range sorted {
+		if o.PeakBytes == 0 {
 			continue
 		}
-		scelti = append(scelti, o)
-		recuperato += o.PesoByte
-		if recuperato >= manca {
-			return scelti
+		chosen = append(chosen, o)
+		recovered += o.PeakBytes
+		if recovered >= missing {
+			return chosen
 		}
 	}
 	return nil
 }
 
-func chiaviDi(oo []OccupazioneRuntime) []string {
+func keysOf(oo []RuntimeUsage) []string {
 	var s []string
 	for _, o := range oo {
-		s = append(s, o.Chiave)
+		s = append(s, o.Key)
 	}
 	return s
 }
 
-func nomiDi(oo []OccupazioneRuntime) string {
+func namesOf(oo []RuntimeUsage) string {
 	var s []string
 	for _, o := range oo {
-		s = append(s, o.Nome)
+		s = append(s, o.Name)
 	}
 	switch len(s) {
 	case 0:
@@ -192,10 +197,10 @@ func nomiDi(oo []OccupazioneRuntime) string {
 	case 1:
 		return s[0]
 	}
-	return fmt.Sprintf("%s e %s", joinVirgole(s[:len(s)-1]), s[len(s)-1])
+	return fmt.Sprintf("%s and %s", joinCommas(s[:len(s)-1]), s[len(s)-1])
 }
 
-func joinVirgole(s []string) string {
+func joinCommas(s []string) string {
 	out := ""
 	for i, x := range s {
 		if i > 0 {
@@ -206,10 +211,10 @@ func joinVirgole(s []string) string {
 	return out
 }
 
-func sommaGB(oo []OccupazioneRuntime) float64 {
+func sumGB(oo []RuntimeUsage) float64 {
 	var s uint64
 	for _, o := range oo {
-		s += o.PesoByte
+		s += o.PeakBytes
 	}
 	return float64(s) / 1e9
 }

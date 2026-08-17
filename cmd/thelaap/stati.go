@@ -55,9 +55,9 @@ type SchedaStato struct {
 	// Pronto: quello che risponde adesso senza attese. Ce n'è sempre al
 	// massimo uno, e lo decide il server, non la pagina.
 	Pronto bool `json:"pronto"`
-	// Verdetto se lo si carica adesso, dall'arbitro di budget.go. Solo per i
+	// Verdict se lo si carica adesso, dall'arbitro di budget.go. Solo per i
 	// modelli non caricati: per quelli già in RAM la domanda non ha senso.
-	Verdetto *budget.Verdetto `json:"verdetto,omitempty"`
+	Verdetto *budget.Verdict `json:"verdetto,omitempty"`
 }
 
 // RispostaModelli: tutto quello che serve a disegnare l'elenco in una richiesta
@@ -158,7 +158,7 @@ func modelliConStato() RispostaModelli {
 	m := memoriaCorrente()
 	p := politicaCorrente()
 	b := budgetCorrente()
-	sogliaGB := float64(p.SogliaGrandeByte) / 1e9
+	sogliaGB := float64(p.LargeThresholdBytes) / 1e9
 
 	inArrivo := map[string]bool{}
 	for _, d := range scarichiInCorso() {
@@ -169,7 +169,7 @@ func modelliConStato() RispostaModelli {
 	// file: mtplx dichiara 29,3 GB e ne occupa 84,8 (vedi memory.go).
 	var occupati float64
 	for _, o := range m.Processi {
-		occupati += float64(o.CorrenteByte) / 1e9
+		occupati += float64(o.CurrentBytes) / 1e9
 	}
 	liberi := m.TotaleGB - occupati
 	if liberi < 0 {
@@ -180,7 +180,7 @@ func modelliConStato() RispostaModelli {
 		TotaleGB:      m.TotaleGB,
 		OccupatiGB:    occupati,
 		LiberiGB:      liberi,
-		DisponibiliGB: float64(b.DisponibileByte()) / 1e9,
+		DisponibiliGB: float64(b.AvailableBytes()) / 1e9,
 		RiservaGB:     riservaSistemaGB(),
 		SogliaGB:      sogliaGB,
 		TettoGB:       m.CeilingGB,
@@ -197,7 +197,7 @@ func modelliConStato() RispostaModelli {
 		// così la pagina non deve chiederla modello per modello, e non può
 		// rispondere da sé una cosa diversa.
 		if x.Stato == StatoSpento && s.GB > 0 {
-			v := b.Ammette(uint64(s.GB*1e9), p)
+			v := b.Admits(uint64(s.GB*1e9), p)
 			x.Verdetto = &v
 		}
 		out.Modelli = append(out.Modelli, x)
