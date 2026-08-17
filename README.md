@@ -168,7 +168,7 @@ NSWindow + WKWebView           127.0.0.1:7070, localhost only
 cmd/thelaap/      the program: server, routes, embedded page
 internal/budget/  the memory arbiter, no I/O
 menubar/          menu bar item and window (Swift)
-esempi/           a working example of a regime script
+examples/         an adaptable example of a regime script
 ```
 
 `internal/budget` is the only extracted piece, and not for symmetry: `budget.go`

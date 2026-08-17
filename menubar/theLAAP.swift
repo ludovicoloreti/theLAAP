@@ -164,7 +164,7 @@ final class Finestra: NSWindowController, WKNavigationDelegate, WKScriptMessageH
            una finestra di Terminale che lo avvia, poi puoi chiuderla.</p>
         <button onclick="window.webkit.messageHandlers.avvia.postMessage('')">Avvia il pannello</button>
         <p style="margin-top:18px;font-size:13px">In alternativa, doppio click su
-           <code>Avvia theLAAP.command</code> sulla Scrivania.</p>
+           <code>start-server.command</code> nella cartella del progetto.</p>
         </div></body></html>
         """
         w.loadHTMLString(html, baseURL: nil)
@@ -418,7 +418,7 @@ final class Barra: NSObject, NSApplicationDelegate {
     /// schermo di chi sta cercando di capire cosa non va.
     private var ultimoTerminale = Date.distantPast
     func avviaViaTerminale() {
-        let script = Bundle.main.bundlePath + "/Contents/Resources/avvia-server.command"
+        let script = Bundle.main.bundlePath + "/Contents/Resources/start-server.command"
         guard FileManager.default.isExecutableFile(atPath: script) else { return }
         guard Date().timeIntervalSince(ultimoTerminale) > 120 else { return }
         ultimoTerminale = Date()

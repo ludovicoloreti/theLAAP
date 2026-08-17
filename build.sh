@@ -1,17 +1,17 @@
 #!/bin/bash
-# build.sh — compila theLAAP (The Local AI Admin Panel).
+# build.sh — builds theLAAP (The Local AI Admin Panel).
 #
-#   ./build.sh              solo i binari
-#   ./build.sh --app        crea theLAAP.app qui accanto
-#   ./build.sh --install    la mette in /Applications
-#   ./build.sh --desktop    la mette sulla Scrivania
+#   ./build.sh              binaries only
+#   ./build.sh --app        creates theLAAP.app next to this file
+#   ./build.sh --install    puts it in /Applications
+#   ./build.sh --desktop    puts it on the Desktop
 #
-# L'app contiene due programmi:
-#   · aipanel  — il server del pannello web (Go)
-#   · theLAAP  — la voce nella barra dei menu (Swift), che è quello che parte
+# The app carries two programs:
+#   aipanel   the panel server (Go)
+#   theLAAP   the menu bar item (Swift), which is what actually launches
 #
-# Il codesign ad-hoc NON è facoltativo: senza firma il binario Go parte da
-# terminale ma, lanciato da launchd, resta appeso dentro dyld senza dire niente.
+# The ad-hoc codesign is NOT optional: unsigned, the Go binary runs from a
+# terminal but, launched by launchd, hangs inside dyld without saying anything.
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -19,21 +19,21 @@ QUI="$(pwd)"
 PORTA=7070
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH
 
-echo "▸ compilo il pannello (Go)"
+echo "> building the panel (Go)"
 go build -o aipanel ./cmd/thelaap
 codesign -s - --force ./aipanel >/dev/null 2>&1
-echo "  ✅ aipanel ($(du -h aipanel | cut -f1))"
+echo "  aipanel ok ($(du -h aipanel | cut -f1))"
 
-echo "▸ compilo la voce nella barra (Swift)"
+echo "> building the menu bar item (Swift)"
 if swiftc -O menubar/theLAAP.swift -o menubar/theLAAP -framework Cocoa -framework WebKit 2>/dev/null; then
-  echo "  ✅ theLAAP ($(du -h menubar/theLAAP | cut -f1))"
+  echo "  theLAAP ok ($(du -h menubar/theLAAP | cut -f1))"
   BARRA=1
 else
-  echo "  ⚠️  Swift non disponibile: l'app avrà solo il pannello"
+  echo "  Swift toolchain missing: the app will carry only the panel"
   BARRA=0
 fi
 
-[[ "${1:-}" == "" ]] && { echo; echo "Avvia con: ./aipanel   (oppure ./build.sh --install)"; exit 0; }
+[[ "${1:-}" == "" ]] && { echo; echo "Run it with: ./aipanel   (or ./build.sh --install)"; exit 0; }
 
 DEST="$QUI"
 case "${1:-}" in
@@ -42,11 +42,11 @@ case "${1:-}" in
 esac
 APP="$DEST/theLAAP.app"
 
-echo "▸ preparo theLAAP.app"
+echo "> assembling theLAAP.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-# LSUIElement=true → vive nella barra dei menu, senza icona nel Dock
+# The activation policy is set at runtime, not here: see note 2 in the README.
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -73,18 +73,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 cp aipanel "$APP/Contents/MacOS/aipanel"
-cp avvia-server.command "$APP/Contents/Resources/avvia-server.command" 2>/dev/null || true
-chmod +x "$APP/Contents/Resources/avvia-server.command" 2>/dev/null || true
+cp start-server.command "$APP/Contents/Resources/start-server.command" 2>/dev/null || true
+chmod +x "$APP/Contents/Resources/start-server.command" 2>/dev/null || true
 [ "$BARRA" = 1 ] && cp menubar/theLAAP "$APP/Contents/MacOS/theLAAP"
 
 cat > "$APP/Contents/MacOS/avvia" <<AVVIO
 #!/bin/bash
-# Avvia il server del pannello se non c'è già, poi passa il comando
-# alla voce nella barra dei menu (o apre direttamente il pannello).
+# Starts the panel server if it is not already up, then hands over to the menu
+# bar item (or opens the panel directly).
 QUI="\$(cd "\$(dirname "\$0")" && pwd)"
 PORTA=$PORTA
-# Il server lo avvia theLAAP: un'app lanciata dal Finder ha un ambiente ridotto
-# e il figlio avviato da questo script non arrivava mai ad ascoltare.
+# theLAAP starts the server: an app launched from the Finder has a reduced
+# environment, and the child started by this script never got to listen.
 if [ -x "\$QUI/theLAAP" ]; then
   exec "\$QUI/theLAAP"
 fi
@@ -101,7 +101,7 @@ exec open "http://127.0.0.1:\$PORTA"
 AVVIO
 chmod +x "$APP/Contents/MacOS/avvia"
 
-# icona generata al volo: niente file binari da tenere nel progetto
+# icon generated on the fly: no binary files to keep in the repository
 ICO=$(mktemp -d)/icona.iconset
 mkdir -p "$ICO"
 python3 - "$ICO" <<'PY' 2>/dev/null || true
@@ -123,10 +123,10 @@ PY
 ls "$ICO"/*.png >/dev/null 2>&1 && iconutil -c icns "$ICO" -o "$APP/Contents/Resources/icona.icns" 2>/dev/null || true
 
 codesign -s - --force --deep "$APP" >/dev/null 2>&1 || true
-echo "  ✅ $APP"
+echo "  $APP ok"
 echo
 if [ "$BARRA" = 1 ]; then
-  echo "Aprila: compare l'icona nella barra in alto. Da lì apri il pannello completo."
+  echo "Open it: the icon appears in the menu bar. The full panel opens from there."
 else
   echo "Aprila: si apre il pannello su http://127.0.0.1:$PORTA"
 fi

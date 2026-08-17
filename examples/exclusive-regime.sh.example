@@ -1,0 +1,178 @@
+#!/bin/bash
+# exclusive-regime.sh — the "one large model, and nothing else" regime.
+#
+# WHY IT EXISTS
+# A ~89.5 GiB model fits comfortably on a 128 GiB machine on its own, but NOT
+# next to a second server that peaks at 79 GiB: on 27 July 2026 the two together
+# caused a kernel panic.
+#
+# The refusal seen with the normal profile was NOT a lack of RAM. The machine had
+# 16.4 GB free and zero swap. It was the margin oMLX imposes on itself:
+#
+#   prefill cap = (ceiling - hot cache reserve) x tier margin
+#
+# Two knobs were tightening it for no reason in single model use:
+#
+#   1. hot_cache_max_size 8GB is SUBTRACTED from the abort ceiling: 8 GB of
+#      prompt cache cost 8 GB of prefill margin.
+#   2. the "balanced" tier uses 90% of the ceiling, "custom" 95%
+#      (_PREFILL_ABORT_MARGIN in process_memory_enforcer.py).
+#
+# The "custom" tier is blind to other processes, which is exactly why it caused
+# the panic. But in an exclusive regime there is nothing else to see, and that is
+# what makes the tier safe again here.
+#
+# USAGE
+#   ./exclusive-regime.sh on       enter the regime (stop the other server, widen margins)
+#   ./exclusive-regime.sh off      restore everything
+#   ./exclusive-regime.sh stato    show where you are
+#
+#   margini-larghi / margini-prudenti      (wide margins / cautious margins)
+#     The memory part only, without touching the other programs. These are the
+#     two subcommands theLAAP invokes: the panel already knows how to stop and
+#     restart the runtimes, and it stops them BEFORE calling margini-larghi. The
+#     order matters, because widening the margins while another model is still
+#     resident is exactly the configuration that panicked the machine.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# ADAPT THIS BLOCK. Everything below it is machine independent.
+# These values come from the machine this was written on: LaunchAgent labels,
+# service ports and the ceiling the GPU allows.
+# ─────────────────────────────────────────────────────────────────────────────
+ETICHETTA_GRANDE="com.example.omlx"      # the runtime that stays up
+ETICHETTA_ALTRO="com.example.mtplx"      # the runtime stopped by "on"
+PORTA_GRANDE=8000                        # its health endpoint
+PORTA_ALTRO=8080                         # the other one's model list
+OMLX_CFG="$HOME/.omlx/settings.json"
+AGENT_GRANDE="$HOME/Library/LaunchAgents/$ETICHETTA_GRANDE.plist"
+AGENT_ALTRO="$HOME/Library/LaunchAgents/$ETICHETTA_ALTRO.plist"
+
+# The file whose existence tells the panel the regime is on. Declare the same
+# path as "segno" in the panel configuration, or the panel cannot tell "off"
+# from "I do not know".
+SEGNO="$HOME/.omlx/.exclusive-regime"
+
+# 112 is the Metal cap: past it you get nothing anyway, and keeping it there
+# makes the clean refusal (105.4 GiB) fire BEFORE the destructive abort
+# (106.4 GiB). The order matters: inverted, one long request would kill all the
+# others instead of being refused on its own.
+GUARD_ESCL=112
+HOT_ESCL='"1GB"'
+# The normal profile, the one that coexists with the other server.
+HOT_NORM='"8GB"'
+# ─────────────────────────────────────────────────────────────────────────────
+
+set -uo pipefail
+UID_=$(id -u)
+
+msg(){ printf '  %s\n' "$*"; }
+
+libera_gb(){ python3 - <<'PY'
+import subprocess
+o=subprocess.run(['vm_stat'],capture_output=True,text=True).stdout
+d={l.split(':')[0].strip():int(l.split(':')[1].strip().rstrip('.'))*16384
+   for l in o.splitlines() if ':' in l and l.split(':')[1].strip().rstrip('.').isdigit()}
+print(f"{(d['Pages free']+d['Pages inactive'])/1e9:.1f}")
+PY
+}
+
+attende(){ # attende <url> <seconds>
+  local i; for i in $(seq 1 "$2"); do
+    curl -s --max-time 4 "$1" >/dev/null 2>&1 && return 0; sleep 2
+  done; return 1
+}
+
+imposta_hot(){ # imposta_hot <json-value>
+  python3 - "$OMLX_CFG" "$1" <<'PY'
+import json,sys
+p,v=sys.argv[1],json.loads(sys.argv[2])
+d=json.load(open(p)); d.setdefault("cache",{})["hot_cache_max_size"]=v
+json.dump(d,open(p,"w"),indent=2,ensure_ascii=False)
+PY
+}
+
+imposta_guard(){ # imposta_guard esclusivo|normale
+  python3 - "$AGENT_GRANDE" "$1" "$GUARD_ESCL" <<'PY'
+import plistlib,sys
+p,modo,gb=sys.argv[1],sys.argv[2],sys.argv[3]
+d=plistlib.load(open(p,'rb')); a=d["ProgramArguments"]
+# drop any previous guard setting
+out=[];i=0
+while i<len(a):
+    if a[i] in ("--memory-guard","--memory-guard-gb"): i+=2; continue
+    out.append(a[i]); i+=1
+out += (["--memory-guard-gb",gb] if modo=="esclusivo" else ["--memory-guard","balanced"])
+d["ProgramArguments"]=out
+plistlib.dump(d,open(p,'wb'))
+print("  arguments:"," ".join(out[-2:]))
+PY
+}
+
+riavvia_grande(){
+  # bootout+bootstrap, not kickstart: launchd does NOT re-read the plist on kickstart.
+  launchctl bootout "gui/$UID_/$ETICHETTA_GRANDE" 2>/dev/null; sleep 5
+  launchctl bootstrap "gui/$UID_" "$AGENT_GRANDE" 2>/dev/null
+  attende "http://127.0.0.1:$PORTA_GRANDE/health" 40
+}
+
+# The memory part only. theLAAP calls these two: by the time it gets here the
+# panel has already stopped the other programs.
+margini_larghi(){
+  msg "hot cache 8GB -> 1GB (gives back ~7 GiB of prefill ceiling)"
+  imposta_hot "$HOT_ESCL"
+  msg "memory guard -> custom $GUARD_ESCL GiB (margin 0.95 instead of 0.90)"
+  imposta_guard esclusivo
+  msg "restarting the runtime"
+  if riavvia_grande; then msg "runtime ready"; else msg "WARNING: the runtime is not answering"; fi
+  touch "$SEGNO"
+  msg "free memory: $(libera_gb) GB"
+}
+
+margini_prudenti(){
+  msg "hot cache -> 8GB"; imposta_hot "$HOT_NORM"
+  msg "memory guard -> balanced (it sees the other processes again)"; imposta_guard normale
+  msg "restarting the runtime"
+  if riavvia_grande; then msg "runtime ready"; else msg "WARNING: the runtime is not answering"; fi
+  rm -f "$SEGNO"
+}
+
+case "${1:-stato}" in
+margini-larghi)   margini_larghi; exit 0 ;;
+margini-prudenti) margini_prudenti; exit 0 ;;
+on)
+  [ -f "$SEGNO" ] && { msg "already in the exclusive regime"; exit 0; }
+  msg "1/4 stopping the other runtime (it stays unreachable until \"off\")"
+  launchctl bootout "gui/$UID_/$ETICHETTA_ALTRO" 2>/dev/null; sleep 6
+  msg "    free memory now: $(libera_gb) GB"
+  msg "2/4 hot cache 8GB -> 1GB (gives back ~7 GiB of prefill ceiling)"
+  imposta_hot "$HOT_ESCL"
+  msg "3/4 memory guard -> custom $GUARD_ESCL GiB (margin 0.95 instead of 0.90)"
+  imposta_guard esclusivo
+  msg "4/4 restarting the runtime"
+  if riavvia_grande; then msg "    runtime ready"; else msg "    WARNING: the runtime is not answering"; fi
+  touch "$SEGNO"
+  msg ""
+  msg "Exclusive regime on. Load the large model whenever you want."
+  msg "To leave and get the other one back:  $0 off"
+  ;;
+off)
+  msg "1/4 hot cache -> 8GB"; imposta_hot "$HOT_NORM"
+  msg "2/4 memory guard -> balanced (it sees the other processes again)"; imposta_guard normale
+  msg "3/4 restarting the runtime"; riavvia_grande >/dev/null && msg "    runtime ready" || msg "    WARNING: not answering"
+  msg "4/4 starting the other runtime again"
+  launchctl bootstrap "gui/$UID_" "$AGENT_ALTRO" 2>/dev/null
+  if attende "http://127.0.0.1:$PORTA_ALTRO/v1/models" 60; then msg "    ready"; else msg "    WARNING: not answering"; fi
+  rm -f "$SEGNO"
+  msg ""; msg "Normal state restored."
+  ;;
+stato)
+  [ -f "$SEGNO" ] && msg "regime: EXCLUSIVE" || msg "regime: normal"
+  msg "hot cache:  $(python3 -c "import json;print(json.load(open('$OMLX_CFG'))['cache']['hot_cache_max_size'])" 2>/dev/null)"
+  msg "guard:      $(launchctl print "gui/$UID_/$ETICHETTA_GRANDE" 2>/dev/null | grep -A1 -- '--memory-guard' | tail -1 | tr -d ' \t')"
+  msg "other:      $(curl -s --max-time 3 "http://127.0.0.1:$PORTA_ALTRO/v1/models" >/dev/null 2>&1 && echo up || echo down)"
+  msg "large:      $(curl -s --max-time 3 "http://127.0.0.1:$PORTA_GRANDE/health" >/dev/null 2>&1 && echo up || echo down)"
+  msg "free:       $(libera_gb) GB"
+  ;;
+*)
+  echo "usage: $0 on|off|stato"; exit 1;;
+esac

@@ -397,7 +397,7 @@ freno di due minuti.
 cmd/thelaap/      il programma: server, rotte, pagina incorporata
 internal/budget/  l'arbitro della memoria, senza I/O
 menubar/          la voce nella barra dei menu e la finestra (Swift)
-esempi/           uno script di regime, di esempio e funzionante
+examples/         uno script di regime, di esempio e adattabile
 ```
 
 `internal/budget` è l'unico pezzo estratto, e non per simmetria: `budget.go`
@@ -437,7 +437,7 @@ team Go.
 | `menubar/theLAAP.swift` | la voce nella barra di stato, la finestra vera e il menu in alto |
 | `ui.html` | tutta l'interfaccia, incorporata nel binario |
 | `build.sh` | compila, firma, e crea l'app per macOS |
-| `avvia-server.command` | avvio del server da terminale: da quando i dati non stanno sul Desktop è solo un ripiego (nota 3) |
+| `start-server.command` | avvio del server da terminale: da quando i dati non stanno sul Desktop è solo un ripiego (nota 3) |
 
 I test dicono cosa non deve tornare a rompersi, e ognuno è stato verificato
 rompendo la regola prima di scriverla:
