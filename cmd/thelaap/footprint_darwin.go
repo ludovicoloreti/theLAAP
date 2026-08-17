@@ -39,9 +39,9 @@ var (
 	rePicco     = regexp.MustCompile(`phys_footprint_peak:\s+([\d.]+)\s*([KMGT]?B)`)
 )
 
-// byteDaMisura converte "71 GB", "2464 KB", "0 B" in byte.
+// bytesFromMeasure converte "71 GB", "2464 KB", "0 B" in byte.
 // footprint(1) usa unità binarie pur scrivendo KB/MB/GB.
-func byteDaMisura(valore, unita string) uint64 {
+func bytesFromMeasure(valore, unita string) uint64 {
 	v := parseFloat(valore)
 	if v < 0 {
 		return 0
@@ -60,18 +60,18 @@ func byteDaMisura(valore, unita string) uint64 {
 	return uint64(v * mult)
 }
 
-func occupazioneProcesso(pid int) (Occupazione, error) {
+func processFootprint(pid int) (Footprint, error) {
 	if pid <= 0 {
-		return Occupazione{}, fmt.Errorf("pid non valido: %d", pid)
+		return Footprint{}, fmt.Errorf("pid non valido: %d", pid)
 	}
 	out, err := cmdErr(6*time.Second, "footprint", fmt.Sprint(pid))
 	if err == nil {
 		mc := reFootprint.FindStringSubmatch(out)
 		mp := rePicco.FindStringSubmatch(out)
 		if len(mc) == 3 {
-			o := Occupazione{CorrenteByte: byteDaMisura(mc[1], mc[2])}
+			o := Footprint{CorrenteByte: bytesFromMeasure(mc[1], mc[2])}
 			if len(mp) == 3 {
-				o.PiccoByte = byteDaMisura(mp[1], mp[2])
+				o.PiccoByte = bytesFromMeasure(mp[1], mp[2])
 			}
 			if o.PiccoByte < o.CorrenteByte {
 				o.PiccoByte = o.CorrenteByte
@@ -86,19 +86,19 @@ func occupazioneProcesso(pid int) (Occupazione, error) {
 	// stima per una misura.
 	rss, err2 := cmdErr(4*time.Second, "ps", "-o", "rss=", "-p", fmt.Sprint(pid))
 	if err2 != nil {
-		return Occupazione{}, fmt.Errorf("né footprint né ps hanno risposto per il pid %d: %v / %v", pid, err, err2)
+		return Footprint{}, fmt.Errorf("né footprint né ps hanno risposto per il pid %d: %v / %v", pid, err, err2)
 	}
 	kb := parseFloat(strings.TrimSpace(rss))
 	if kb <= 0 {
-		return Occupazione{}, fmt.Errorf("nessuna misura per il pid %d", pid)
+		return Footprint{}, fmt.Errorf("nessuna misura per il pid %d", pid)
 	}
 	b := uint64(kb * 1024)
-	return Occupazione{CorrenteByte: b, PiccoByte: b, Stimato: true}, nil
+	return Footprint{CorrenteByte: b, PiccoByte: b, Stimato: true}, nil
 }
 
-// pidInAscoltoSuPorta: chi tiene la porta. Serve per legare un runtime della
+// pidListeningOnPort: chi tiene la porta. Serve per legare un runtime della
 // configurazione al processo che lo esegue davvero.
-func pidInAscoltoSuPorta(porta int) (int, error) {
+func pidListeningOnPort(porta int) (int, error) {
 	out, err := cmdErr(5*time.Second, "lsof", "-nP",
 		fmt.Sprintf("-iTCP:%d", porta), "-sTCP:LISTEN", "-t")
 	if err != nil {

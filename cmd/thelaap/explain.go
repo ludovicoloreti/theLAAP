@@ -15,23 +15,23 @@ import (
 // rubare memoria ai modelli veri. Non lo fissiamo per nome: lo cerchiamo fra
 // quelli serviti, preferendo il più piccolo. Così se domani i modelli sono altri,
 // l'aiuto continua a funzionare.
-var MODELLO_SPIEGA_FISSO = os.Getenv("LAAP_MODELLO_AIUTO") // se vuoi imporne uno
+var EXPLAIN_MODEL_PINNED = os.Getenv("LAAP_MODELLO_AIUTO") // se vuoi imporne uno
 
 var (
 	aiutoScelto   string
 	aiutoSceltoMu sync.RWMutex
 )
 
-// tettoModellinoB: sopra questi miliardi di parametri non è più un modellino.
+// helperCeilingB: sopra questi miliardi di parametri non è più un modellino.
 // Serve a scrivere etichette e a rispondere a domande sul pannello: deve costare
 // poco e potersi tenere scaricato, non essere il modello più capace.
-const tettoModellinoB = 8.0
+const helperCeilingB = 8.0
 
-// numeriNelNome trova le taglie scritte nel nome: il gruppo 1 è un'eventuale "a"
+// numbersInName trova le taglie scritte nel nome: il gruppo 1 è un'eventuale "a"
 // (parametri ATTIVI), il 3 un eventuale "it" (è una quantizzazione, non una taglia).
-var numeriNelNome = regexp.MustCompile(`(a?)(\d+(?:\.\d+)?)b(it)?`)
+var numbersInName = regexp.MustCompile(`(a?)(\d+(?:\.\d+)?)b(it)?`)
 
-// parametriMiliardi: quanti miliardi di parametri dice il nome, 0 se non lo dice.
+// paramsBillions: quanti miliardi di parametri dice il nome, 0 se non lo dice.
 //
 // Conta i parametri TOTALI, non quelli attivi. `gemma-4-26b-a4b` è un modello a
 // esperti che ne attiva 4 su 26: è veloce, ma in memoria ce ne stanno 26 — e per
@@ -39,9 +39,9 @@ var numeriNelNome = regexp.MustCompile(`(a?)(\d+(?:\.\d+)?)b(it)?`)
 // faceva scegliere un 26B come modellino, ed è quello che è successo.
 //
 // Ignora anche la quantizzazione: `-8bit` non sono 8 miliardi di parametri.
-func parametriMiliardi(id string) float64 {
+func paramsBillions(id string) float64 {
 	piu := 0.0
-	for _, m := range numeriNelNome.FindAllStringSubmatch(strings.ToLower(id), -1) {
+	for _, m := range numbersInName.FindAllStringSubmatch(strings.ToLower(id), -1) {
 		if m[1] == "a" || m[3] == "it" {
 			continue // parametri attivi, oppure bit di quantizzazione
 		}
@@ -60,36 +60,36 @@ func parametriMiliardi(id string) float64 {
 // voleva dire tenerne due allineati a mano — e il primo tentativo non conosceva
 // «bge-», che è una delle famiglie di embedding più diffuse: l'avrebbe proposto
 // come aiuto.
-var mestieriCheNonConversano = map[string]bool{
+var jobsThatDoNotChat = map[string]bool{
 	"ricerca-testi": true, "vede-immagini": true, "trascrive": true, "diffusione": true,
 }
 
-func nonPuoFareAiuto(id string) bool {
+func cannotHelp(id string) bool {
 	for _, i := range indizi(id) {
-		if mestieriCheNonConversano[i.Tratto] {
+		if jobsThatDoNotChat[i.Tratto] {
 			return true
 		}
 	}
 	return false
 }
 
-// aiutoRipiego: vero quando fra i modelli serviti non ce n'era nessuno piccolo e
+// helperFallback: vero quando fra i modelli serviti non ce n'era nessuno piccolo e
 // si è dovuto usare quello che c'era. Non è un dettaglio da tacere: il pannello
 // lo dice, perché un 26B che scrive etichette occupa memoria che serve altrove.
-var aiutoRipiego bool
+var helperFallback bool
 
-// scegliModellino: fra i modelli serviti, il più piccolo che sappia conversare.
+// pickHelper: fra i modelli serviti, il più piccolo che sappia conversare.
 // Il secondo valore dice che è un RIPIEGO: nessuno era abbastanza piccolo e si è
-// preso quello che c'era. Sta fuori da modelloAiuto perché quella interroga i
+// preso quello che c'era. Sta fuori da helperModel perché quella interroga i
 // runtime, e la regola va potuta provare senza accendere niente.
-func scegliModellino(candidati []string) (string, bool) {
+func pickHelper(candidati []string) (string, bool) {
 	scelto, taglia := "", 0.0
 	for _, id := range candidati {
-		if nonPuoFareAiuto(id) {
+		if cannotHelp(id) {
 			continue
 		}
-		n := parametriMiliardi(id)
-		if n == 0 || n > tettoModellinoB {
+		n := paramsBillions(id)
+		if n == 0 || n > helperCeilingB {
 			continue
 		}
 		if scelto == "" || n < taglia {
@@ -102,20 +102,20 @@ func scegliModellino(candidati []string) (string, bool) {
 	// Meglio uno grosso che nessuno — senza aiuto il pannello perde le
 	// descrizioni e la chat — ma chi lo usa deve saperlo.
 	for _, id := range candidati {
-		if !nonPuoFareAiuto(id) {
+		if !cannotHelp(id) {
 			return id, true
 		}
 	}
 	return "", false
 }
 
-func modelloAiuto() string {
+func helperModel() string {
 	// Ordine di precedenza: la variabile d'ambiente (per provarlo), poi la
-	// configurazione, poi la scelta automatica. `modelloAiuto` in configurazione
+	// configurazione, poi la scelta automatica. `helperModel` in configurazione
 	// prometteva «vuoto = lo sceglie da sé» e non veniva letta da nessuno: chi
 	// la scriveva non otteneva niente, in silenzio.
-	if MODELLO_SPIEGA_FISSO != "" {
-		return MODELLO_SPIEGA_FISSO
+	if EXPLAIN_MODEL_PINNED != "" {
+		return EXPLAIN_MODEL_PINNED
 	}
 	if m := strings.TrimSpace(cfg().ModelloAiuto); m != "" {
 		return m
@@ -128,15 +128,15 @@ func modelloAiuto() string {
 	aiutoSceltoMu.RUnlock()
 
 	var candidati []string
-	for _, rt := range scopriRuntime() {
+	for _, rt := range discoverRuntimes() {
 		if rt.Chiave != "omlx" && rt.Chiave != "lmstudio" {
 			continue
 		}
 		candidati = append(candidati, rt.Modelli...)
 	}
-	scelto, ripiego := scegliModellino(candidati)
+	scelto, ripiego := pickHelper(candidati)
 	aiutoSceltoMu.Lock()
-	aiutoScelto, aiutoRipiego = scelto, ripiego
+	aiutoScelto, helperFallback = scelto, ripiego
 	aiutoSceltoMu.Unlock()
 	return scelto
 }
@@ -144,7 +144,7 @@ func modelloAiuto() string {
 // Non è un assistente generico: è il libretto di istruzioni di QUESTO pannello.
 // Deve rispondere solo con quello che gli passiamo (manuale + stato di adesso),
 // e ammettere di non sapere invece di inventare.
-const REGOLE = `Sei l'aiuto del pannello di controllo dei modelli AI installati su questo Mac.
+const RULES = `Sei l'aiuto del pannello di controllo dei modelli AI installati su questo Mac.
 Chi ti scrive è la persona che usa il pannello, non un tecnico.
 
 REGOLE:
@@ -156,35 +156,35 @@ REGOLE:
 - Non citare mai i titoli in maiuscolo di questo testo: sono appunti per te, non cose che la persona vede sullo schermo. Le sezioni che lei vede si chiamano "I tuoi modelli", "Aggiungi un modello" e "Sistema".
 - Non fare somme o calcoli sui numeri: riporta quelli che trovi, e basta.`
 
-type reqSpiega struct {
+type reqExplain struct {
 	Domanda string `json:"domanda"`
 }
 
-// apiDomande: il repertorio dei suggerimenti, mescolato dal client.
-func apiDomande(w http.ResponseWriter, r *http.Request) {
-	scriviJSON(w, DOMANDE)
+// apiQuestions: il repertorio dei suggerimenti, mescolato dal client.
+func apiQuestions(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, QUESTIONS)
 }
 
-// apiAiuto: quale modello risponde alle domande e scrive le descrizioni.
+// apiHelper: quale modello risponde alle domande e scrive le descrizioni.
 //
 // Serve al pannello per nominarlo invece di dire «il modellino»: senza questo,
 // l'unico modo di scriverlo nella pagina sarebbe cablarne il nome, e cambiando
 // macchina la pagina mentirebbe. Sta su una rotta sua e non dentro
 // /api/modelli perché sceglierlo interroga i runtime, e /api/modelli viene
 // richiesto ogni cinque secondi.
-func apiAiuto(w http.ResponseWriter, r *http.Request) {
-	m := modelloAiuto()
-	scriviJSON(w, map[string]any{
-		"modello": m, "porta": portaAiuto(),
-		"fisso":      MODELLO_SPIEGA_FISSO != "" || strings.TrimSpace(cfg().ModelloAiuto) != "",
-		"parametriB": parametriMiliardi(m),
-		"tettoB":     tettoModellinoB,
-		"ripiego":    aiutoRipiego,
+func apiHelper(w http.ResponseWriter, r *http.Request) {
+	m := helperModel()
+	writeJSON(w, map[string]any{
+		"modello": m, "porta": helperPort(),
+		"fisso":      EXPLAIN_MODEL_PINNED != "" || strings.TrimSpace(cfg().ModelloAiuto) != "",
+		"parametriB": paramsBillions(m),
+		"tettoB":     helperCeilingB,
+		"ripiego":    helperFallback,
 	})
 }
 
-func apiSpiega(w http.ResponseWriter, r *http.Request) {
-	var req reqSpiega
+func apiExplain(w http.ResponseWriter, r *http.Request) {
+	var req reqExplain
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Domanda == "" {
 		errJSON(w, "domanda mancante")
 		return
@@ -192,11 +192,11 @@ func apiSpiega(w http.ResponseWriter, r *http.Request) {
 	// Mini-RAG: prendo dal manuale solo i pezzi che c'entrano con la domanda,
 	// e ci aggiungo sempre la fotografia dello stato attuale della macchina.
 	var ctx strings.Builder
-	ctx.WriteString(REGOLE)
-	ctx.WriteString("\n\n" + statoLive())
+	ctx.WriteString(RULES)
+	ctx.WriteString("\n\n" + liveState())
 	docs := recupera(req.Domanda, 3)
 	if len(docs) == 0 {
-		docs = CONOSCENZA[:2] // almeno "a cosa serve il pannello"
+		docs = KNOWLEDGE[:2] // almeno "a cosa serve il pannello"
 	}
 	ctx.WriteString("\nDAL MANUALE DEL PANNELLO:\n")
 	for _, d := range docs {
@@ -204,7 +204,7 @@ func apiSpiega(w http.ResponseWriter, r *http.Request) {
 	}
 
 	corpo, _ := json.Marshal(map[string]any{
-		"model": modelloAiuto(),
+		"model": helperModel(),
 		"messages": []any{
 			map[string]any{"role": "system", "content": ctx.String()},
 			map[string]any{"role": "user", "content": trunc(req.Domanda, 500)},
@@ -213,7 +213,7 @@ func apiSpiega(w http.ResponseWriter, r *http.Request) {
 		"temperature": 0.2,
 	})
 	cl := &http.Client{Timeout: 10 * time.Minute}
-	resp, err := cl.Post("http://127.0.0.1:"+itoa(portaAiuto())+"/v1/chat/completions",
+	resp, err := cl.Post("http://127.0.0.1:"+itoa(helperPort())+"/v1/chat/completions",
 		"application/json", bytes.NewReader(corpo))
 	if err != nil {
 		errJSON(w, "il mini-modello non risponde: "+err.Error())
@@ -237,13 +237,13 @@ func apiSpiega(w http.ResponseWriter, r *http.Request) {
 	c0, _ := scelte[0].(map[string]any)
 	msg, _ := c0["message"].(map[string]any)
 	testo, _ := msg["content"].(string)
-	scriviJSON(w, map[string]any{"ok": true, "risposta": testo})
+	writeJSON(w, map[string]any{"ok": true, "risposta": testo})
 }
 
-// portaAiuto: su quale runtime vive il modello scelto per l'aiuto.
-func portaAiuto() int {
-	m := modelloAiuto()
-	for _, rt := range scopriRuntime() {
+// helperPort: su quale runtime vive il modello scelto per l'aiuto.
+func helperPort() int {
+	m := helperModel()
+	for _, rt := range discoverRuntimes() {
 		for _, id := range rt.Modelli {
 			if id == m {
 				return rt.Porta

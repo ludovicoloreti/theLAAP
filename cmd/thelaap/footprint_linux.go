@@ -15,13 +15,13 @@ import (
 // footprint(1) dà su macOS. Non copre la memoria della GPU discreta, che su
 // Linux è separata dalla RAM e va chiesta al driver — per questo il dato è
 // marcato come stima quando c'è una GPU NVIDIA/AMD di mezzo.
-func occupazioneProcesso(pid int) (Occupazione, error) {
+func processFootprint(pid int) (Footprint, error) {
 	if pid <= 0 {
-		return Occupazione{}, fmt.Errorf("pid non valido: %d", pid)
+		return Footprint{}, fmt.Errorf("pid non valido: %d", pid)
 	}
 	b, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
 	if err != nil {
-		return Occupazione{}, fmt.Errorf("lettura di /proc/%d/status: %w", pid, err)
+		return Footprint{}, fmt.Errorf("lettura di /proc/%d/status: %w", pid, err)
 	}
 	var rss, hwm uint64
 	for _, riga := range strings.Split(string(b), "\n") {
@@ -37,18 +37,18 @@ func occupazioneProcesso(pid int) (Occupazione, error) {
 		}
 	}
 	if rss == 0 {
-		return Occupazione{}, fmt.Errorf("nessun VmRSS per il pid %d", pid)
+		return Footprint{}, fmt.Errorf("nessun VmRSS per il pid %d", pid)
 	}
 	if hwm < rss {
 		hwm = rss
 	}
 	// Con una GPU discreta la memoria dei pesi non sta in VmRSS: è nella VRAM
 	// e la conta il driver. Dirlo, invece di far passare il numero per completo.
-	stimato := haGPUDiscreta()
-	return Occupazione{CorrenteByte: rss, PiccoByte: hwm, Stimato: stimato}, nil
+	stimato := hasDiscreteGPU()
+	return Footprint{CorrenteByte: rss, PiccoByte: hwm, Stimato: stimato}, nil
 }
 
-func haGPUDiscreta() bool {
+func hasDiscreteGPU() bool {
 	if _, err := os.Stat("/proc/driver/nvidia"); err == nil {
 		return true
 	}
@@ -58,7 +58,7 @@ func haGPUDiscreta() bool {
 	return false
 }
 
-func pidInAscoltoSuPorta(porta int) (int, error) {
+func pidListeningOnPort(porta int) (int, error) {
 	out, err := shErr(5*time.Second,
 		fmt.Sprintf("ss -lptnH 'sport = :%d' 2>/dev/null | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2", porta))
 	if err != nil {

@@ -33,7 +33,7 @@ type Runtime struct {
 
 // I runtime non sono più scritti qui: vengono dalla configurazione, che
 // descrive la macchina su cui il pannello sta girando.
-func runtimeConfigurati() []Runtime {
+func configuredRuntimes() []Runtime {
 	out := []Runtime{}
 	for _, r := range cfg().Runtime {
 		chiaveOC := r.ChiaveOC
@@ -44,15 +44,15 @@ func runtimeConfigurati() []Runtime {
 		if elenco == "" {
 			elenco = "/v1/models"
 		}
-		// Le tre capacità le decide comandoServizio, la stessa funzione che poi
+		// Le tre capacità le decide serviceCommand, la stessa funzione che poi
 		// esegue: così il pannello non può offrire un pulsante che il server
 		// rifiuta. Le righe di shell non escono verso il browser.
 		out = append(out, Runtime{Chiave: r.Chiave, ChiaveOC: chiaveOC,
 			Nome: r.Nome, Cosa: r.Cosa, Porta: r.Porta, Elenco: elenco,
 			ModelloResidente: r.ModelloResidente,
-			PuoAvviare:       comandoServizio(r, "start") != "",
-			PuoFermare:       comandoServizio(r, "stop") != "",
-			PuoRiavviare:     comandoServizio(r, "restart") != ""})
+			PuoAvviare:       serviceCommand(r, "start") != "",
+			PuoFermare:       serviceCommand(r, "stop") != "",
+			PuoRiavviare:     serviceCommand(r, "restart") != ""})
 	}
 	return out
 }
@@ -80,9 +80,9 @@ func httpGet(url string, timeout time.Duration) []byte {
 	return b
 }
 
-// scopriRuntime interroga i server in parallelo e dice cosa serve DAVVERO ognuno.
-func scopriRuntime() []Runtime {
-	out := runtimeConfigurati()
+// discoverRuntimes interroga i server in parallelo e dice cosa serve DAVVERO ognuno.
+func discoverRuntimes() []Runtime {
+	out := configuredRuntimes()
 	if out == nil {
 		out = []Runtime{}
 	}
@@ -149,5 +149,5 @@ func itoa(n int) string {
 }
 
 func apiRuntime(w http.ResponseWriter, r *http.Request) {
-	scriviJSON(w, scopriRuntime())
+	writeJSON(w, discoverRuntimes())
 }

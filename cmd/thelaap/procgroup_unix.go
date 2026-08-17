@@ -11,11 +11,11 @@ import (
 // Uccidere solo `sh` lascia in giro i figli, che continuano a girare e a
 // tenere la memoria — proprio quello che il pannello serve a evitare.
 // Metterli in un gruppo di processi permette di ucciderli tutti insieme.
-func isolaGruppoProcessi(c *exec.Cmd) {
+func isolateProcessGroup(c *exec.Cmd) {
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }
 
-func uccidiGruppo(c *exec.Cmd) {
+func killGroup(c *exec.Cmd) {
 	if c.Process == nil {
 		return
 	}

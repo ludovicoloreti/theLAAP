@@ -12,35 +12,35 @@ import (
 )
 
 func TestValidaJSONEYAML(t *testing.T) {
-	jsonDoc := DocumentoConfig{ID: "client-0", Formato: "json"}
-	yamlDoc := DocumentoConfig{ID: "client-0", Formato: "yaml"}
-	if err := validaDocumento(jsonDoc, `{"modelli":[{"id":"uno"}]}`); err != nil {
+	jsonDoc := ConfigDocument{ID: "client-0", Formato: "json"}
+	yamlDoc := ConfigDocument{ID: "client-0", Formato: "yaml"}
+	if err := validateDocument(jsonDoc, `{"modelli":[{"id":"uno"}]}`); err != nil {
 		t.Fatalf("JSON valido rifiutato: %v", err)
 	}
-	if err := validaDocumento(jsonDoc, `{"modelli":`); err == nil {
+	if err := validateDocument(jsonDoc, `{"modelli":`); err == nil {
 		t.Fatal("JSON rotto accettato")
 	}
-	if err := validaDocumento(yamlDoc, "modelli:\n  - id: uno\n"); err != nil {
+	if err := validateDocument(yamlDoc, "modelli:\n  - id: uno\n"); err != nil {
 		t.Fatalf("YAML valido rifiutato: %v", err)
 	}
-	if err := validaDocumento(yamlDoc, "modelli:\n  - id: [\n"); err == nil {
+	if err := validateDocument(yamlDoc, "modelli:\n  - id: [\n"); err == nil {
 		t.Fatal("YAML rotto accettato")
 	}
-	if err := validaDocumento(yamlDoc, "uno: 1\n---\ndue: 2\n"); err == nil {
+	if err := validateDocument(yamlDoc, "uno: 1\n---\ndue: 2\n"); err == nil {
 		t.Fatal("file YAML con due documenti accettato")
 	}
 }
 
 func TestConversioneJSONYAMLSenzaPerdereLaStruttura(t *testing.T) {
 	originale := `{"runtime":[{"chiave":"omlx","porta":8000}],"attivo":true,"limite":24,"interoGrande":9007199254740993}`
-	y, err := convertiDocumento(originale, "json", "yaml")
+	y, err := convertDocument(originale, "json", "yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(y, "runtime:") || !strings.Contains(y, "chiave: omlx") {
 		t.Fatalf("YAML inatteso:\n%s", y)
 	}
-	j, err := convertiDocumento(y, "yaml", "json")
+	j, err := convertDocument(y, "yaml", "json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,12 +54,12 @@ func TestConversioneJSONYAMLSenzaPerdereLaStruttura(t *testing.T) {
 	if err := json.Unmarshal([]byte(j), &dopo); err != nil {
 		t.Fatal(err)
 	}
-	if !ugualiJSON(prima, dopo) {
+	if !sameJSON(prima, dopo) {
 		t.Fatalf("andata e ritorno hanno cambiato i dati:\n%s", j)
 	}
 }
 
-func ugualiJSON(a, b any) bool {
+func sameJSON(a, b any) bool {
 	aa, _ := json.Marshal(a)
 	bb, _ := json.Marshal(b)
 	return bytes.Equal(aa, bb)
@@ -89,11 +89,11 @@ func TestEditorNonSovrascriveUnaModificaEsterna(t *testing.T) {
 
 	get := httptest.NewRequest(http.MethodGet, "/api/documento?id=thelaap", nil)
 	wget := httptest.NewRecorder()
-	apiDocumento(wget, get)
+	apiDocument(wget, get)
 	if wget.Code != http.StatusOK {
 		t.Fatalf("lettura: codice %d, %s", wget.Code, wget.Body.String())
 	}
-	var letto documentoLetto
+	var letto documentRead
 	if err := json.Unmarshal(wget.Body.Bytes(), &letto); err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestEditorNonSovrascriveUnaModificaEsterna(t *testing.T) {
 	})
 	post := httptest.NewRequest(http.MethodPost, "/api/documento?id=thelaap", bytes.NewReader(corpo))
 	wpost := httptest.NewRecorder()
-	apiDocumento(wpost, post)
+	apiDocument(wpost, post)
 	if wpost.Code != http.StatusConflict {
 		t.Fatalf("modifica esterna sovrascritta: codice %d, %s", wpost.Code, wpost.Body.String())
 	}
@@ -118,7 +118,7 @@ func TestEditorNonSovrascriveUnaModificaEsterna(t *testing.T) {
 }
 
 func TestEditorEsponeSoloFileDichiarati(t *testing.T) {
-	if _, ok := trovaDocumento("../../etc/passwd"); ok {
+	if _, ok := findDocument("../../etc/passwd"); ok {
 		t.Fatal("un percorso arbitrario e' entrato nella lista bianca")
 	}
 }

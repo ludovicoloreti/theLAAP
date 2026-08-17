@@ -21,7 +21,7 @@ import (
 
 // La classe non è un'opinione: viene dalla soglia, e la soglia dalla macchina.
 func TestClasseDipendeDallaSogliaNonDalModello(t *testing.T) {
-	conConfig(t, Config{}) // nessun runtime residente dichiarato
+	withConfig(t, Config{}) // nessun runtime residente dichiarato
 	casi := []struct {
 		nome   string
 		gb     float64
@@ -36,7 +36,7 @@ func TestClasseDipendeDallaSogliaNonDalModello(t *testing.T) {
 		{"su un Mac da 256 lo stesso modello convive", 89.4, 128, ClasseConvivente},
 	}
 	for _, c := range casi {
-		got := classeDi(Scheda{GB: c.gb}, c.soglia)
+		got := classOf(Card{GB: c.gb}, c.soglia)
 		if got != c.atteso {
 			t.Errorf("%s: peso %.1f soglia %.0f → %s, atteso %s", c.nome, c.gb, c.soglia, got, c.atteso)
 		}
@@ -46,14 +46,14 @@ func TestClasseDipendeDallaSogliaNonDalModello(t *testing.T) {
 // La classe «residente» non si indovina dal nome del programma: la dichiara la
 // configurazione, ed è l'unica cosa che la decide.
 func TestResidenteVieneDallaConfigurazioneNonDalNome(t *testing.T) {
-	conConfig(t, Config{Runtime: []RuntimeCfg{
+	withConfig(t, Config{Runtime: []RuntimeCfg{
 		{Chiave: "ollama", Nome: "Ollama", ModelloResidente: true},
 		{Chiave: "mtplx", Nome: "MTPLX"},
 	}})
-	if c := classeDi(Scheda{Modello: Modello{Runtime: "ollama"}, GB: 0.3}, 64); c != ClasseResidente {
+	if c := classOf(Card{Model: Model{Runtime: "ollama"}, GB: 0.3}, 64); c != ClasseResidente {
 		t.Errorf("runtime dichiarato residente → %s", c)
 	}
-	if c := classeDi(Scheda{Modello: Modello{Runtime: "mtplx"}, GB: 0.3}, 64); c != ClasseConvivente {
+	if c := classOf(Card{Model: Model{Runtime: "mtplx"}, GB: 0.3}, 64); c != ClasseConvivente {
 		t.Errorf("runtime non dichiarato residente → %s, atteso convivente", c)
 	}
 }
@@ -62,40 +62,40 @@ func TestResidenteVieneDallaConfigurazioneNonDalNome(t *testing.T) {
 // Se qualcuno ne introduce una seconda, il pannello dice «convivente» su un
 // modello che il preflight rifiuta: è il difetto che questo test impedisce.
 func TestLaClasseUsaLaSogliaDellArbitro(t *testing.T) {
-	conConfig(t, Config{SogliaModelloGrandeGB: 50})
-	soglia := float64(politicaCorrente().LargeThresholdBytes) / 1e9
+	withConfig(t, Config{SogliaModelloGrandeGB: 50})
+	soglia := float64(currentPolicy().LargeThresholdBytes) / 1e9
 	if soglia != 50 {
 		t.Fatalf("la politica dice soglia %.1f GB, la configurazione 50", soglia)
 	}
 	// 60 GB: sopra la soglia → esclusivo per la classe E rifiutato dall'arbitro
 	// quando c'è già un grande in memoria.
-	if c := classeDi(Scheda{GB: 60}, soglia); c != ClasseEsclusivo {
+	if c := classOf(Card{GB: 60}, soglia); c != ClasseEsclusivo {
 		t.Errorf("60 GB con soglia 50 → %s", c)
 	}
 	b := budget.Budget{TotalBytes: gb(128), OSReserveBytes: gb(24),
 		Used: []budget.RuntimeUsage{{Key: "mtplx", Name: "MTPLX", PeakBytes: gb(55)}}}
-	if v := b.Admits(gb(60), politicaCorrente()); v.Allowed {
+	if v := b.Admits(gb(60), currentPolicy()); v.Allowed {
 		t.Error("l'arbitro ammette due grandi mentre la classe li dice esclusivi: le due soglie sono divergenti")
 	}
 }
 
 // Un modello pronto e basta, e non può essere il residente della ricerca.
 func TestUnSoloProntoEMaiIlResidente(t *testing.T) {
-	ss := []SchedaStato{
-		{Scheda: Scheda{TokS: 0}, Stato: StatoInMemoria, Classe: ClasseResidente},
-		{Scheda: Scheda{TokS: 3.7}, Stato: StatoInMemoria, Classe: ClasseConvivente},
-		{Scheda: Scheda{TokS: 61.4}, Stato: StatoInMemoria, Classe: ClasseConvivente},
-		{Scheda: Scheda{TokS: 99}, Stato: StatoSpento, Classe: ClasseConvivente},
+	ss := []CardState{
+		{Card: Card{TokS: 0}, Stato: StatoInMemoria, Classe: ClasseResidente},
+		{Card: Card{TokS: 3.7}, Stato: StatoInMemoria, Classe: ClasseConvivente},
+		{Card: Card{TokS: 61.4}, Stato: StatoInMemoria, Classe: ClasseConvivente},
+		{Card: Card{TokS: 99}, Stato: StatoSpento, Classe: ClasseConvivente},
 	}
-	if i := scegliPronto(ss); i != 2 {
+	if i := pickReady(ss); i != 2 {
 		t.Fatalf("pronto = indice %d, atteso 2 (il più veloce fra quelli in memoria che conversano)", i)
 	}
 	// Solo residenti in memoria: meglio proporre quello che niente.
-	if scegliPronto([]SchedaStato{{Stato: StatoInMemoria, Classe: ClasseResidente}}) != 0 {
+	if pickReady([]CardState{{Stato: StatoInMemoria, Classe: ClasseResidente}}) != 0 {
 		t.Error("con solo un residente caricato non propone niente")
 	}
 	// Niente in memoria: niente pronto, e non deve inventarlo.
-	if scegliPronto([]SchedaStato{{Stato: StatoSpento}}) != -1 {
+	if pickReady([]CardState{{Stato: StatoSpento}}) != -1 {
 		t.Error("propone un pronto con la memoria vuota")
 	}
 }
@@ -103,24 +103,24 @@ func TestUnSoloProntoEMaiIlResidente(t *testing.T) {
 // Le priorità dello stato. Un modello che sta scaricando non è "spento", e uno
 // che non risponde non è "in memoria" perché il programma è acceso.
 func TestPrioritaDelloStato(t *testing.T) {
-	conConfig(t, Config{})
-	m := MemStato{Caricati: []ModelloInRAM{{Nome: "publisher/Modello-8bit"}}}
+	withConfig(t, Config{})
+	m := MemState{Caricati: []ModelInRAM{{Nome: "publisher/Modello-8bit"}}}
 	arrivo := map[string]bool{"publisher/in-arrivo": true}
 
-	if s := statoDi(Scheda{Modello: Modello{ID: "publisher/Modello-8bit", Servito: true}}, m, arrivo); s != StatoInMemoria {
+	if s := stateOf(Card{Model: Model{ID: "publisher/Modello-8bit", Servito: true}}, m, arrivo); s != StatoInMemoria {
 		t.Errorf("caricato → %s", s)
 	}
-	if s := statoDi(Scheda{Modello: Modello{ID: "publisher/Modello-8bit", Servito: false}}, m, arrivo); s != StatoGuasto {
+	if s := stateOf(Card{Model: Model{ID: "publisher/Modello-8bit", Servito: false}}, m, arrivo); s != StatoGuasto {
 		t.Errorf("non servito ma caricato → %s, atteso guasto: l'id in configurazione è sbagliato", s)
 	}
-	if s := statoDi(Scheda{Modello: Modello{ID: "publisher/in-arrivo", Servito: false}}, m, arrivo); s != StatoInArrivo {
+	if s := stateOf(Card{Model: Model{ID: "publisher/in-arrivo", Servito: false}}, m, arrivo); s != StatoInArrivo {
 		t.Errorf("in scaricamento → %s, atteso in-arrivo", s)
 	}
-	if s := statoDi(Scheda{Modello: Modello{ID: "publisher/altro", Servito: true}}, m, arrivo); s != StatoSpento {
+	if s := stateOf(Card{Model: Model{ID: "publisher/altro", Servito: true}}, m, arrivo); s != StatoSpento {
 		t.Errorf("dichiarato e non caricato → %s", s)
 	}
 	// Maiuscole: i nomi arrivano da servizi di terzi e non combaciano mai.
-	if s := statoDi(Scheda{Modello: Modello{ID: "PUBLISHER/modello-8BIT", Servito: true}}, m, arrivo); s != StatoInMemoria {
+	if s := stateOf(Card{Model: Model{ID: "PUBLISHER/modello-8BIT", Servito: true}}, m, arrivo); s != StatoInMemoria {
 		t.Error("il confronto con i caricati è sensibile alle maiuscole")
 	}
 }
@@ -129,12 +129,12 @@ func TestPrioritaDelloStato(t *testing.T) {
 // È il difetto del 16/08/2026, riprodotto qui in modo che non torni: la voce
 // del menu mandava `stoppa-tutto` e il server conosceva `ferma-tutto`.
 func TestIdDelRegistroSonoEseguibili(t *testing.T) {
-	conConfig(t, Config{
+	withConfig(t, Config{
 		FermaTutto:     "ferma-tutto.sh",
 		RiaccendiTutto: "riaccendi.sh",
-		Strumenti: []StrumentoCfg{
-			{ID: "stato", Nome: "Stato rapido", Comando: "aistack.py", Durata: "2 s"},
-			{ID: "controllo-completo", Nome: "Controllo completo", Comando: "aicheck.py"},
+		Strumenti: []ToolCfg{
+			{ID: "stato", Nome: "Stato rapido", Command: "aistack.py", Durata: "2 s"},
+			{ID: "controllo-completo", Nome: "Controllo completo", Command: "aicheck.py"},
 		},
 		Regimi: []RegimeCfg{{Chiave: "esclusivo", Nome: "Un modello solo", RuntimeAttivo: "omlx"}},
 		Runtime: []RuntimeCfg{
@@ -152,7 +152,7 @@ func TestIdDelRegistroSonoEseguibili(t *testing.T) {
 		visti[c.ID] = true
 		switch c.Rotta {
 		case "/api/esegui":
-			if _, ok := comandoAmmesso(c.ID); !ok {
+			if _, ok := allowedCommand(c.ID); !ok {
 				t.Errorf("%q è nel registro ma /api/esegui lo rifiuta", c.ID)
 			}
 			if c.Corpo["cmd"] != c.ID {
@@ -183,7 +183,7 @@ func TestIdDelRegistroSonoEseguibili(t *testing.T) {
 // Senza comandi dichiarati non si inventa niente: un pulsante che non fa nulla
 // è peggio di un pulsante assente.
 func TestSenzaComandiIlRegistroNonInventa(t *testing.T) {
-	conConfig(t, Config{})
+	withConfig(t, Config{})
 	for _, c := range comandi() {
 		t.Errorf("configurazione vuota, e il registro offre %q su %s", c.ID, c.Rotta)
 	}
@@ -193,7 +193,7 @@ func TestSenzaComandiIlRegistroNonInventa(t *testing.T) {
 // server sa eseguire. Se le due regole si separano, il pulsante c'è e non fa
 // niente — in silenzio, come le voci di menu del 16/08/2026.
 func TestPulsantiDeiProgrammiSeguonoIComandi(t *testing.T) {
-	conConfig(t, Config{Runtime: []RuntimeCfg{
+	withConfig(t, Config{Runtime: []RuntimeCfg{
 		{Chiave: "completo", Nome: "Completo", Porta: 9001, Avvia: "su", Ferma: "giu", Riavvia: "ri"},
 		{Chiave: "senzariavvio", Nome: "Senza riavvio", Porta: 9002, Avvia: "su", Ferma: "giu"},
 		{Chiave: "solostop", Nome: "Solo stop", Porta: 9003, Ferma: "giu"},
@@ -205,7 +205,7 @@ func TestPulsantiDeiProgrammiSeguonoIComandi(t *testing.T) {
 		"solostop":     {false, true, false},
 		"muto":         {false, false, false},
 	}
-	for _, r := range runtimeConfigurati() {
+	for _, r := range configuredRuntimes() {
 		a := atteso[r.Chiave]
 		if r.PuoAvviare != a[0] || r.PuoFermare != a[1] || r.PuoRiavviare != a[2] {
 			t.Errorf("%s: avvia/ferma/riavvia = %v/%v/%v, atteso %v/%v/%v",
@@ -220,7 +220,7 @@ func TestPulsantiDeiProgrammiSeguonoIComandi(t *testing.T) {
 					rc = x
 				}
 			}
-			if puo != (comandoServizio(rc, azione) != "") {
+			if puo != (serviceCommand(rc, azione) != "") {
 				t.Errorf("%s: dichiara %s=%v ma comandoServizio dice il contrario", r.Chiave, azione, puo)
 			}
 		}
@@ -229,11 +229,11 @@ func TestPulsantiDeiProgrammiSeguonoIComandi(t *testing.T) {
 
 // Le righe di shell restano sul server: /api/runtime non le porta al browser.
 func TestRuntimeNonEsponeIComandi(t *testing.T) {
-	conConfig(t, Config{Runtime: []RuntimeCfg{
+	withConfig(t, Config{Runtime: []RuntimeCfg{
 		{Chiave: "x", Nome: "X", Porta: 9099, Avvia: "segreto-avvia", Ferma: "segreto-ferma",
 			Riavvia: "segreto-riavvia", ScaricaModello: "segreto-scarica {modello}"},
 	}})
-	b, err := json.Marshal(runtimeConfigurati())
+	b, err := json.Marshal(configuredRuntimes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,14 +246,14 @@ func TestRuntimeNonEsponeIComandi(t *testing.T) {
 
 // Nessuna lista che esce come `null`: la pagina la scorre sempre e cadrebbe.
 func TestElenchiMaiNil(t *testing.T) {
-	conConfig(t, Config{})
-	if modelliConStato().Modelli == nil {
+	withConfig(t, Config{})
+	if modelsWithState().Modelli == nil {
 		t.Error("Modelli è nil: uscirebbe null e la pagina cade appena la scorre")
 	}
 	if comandi() == nil {
 		t.Error("comandi() è nil")
 	}
-	if scarichiInCorso() == nil {
+	if downloadsInProgress() == nil {
 		t.Error("scarichiInCorso() è nil")
 	}
 }

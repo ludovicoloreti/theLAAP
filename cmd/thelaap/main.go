@@ -20,7 +20,7 @@ import (
 //go:embed ui.html
 var UI string
 
-func scriviJSON(w http.ResponseWriter, v any) {
+func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(v)
 }
@@ -71,68 +71,68 @@ func rotte(pagina string) *http.ServeMux {
 			`<text y="26" font-size="26">🎛</text></svg>`)
 	})
 	mux.HandleFunc("/api/runtime", guardia(apiRuntime))
-	mux.HandleFunc("/api/memoria", guardia(apiMemoria))
+	mux.HandleFunc("/api/memoria", guardia(apiMemory))
 	mux.HandleFunc("/api/config", guardia(apiConfig))
-	mux.HandleFunc("/api/prova", guardia(soloPost(apiProva)))
+	mux.HandleFunc("/api/prova", guardia(postOnly(apiProbe)))
 	// Eseguono comandi o riscrivono le schede: da GET erano raggiungibili con
 	// un <img src=...> da qualunque pagina web.
-	mux.HandleFunc("/api/esegui", guardia(soloPost(apiEsegui)))
-	mux.HandleFunc("/api/servizio", guardia(soloPost(apiServizio)))
-	mux.HandleFunc("/api/spiega", guardia(soloPost(apiSpiega)))
-	mux.HandleFunc("/api/domande", guardia(apiDomande))
+	mux.HandleFunc("/api/esegui", guardia(postOnly(apiRun)))
+	mux.HandleFunc("/api/servizio", guardia(postOnly(apiService)))
+	mux.HandleFunc("/api/spiega", guardia(postOnly(apiExplain)))
+	mux.HandleFunc("/api/domande", guardia(apiQuestions))
 	// Chi è il modellino che risponde: il pannello lo nomina invece di cablarlo.
-	mux.HandleFunc("/api/aiuto", guardia(apiAiuto))
-	mux.HandleFunc("/api/configurazione", guardia(apiConfigurazione))
+	mux.HandleFunc("/api/aiuto", guardia(apiHelper))
+	mux.HandleFunc("/api/configurazione", guardia(apiSetup))
 	mux.HandleFunc("/api/strumenti", guardia(func(w http.ResponseWriter, r *http.Request) {
 		// Mai nil: uscirebbe "null" e la pagina cade appena prova a scorrerlo.
 		if s := cfg().Strumenti; s != nil {
-			scriviJSON(w, s)
+			writeJSON(w, s)
 		} else {
-			scriviJSON(w, []StrumentoCfg{})
+			writeJSON(w, []ToolCfg{})
 		}
 	}))
 	// Governo della memoria: la domanda «ci sta?» prima di caricare, e lo
 	// scarico del singolo modello dove il programma sa farlo.
-	mux.HandleFunc("/api/capacita", guardia(apiCapacita))
-	mux.HandleFunc("/api/regimi", guardia(apiRegimi))
-	mux.HandleFunc("/api/regime", guardia(soloPost(apiRegime)))
-	mux.HandleFunc("/api/preflight", guardia(soloPost(apiPreflight)))
-	mux.HandleFunc("/api/modello/libera-memoria", guardia(soloPost(apiScaricaModello)))
+	mux.HandleFunc("/api/capacita", guardia(apiCapability))
+	mux.HandleFunc("/api/regimi", guardia(apiRegimes))
+	mux.HandleFunc("/api/regime", guardia(postOnly(apiRegime)))
+	mux.HandleFunc("/api/preflight", guardia(postOnly(apiPreflight)))
+	mux.HandleFunc("/api/modello/libera-memoria", guardia(postOnly(apiUnloadModel)))
 	// Cosa sanno servire i provider, compresi quelli remoti: senza questo il
 	// pannello mostra solo ciò che hai già scritto a mano nei client.
 	mux.HandleFunc("/api/provider", guardia(apiProvider))
 	// Cambiare la chiave di un provider: si legge se c'è, non quale.
-	mux.HandleFunc("/api/credenziali", guardia(apiCredenziali))
-	mux.HandleFunc("/api/credenziale", guardia(soloPost(apiImpostaCredenziale)))
+	mux.HandleFunc("/api/credenziali", guardia(apiCredentials))
+	mux.HandleFunc("/api/credenziale", guardia(postOnly(apiSetCredential)))
 	// Togliere un modello dal disco: prima si guarda chi ci dipende. La prima
 	// azione lo archivia; la cancellazione definitiva accetta solo voci gia'
 	// isolate nel deposito.
-	mux.HandleFunc("/api/modello/esamina", guardia(apiEsaminaModello))
-	mux.HandleFunc("/api/modello/rimuovi", guardia(soloPost(apiRimuoviModello)))
-	mux.HandleFunc("/api/modelli/archivio", guardia(apiArchivioModelli))
-	mux.HandleFunc("/api/modello/ripristina", guardia(soloPost(apiRipristinaModello)))
-	mux.HandleFunc("/api/modello/elimina", guardia(soloPost(apiEliminaArchivio)))
-	mux.HandleFunc("/api/schede", guardia(apiSchede))
+	mux.HandleFunc("/api/modello/esamina", guardia(apiExamineModel))
+	mux.HandleFunc("/api/modello/rimuovi", guardia(postOnly(apiRemoveModel)))
+	mux.HandleFunc("/api/modelli/archivio", guardia(apiModelArchive))
+	mux.HandleFunc("/api/modello/ripristina", guardia(postOnly(apiRestoreModel)))
+	mux.HandleFunc("/api/modello/elimina", guardia(postOnly(apiDeleteArchived)))
+	mux.HandleFunc("/api/schede", guardia(apiCards))
 	// Stato, classe e verdetto calcolati dove stanno già i numeri (states.go).
 	// La pagina li legge, non li rifà: con due calcoli separati il pannello
 	// finirebbe per dire «convivente» su un modello che l'arbitro rifiuta.
-	mux.HandleFunc("/api/modelli", guardia(apiModelli))
+	mux.HandleFunc("/api/modelli", guardia(apiModels))
 	// Un registro solo di comandi, letto dal pannello e dalla barra dei menu.
-	mux.HandleFunc("/api/comandi", guardia(apiComandi))
-	mux.HandleFunc("/api/etichetta", guardia(soloPost(apiEtichetta)))
-	mux.HandleFunc("/api/etichetta-auto", guardia(soloPost(apiEtichettaAuto)))
+	mux.HandleFunc("/api/comandi", guardia(apiCommands))
+	mux.HandleFunc("/api/etichetta", guardia(postOnly(apiLabel)))
+	mux.HandleFunc("/api/etichetta-auto", guardia(postOnly(apiAutoLabel)))
 	// Il tema del Mac letto dal Mac: un browser aperto in modalità applicazione
 	// riporta `prefers-color-scheme: light` anche col sistema in scuro.
 	mux.HandleFunc("/api/tema", guardia(func(w http.ResponseWriter, r *http.Request) {
 		scuro := strings.TrimSpace(sh("defaults read -g AppleInterfaceStyle 2>/dev/null")) == "Dark"
-		scriviJSON(w, map[string]any{"scuro": scuro})
+		writeJSON(w, map[string]any{"scuro": scuro})
 	}))
-	mux.HandleFunc("/api/documenti", guardia(letturaRiservata(apiDocumenti)))
-	mux.HandleFunc("/api/documento", guardia(letturaRiservata(apiDocumento)))
-	mux.HandleFunc("/api/grezzo", guardia(letturaRiservata(apiGrezzo)))
-	mux.HandleFunc("/api/hf/cerca", guardia(apiHFCerca))
-	mux.HandleFunc("/api/modello/installa", guardia(soloPost(apiHFScarica)))
-	mux.HandleFunc("/api/hf/stato", guardia(apiHFStato))
+	mux.HandleFunc("/api/documenti", guardia(restrictedRead(apiDocuments)))
+	mux.HandleFunc("/api/documento", guardia(restrictedRead(apiDocument)))
+	mux.HandleFunc("/api/grezzo", guardia(restrictedRead(apiRaw)))
+	mux.HandleFunc("/api/hf/cerca", guardia(apiHFSearch))
+	mux.HandleFunc("/api/modello/installa", guardia(postOnly(apiHFDownload)))
+	mux.HandleFunc("/api/hf/stato", guardia(apiHFStatus))
 	return mux
 }
 
@@ -140,14 +140,14 @@ func main() {
 	porta := flag.Int("porta", 0, "porta di ascolto (0 = quella della configurazione)")
 	flag.Parse()
 
-	caricaConfig() // per prima: tutto il resto ne dipende
-	generaToken()  // subito dopo: serve per costruire la pagina
-	caricaProfili()
-	avviaMonitorMemoria() // la prima fotografia costa ~4s: falla ora, non alla prima richiesta
+	loadConfig()    // per prima: tutto il resto ne dipende
+	generateToken() // subito dopo: serve per costruire la pagina
+	loadProfiles()
+	startMemoryMonitor() // la prima fotografia costa ~4s: falla ora, non alla prima richiesta
 
 	// Il token finisce nella pagina una volta sola, all'avvio: il corpo è
 	// costante e non c'è motivo di ricomporlo a ogni richiesta.
-	pagina := strings.Replace(UI, "__TOKEN__", tokenSessione, 1)
+	pagina := strings.Replace(UI, "__TOKEN__", sessionToken, 1)
 
 	mux := rotte(pagina)
 
@@ -158,7 +158,7 @@ func main() {
 	if p == 0 {
 		p = 7070
 	}
-	portaInAscolto = p // la guardia confronta l'Origin con questa, non con la configurazione
+	listeningPort = p // la guardia confronta l'Origin con questa, non con la configurazione
 	addr := fmt.Sprintf("127.0.0.1:%d", p)
 	log.Printf("aipanel → http://%s", addr)
 	log.Printf("config: %s", PI_CFG)

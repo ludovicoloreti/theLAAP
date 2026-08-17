@@ -24,7 +24,7 @@ import (
 // Il pannello mostra la granularità vera di ciascuno. Un pulsante unico che
 // sotto fa cose diverse è la bugia che poi costa una notte.
 
-type CapacitaRuntime struct {
+type RuntimeCapability struct {
 	Chiave                string `json:"chiave"`
 	Nome                  string `json:"nome"`
 	ScaricaSingoloModello bool   `json:"scaricaSingoloModello"`
@@ -36,8 +36,8 @@ type CapacitaRuntime struct {
 
 // capacita legge il comando di scarico dalla configurazione. Se manca, il
 // runtime non sa scaricare per modello e lo si dice.
-func capacita(rc RuntimeCfg) CapacitaRuntime {
-	c := CapacitaRuntime{Chiave: rc.Chiave, Nome: rc.Nome}
+func capacita(rc RuntimeCfg) RuntimeCapability {
+	c := RuntimeCapability{Chiave: rc.Chiave, Nome: rc.Nome}
 	if strings.TrimSpace(rc.ScaricaModello) != "" {
 		c.ScaricaSingoloModello = true
 		return c
@@ -52,17 +52,17 @@ func capacita(rc RuntimeCfg) CapacitaRuntime {
 	return c
 }
 
-func apiCapacita(w http.ResponseWriter, r *http.Request) {
-	out := []CapacitaRuntime{}
+func apiCapability(w http.ResponseWriter, r *http.Request) {
+	out := []RuntimeCapability{}
 	for _, rc := range cfg().Runtime {
 		out = append(out, capacita(rc))
 	}
-	scriviJSON(w, out)
+	writeJSON(w, out)
 }
 
-// scaricaModello esegue il comando dichiarato, con il nome del modello messo
+// unloadModel esegue il comando dichiarato, con il nome del modello messo
 // fra apici: arriva da un servizio esterno e non deve poter diventare shell.
-func scaricaModello(chiave, modello string) (string, error) {
+func unloadModel(chiave, modello string) (string, error) {
 	if strings.TrimSpace(modello) == "" {
 		return "", fmt.Errorf("non mi hai detto quale modello")
 	}
@@ -90,7 +90,7 @@ func scaricaModello(chiave, modello string) (string, error) {
 	if err != nil {
 		// Il messaggio del programma vale più del codice di uscita: se c'è, è
 		// quello che dice all'utente cos'è andato storto.
-		if m := senzaAnsi(out); m != "" {
+		if m := withoutAnsi(out); m != "" {
 			return out, fmt.Errorf("%s non ha scaricato %s: %s", rc.Nome, modello, trunc(m, 300))
 		}
 		return out, fmt.Errorf("%s non ha scaricato %s: %w", rc.Nome, modello, err)
@@ -98,62 +98,62 @@ func scaricaModello(chiave, modello string) (string, error) {
 	return out, nil
 }
 
-func apiScaricaModello(w http.ResponseWriter, r *http.Request) {
+func apiUnloadModel(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Runtime string `json:"runtime"`
-		Modello string `json:"modello"`
+		Model   string `json:"modello"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		errJSON(w, "corpo non leggibile: "+err.Error())
 		return
 	}
-	out, err := scaricaModello(req.Runtime, req.Modello)
+	out, err := unloadModel(req.Runtime, req.Model)
 	if err != nil {
 		errJSON(w, err.Error())
 		return
 	}
 	// La fotografia della memoria è vecchia fino a 4 secondi: forzarne una
 	// nuova evita che l'interfaccia mostri ancora il modello appena tolto.
-	rinfrescaMemoria()
+	refreshMemory()
 	if strings.TrimSpace(out) == "" {
 		out = "fatto"
 	}
-	scriviJSON(w, map[string]any{"ok": true, "output": trunc(out, 500)})
+	writeJSON(w, map[string]any{"ok": true, "output": trunc(out, 500)})
 }
 
 // ── preflight ───────────────────────────────────────────────────────────────
 
-// budgetCorrente costruisce la fotografia su cui l'arbitro decide.
+// currentBudget costruisce la fotografia su cui l'arbitro decide.
 //
 // Il peso di ogni runtime è il picco del suo processo, non la somma delle
 // cartelle su disco: misurato su questa macchina, mtplx pesa 79 GB di picco
 // contro ~30 GB di pesi su disco. Decidere col disco avrebbe autorizzato
 // esattamente la combinazione che ha fatto panicare il Mac.
-func budgetCorrente() budget.Budget {
-	m := memoriaCorrente()
+func currentBudget() budget.Budget {
+	m := currentMemory()
 	return budget.Budget{
 		TotalBytes:     uint64(m.TotaleGB * 1e9),
-		OSReserveBytes: uint64(riservaSistemaGB() * 1e9),
+		OSReserveBytes: uint64(systemReserveGB() * 1e9),
 		// Già misurate dal monitor: rifarle a ogni richiesta costerebbe un
 		// lsof e un footprint per runtime, mezzo secondo buttato.
 		Used: m.Processi,
 	}
 }
 
-// occupazioniRuntime misura quanto pesa davvero ogni programma acceso.
+// runtimeFootprints misura quanto pesa davvero ogni programma acceso.
 //
 // È la sola fonte di verità sull'occupazione. I numeri che i runtime danno di
 // sé descrivono i pesi del modello, non la memoria che il processo tiene:
 // misurato qui, mtplx dichiara 29,3 GB e ne occupa 84,8. La differenza sono
 // KV cache e buffer, che non stanno su disco e non compaiono in `ps`.
-func occupazioniRuntime(caricati []ModelloInRAM) []budget.RuntimeUsage {
+func runtimeFootprints(caricati []ModelInRAM) []budget.RuntimeUsage {
 	var out []budget.RuntimeUsage
 	for _, rc := range cfg().Runtime {
-		pid, err := pidInAscoltoSuPorta(rc.Porta)
+		pid, err := pidListeningOnPort(rc.Porta)
 		if err != nil {
 			continue // spento: non occupa niente
 		}
-		occ, err := occupazioneProcesso(pid)
+		occ, err := processFootprint(pid)
 		if err != nil {
 			continue
 		}
@@ -166,7 +166,7 @@ func occupazioniRuntime(caricati []ModelloInRAM) []budget.RuntimeUsage {
 		out = append(out, budget.RuntimeUsage{
 			Key:          rc.Chiave,
 			Name:         rc.Nome,
-			PeakBytes:    occ.PesoDaPrevedereByte(),
+			PeakBytes:    occ.ExpectedWeightBytes(),
 			CurrentBytes: occ.CorrenteByte,
 			Estimated:    occ.Stimato,
 			Freeable:     strings.TrimSpace(rc.ScaricaModello) != "",
@@ -176,10 +176,10 @@ func occupazioniRuntime(caricati []ModelloInRAM) []budget.RuntimeUsage {
 	return out
 }
 
-func politicaCorrente() budget.Policy {
+func currentPolicy() budget.Policy {
 	return budget.Policy{
 		OneLargeModelAtATime: true,
-		LargeThresholdBytes:  uint64(sogliaModelloGrandeGB() * 1e9),
+		LargeThresholdBytes:  uint64(largeModelThresholdGB() * 1e9),
 	}
 }
 
@@ -187,7 +187,7 @@ func politicaCorrente() budget.Policy {
 // sapeva porsi, e la cui assenza è costata un kernel panic.
 func apiPreflight(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Modello  string  `json:"modello"`
+		Model    string  `json:"modello"`
 		PesoGB   float64 `json:"pesoGB"`   // se noto
 		Percorso string  `json:"percorso"` // altrimenti si stima dal disco
 	}
@@ -200,14 +200,14 @@ func apiPreflight(w http.ResponseWriter, r *http.Request) {
 	if peso == 0 && req.Percorso != "" {
 		// Ultima risorsa: la dimensione su disco, gonfiata del fattore
 		// misurato fra pesi e occupazione reale. Resta una stima e va detto.
-		peso = uint64(dimensioneGB(req.Percorso) * gonfiaggioDiscoMemoria * 1e9)
+		peso = uint64(sizeGB(req.Percorso) * diskToMemoryInflation * 1e9)
 		stimato = true
 	}
-	v := budgetCorrente().Admits(peso, politicaCorrente())
-	scriviJSON(w, map[string]any{
+	v := currentBudget().Admits(peso, currentPolicy())
+	writeJSON(w, map[string]any{
 		"verdetto": v,
 		"stimato":  stimato,
-		"modello":  req.Modello,
+		"modello":  req.Model,
 	})
 }
 
@@ -216,17 +216,17 @@ func apiPreflight(w http.ResponseWriter, r *http.Request) {
 // 86 GB su disco e 92,4 residenti (1,07); il Qwen di mtplx è ~30 GB su disco
 // e 79 di picco (2,6). Si tiene il caso peggiore, perché sbagliare per eccesso
 // costa un rifiuto e sbagliare per difetto costa la macchina.
-const gonfiaggioDiscoMemoria = 2.6
+const diskToMemoryInflation = 2.6
 
 // ── forzatura della fotografia ──────────────────────────────────────────────
 
-var rinfrescoOra = make(chan struct{}, 1)
+var refreshedAt = make(chan struct{}, 1)
 
-// rinfrescaMemoria chiede al monitor una lettura subito, senza aspettare il
+// refreshMemory chiede al monitor una lettura subito, senza aspettare il
 // prossimo giro. Non blocca: se una richiesta è già in coda, questa cade.
-func rinfrescaMemoria() {
+func refreshMemory() {
 	select {
-	case rinfrescoOra <- struct{}{}:
+	case refreshedAt <- struct{}{}:
 	default:
 	}
 }

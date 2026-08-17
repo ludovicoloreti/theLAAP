@@ -26,30 +26,30 @@ import (
 //
 // Le letture generiche restano libere, così la pagina si carica anche col token
 // scaduto. Quelle che restituiscono file di configurazione no: vedi
-// letturaRiservata.
+// restrictedRead.
 
-var tokenSessione string
+var sessionToken string
 
 // La porta su cui stiamo davvero ascoltando. Non coincide con quella della
 // configurazione quando si usa il flag -porta, e l'Origin va confrontato con
 // quella vera: altrimenti il pannello rifiuta le proprie stesse richieste.
-var portaInAscolto int
+var listeningPort int
 
-// generaToken: nuovo a ogni avvio. Se un token trapela, basta riavviare.
-func generaToken() {
+// generateToken: nuovo a ogni avvio. Se un token trapela, basta riavviare.
+func generateToken() {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		// crypto/rand che fallisce è un guasto grave del sistema: meglio non
 		// partire che partire senza difesa.
 		panic("impossibile generare il token di sessione: " + err.Error())
 	}
-	tokenSessione = hex.EncodeToString(b)
+	sessionToken = hex.EncodeToString(b)
 }
 
-// originAmmesso: l'indirizzo da cui la pagina dice di arrivare deve essere
+// allowedOrigin: l'indirizzo da cui la pagina dice di arrivare deve essere
 // questo stesso pannello. Confronta host e porta, non la stringa intera, così
 // 127.0.0.1 e localhost sono entrambi validi.
-func originAmmesso(grezzo string, porta int) bool {
+func allowedOrigin(grezzo string, porta int) bool {
 	if grezzo == "" {
 		return false
 	}
@@ -68,7 +68,7 @@ func originAmmesso(grezzo string, porta int) bool {
 	return true
 }
 
-// hostAmmesso: l'intestazione Host deve nominare questo pannello.
+// allowedHost: l'intestazione Host deve nominare questo pannello.
 //
 // Senza questo controllo il pannello è aperto al DNS rebinding. Un dominio
 // dell'attaccante che risolve a 127.0.0.1 rende la sua pagina same-origin col
@@ -79,7 +79,7 @@ func originAmmesso(grezzo string, porta int) bool {
 //
 // Con SplitHostPort e non a confronto di stringhe: [::1]:7070 romperebbe il
 // confronto ingenuo.
-func hostAmmesso(grezzo string, porta int) bool {
+func allowedHost(grezzo string, porta int) bool {
 	if grezzo == "" {
 		return false
 	}
@@ -95,10 +95,10 @@ func hostAmmesso(grezzo string, porta int) bool {
 	return p == strconv.Itoa(porta)
 }
 
-// portaEffettiva: quella su cui ascoltiamo davvero, con i ripieghi in ordine.
-func portaEffettiva() int {
-	if portaInAscolto != 0 {
-		return portaInAscolto
+// effectivePort: quella su cui ascoltiamo davvero, con i ripieghi in ordine.
+func effectivePort() int {
+	if listeningPort != 0 {
+		return listeningPort
 	}
 	if p := cfg().Porta; p != 0 {
 		return p
@@ -106,8 +106,8 @@ func portaEffettiva() int {
 	return 7070
 }
 
-// indirizzoLocale: vero se la connessione arriva dalla macchina stessa.
-func indirizzoLocale(remoto string) bool {
+// localAddress: vero se la connessione arriva dalla macchina stessa.
+func localAddress(remoto string) bool {
 	host := remoto
 	if i := strings.LastIndex(host, ":"); i > 0 {
 		host = host[:i]
@@ -123,13 +123,13 @@ func indirizzoLocale(remoto string) bool {
 // Origin o Referer di questo pannello e il token di sessione.
 func guardia(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !indirizzoLocale(r.RemoteAddr) {
+		if !localAddress(r.RemoteAddr) {
 			http.Error(w, "solo da localhost", http.StatusForbidden)
 			return
 		}
-		porta := portaEffettiva()
+		porta := effectivePort()
 		// Anche in lettura: il rebinding attacca proprio le GET.
-		if !hostAmmesso(r.Host, porta) {
+		if !allowedHost(r.Host, porta) {
 			http.Error(w, "host non riconosciuto", http.StatusForbidden)
 			return
 		}
@@ -143,7 +143,7 @@ func guardia(next http.HandlerFunc) http.HandlerFunc {
 		if sorgente == "" {
 			sorgente = r.Header.Get("Referer")
 		}
-		if !originAmmesso(sorgente, porta) {
+		if !allowedOrigin(sorgente, porta) {
 			http.Error(w, "richiesta non partita dal pannello", http.StatusForbidden)
 			return
 		}
@@ -151,7 +151,7 @@ func guardia(next http.HandlerFunc) http.HandlerFunc {
 		// Confronto a tempo costante: non serve a molto su localhost, ma
 		// costa nulla e evita di doverci ripensare.
 		dato := r.Header.Get("X-theLAAP-Token")
-		if subtle.ConstantTimeCompare([]byte(dato), []byte(tokenSessione)) != 1 {
+		if subtle.ConstantTimeCompare([]byte(dato), []byte(sessionToken)) != 1 {
 			http.Error(w, "token mancante o non valido", http.StatusForbidden)
 			return
 		}
@@ -159,20 +159,20 @@ func guardia(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// letturaRiservata: il token anche in lettura.
+// restrictedRead: il token anche in lettura.
 //
 // /api/grezzo e /api/documento restituiscono i file dei client tali e quali, e
-// lì dentro sta la chiave dei provider (scriviChiave). /api/documenti ne
+// lì dentro sta la chiave dei provider (writeKey). /api/documenti ne
 // espone i percorsi assoluti. Il controllo dell'Host basta a fermare il
 // rebinding; questo è la seconda serratura, per il giorno in cui una pagina
 // riuscisse comunque a farsi passare per same-origin.
 //
 // La pagina stessa non passa da qui: senza il token nessuno potrebbe caricarla,
 // ed è la pagina a portarlo.
-func letturaRiservata(next http.HandlerFunc) http.HandlerFunc {
+func restrictedRead(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dato := r.Header.Get("X-theLAAP-Token")
-		if subtle.ConstantTimeCompare([]byte(dato), []byte(tokenSessione)) != 1 {
+		if subtle.ConstantTimeCompare([]byte(dato), []byte(sessionToken)) != 1 {
 			http.Error(w, "token mancante o non valido", http.StatusForbidden)
 			return
 		}
@@ -180,10 +180,10 @@ func letturaRiservata(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// soloPost rifiuta i metodi diversi da POST. Serve per le rotte che eseguono
+// postOnly rifiuta i metodi diversi da POST. Serve per le rotte che eseguono
 // comandi o modificano le schede: da GET erano raggiungibili con un semplice
 // <img src=...> da qualsiasi pagina web.
-func soloPost(next http.HandlerFunc) http.HandlerFunc {
+func postOnly(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", "POST")

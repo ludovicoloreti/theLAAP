@@ -16,16 +16,16 @@ import (
 //      quando è stata chiusa la falla CSRF (vedi services.go e security_test.go);
 //   2. mandava cmd=laguna-on / laguna-off, mentre gli strumenti registrati si
 //      chiamano modello-grande-on / modello-grande-off;
-//   3. mandava cmd=stoppa-tutto, mentre comandoAmmesso conosce ferma-tutto.
+//   3. mandava cmd=stoppa-tutto, mentre allowedCommand conosce ferma-tutto.
 //
 // Nessuno dei tre dava errore visibile: la voce di menu semplicemente non faceva
 // niente. Questi test leggono il sorgente Swift e verificano il contratto.
 
-const sorgenteSwift = "../../menubar/theLAAP.swift"
+const swiftSource = "../../menubar/theLAAP.swift"
 
-func leggiSwift(t *testing.T) string {
+func readSwift(t *testing.T) string {
 	t.Helper()
-	b, err := os.ReadFile(sorgenteSwift)
+	b, err := os.ReadFile(swiftSource)
 	if err != nil {
 		t.Skipf("sorgente Swift non leggibile (%v): test saltato", err)
 	}
@@ -35,10 +35,10 @@ func leggiSwift(t *testing.T) string {
 // TestMenubarNonUsaGetSuEsegui: /api/esegui rifiuta le GET. Se lo Swift torna a
 // costruire un URL con ?cmd=..., la voce di menu smette di funzionare in silenzio.
 func TestMenubarNonUsaGetSuEsegui(t *testing.T) {
-	src := leggiSwift(t)
+	src := readSwift(t)
 	if strings.Contains(src, "/api/esegui?cmd=") {
 		t.Errorf("%s chiama /api/esegui con una GET (?cmd=...), ma la rotta accetta solo POST.\n"+
-			"Usa eseguiComando(\"...\"), che manda POST con {\"cmd\":\"...\"} nel corpo.", sorgenteSwift)
+			"Usa eseguiComando(\"...\"), che manda POST con {\"cmd\":\"...\"} nel corpo.", swiftSource)
 	}
 }
 
@@ -52,7 +52,7 @@ func TestMenubarNonUsaGetSuEsegui(t *testing.T) {
 // Quello che va difeso è quindi il contrario di prima: che nello Swift non
 // ricompaia nessun id.
 func TestMenubarNonCablaNessunComando(t *testing.T) {
-	src := leggiSwift(t)
+	src := readSwift(t)
 
 	// Gli id che il server sa risolvere, estratti dal sorgente Go. Servono per
 	// riconoscerli se qualcuno li riscrive nello Swift.
@@ -77,7 +77,7 @@ func TestMenubarNonCablaNessunComando(t *testing.T) {
 	for id := range ammessi {
 		if strings.Contains(src, `"`+id+`"`) {
 			t.Errorf("%s cabla l'id %q. Gli id vengono da /api/comandi: scriverli qui "+
-				"rimette in piedi due elenchi da tenere allineati a mano.", sorgenteSwift, id)
+				"rimette in piedi due elenchi da tenere allineati a mano.", swiftSource, id)
 		}
 	}
 }
@@ -85,19 +85,19 @@ func TestMenubarNonCablaNessunComando(t *testing.T) {
 // TestMenubarLeggeIlRegistro: e deve leggerlo davvero, altrimenti il menu resta
 // senza comandi e il test sopra passerebbe per il motivo sbagliato.
 func TestMenubarLeggeIlRegistro(t *testing.T) {
-	src := leggiSwift(t)
+	src := readSwift(t)
 	// La CHIAMATA, non la stringa: `/api/comandi` compare anche nei commenti, e
 	// cercarla lì fa passare il test anche se il menu ha smesso di chiedere il
 	// registro. Verificato togliendo la chiamata: prima non fallivo.
 	for _, atteso := range []string{`chiedi("/api/comandi"`, "struct Comando", "c.rotta"} {
 		if !strings.Contains(src, atteso) {
-			t.Errorf("%s non contiene %q: il menu non sta usando il registro", sorgenteSwift, atteso)
+			t.Errorf("%s non contiene %q: il menu non sta usando il registro", swiftSource, atteso)
 		}
 	}
 	// La rotta la dice il registro, non lo Swift: nessuna rotta di comando scritta a mano.
 	for _, rotta := range []string{`"/api/esegui"`, `"/api/regime"`, `"/api/servizio"`} {
 		if strings.Contains(src, rotta) {
-			t.Errorf("%s cabla la rotta %s invece di usare quella del registro", sorgenteSwift, rotta)
+			t.Errorf("%s cabla la rotta %s invece di usare quella del registro", swiftSource, rotta)
 		}
 	}
 }
@@ -131,15 +131,15 @@ func chiavi(m map[string]bool) []string {
 // processi. Se la barra somma i file e il pannello i processi, le due superfici
 // si contraddicono sullo stesso schermo, senza che niente dia errore.
 func TestMenubarUsaLaStessaMisuraDelPannello(t *testing.T) {
-	src := leggiSwift(t)
+	src := readSwift(t)
 	if strings.Contains(src, "caricati.reduce") {
 		t.Errorf("%s somma caricati[].gb (i pesi dei FILE) per i GB occupati.\n"+
 			"Il pannello somma processi[].correnteByte: i due numeri divergono. Usa m.occupatiGB.",
-			sorgenteSwift)
+			swiftSource)
 	}
 	if !strings.Contains(src, "correnteByte") {
 		t.Errorf("%s non legge processi[].correnteByte: non può dare lo stesso numero del pannello",
-			sorgenteSwift)
+			swiftSource)
 	}
 	// E la pagina deve stare sulla stessa misura, o il test guarda solo metà del contratto.
 	pagina := mustRead(t, "ui.html")[0]
@@ -151,11 +151,11 @@ func TestMenubarUsaLaStessaMisuraDelPannello(t *testing.T) {
 // TestMenubarNonNominaLaguna: Laguna è stato dismesso il 16/08/2026. Le etichette
 // che l'utente legge non devono più nominarlo, né citarne la taglia (90 GB).
 func TestMenubarNonNominaLaguna(t *testing.T) {
-	src := leggiSwift(t)
+	src := readSwift(t)
 	for _, brutto := range []string{"Laguna", "90 GB"} {
 		if strings.Contains(src, brutto) {
 			t.Errorf("%s contiene ancora %q: il modello grande è DeepSeek V4 Flash (81 GB) dal 16/08/2026",
-				sorgenteSwift, brutto)
+				swiftSource, brutto)
 		}
 	}
 }

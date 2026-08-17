@@ -17,7 +17,7 @@ type Doc struct {
 	Chiavi []string // termini che devono pesare di più del testo normale
 }
 
-var CONOSCENZA = []Doc{
+var KNOWLEDGE = []Doc{
 	{
 		Titolo: "A cosa serve questo pannello",
 		Chiavi: []string{"pannello", "webapp", "app", "sito", "pagina", "aipanel", "serve", "cos'è"},
@@ -135,10 +135,10 @@ Non toccarli: occupano poco e servono a lavori che stai già facendo.`,
 	},
 }
 
-// DOMANDE: il repertorio da cui la pagina pesca i suggerimenti, a rotazione.
+// QUESTIONS: il repertorio da cui la pagina pesca i suggerimenti, a rotazione.
 // Meglio tante e varie che quattro sempre uguali: servono a far scoprire cosa
 // si può chiedere.
-var DOMANDE = []string{
+var QUESTIONS = []string{
 	"Cosa c'è in memoria adesso?",
 	"Quanta memoria mi resta libera?",
 	"Perché ci sono due modelli Gemma?",
@@ -169,11 +169,11 @@ var DOMANDE = []string{
 	"Quanti modelli posso tenere accesi insieme?",
 }
 
-// statoLive: la fotografia di adesso. Senza questa il modellino risponderebbe
+// liveState: la fotografia di adesso. Senza questa il modellino risponderebbe
 // in generale, mentre le domande sono quasi sempre "cosa c'è ADESSO in memoria".
-func statoLive() string {
+func liveState() string {
 	var b strings.Builder
-	m := leggeMemoria()
+	m := readsMemory()
 	b.WriteString("SITUAZIONE DI QUESTO MOMENTO SU QUESTO MAC:\n")
 	b.WriteString(fmt.Sprintf("- memoria totale %.0f GB, libera %.0f GB\n", m.TotaleGB, m.LiberaGB))
 	if len(m.Caricati) == 0 {
@@ -198,7 +198,7 @@ func statoLive() string {
 	nomi := map[string]string{"mtplx": "MTPLX (esegue il modello per il codice)",
 		"omlx":     "oMLX (esegue i modelli grandi e senza filtri)",
 		"lmstudio": "LM Studio (esegue i modelli di chat)", "ollama": "Ollama (ricerca nei documenti)"}
-	for _, r := range scopriRuntime() {
+	for _, r := range discoverRuntimes() {
 		stato := "SPENTO"
 		if r.Attivo {
 			stato = "acceso"
@@ -206,7 +206,7 @@ func statoLive() string {
 		b.WriteString(fmt.Sprintf("- %s: %s\n", nomi[r.Chiave], stato))
 	}
 
-	if modelli, _ := statoConfig(); len(modelli) > 0 {
+	if modelli, _ := configState(); len(modelli) > 0 {
 		b.WriteString("\nMODELLI NEL MENU DI PI E OPENCODE ADESSO:\n")
 		for _, mm := range modelli {
 			if mm.InPi || mm.InOC {
@@ -250,7 +250,7 @@ func recupera(domanda string, quanti int) []Doc {
 		punti int
 	}
 	var vv []voce
-	for _, d := range CONOSCENZA {
+	for _, d := range KNOWLEDGE {
 		testo := strings.ToLower(d.Titolo + " " + d.Testo)
 		p := 0
 		for _, w := range q {

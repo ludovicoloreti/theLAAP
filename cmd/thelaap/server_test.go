@@ -15,10 +15,10 @@ import (
 // ripete mai: che ogni rotta risponda, che quelle che cambiano qualcosa siano
 // protette, e soprattutto che NESSUNA risposta si porti dietro una credenziale.
 
-// Le rotte sono quelle vere: rotteDiProva() sta in main.go. La copia che stava qui era
+// Le rotte sono quelle vere: testRoutes() sta in main.go. La copia che stava qui era
 // un secondo elenco da tenere allineato, e ha smesso di somigliare a quello
 // spedito appena una rotta ha cambiato protezione.
-func rotteDiProva() *http.ServeMux { return rotte("<pagina di prova>") }
+func testRoutes() *http.ServeMux { return rotte("<pagina di prova>") }
 
 func chiedi(t *testing.T, m *http.ServeMux, metodo, percorso string, token bool) *httptest.ResponseRecorder {
 	t.Helper()
@@ -34,7 +34,7 @@ func chiedi(t *testing.T, m *http.ServeMux, metodo, percorso string, token bool)
 	r.Host = "127.0.0.1:7070"
 	if token {
 		r.Header.Set("Origin", "http://127.0.0.1:7070")
-		r.Header.Set("X-theLAAP-Token", tokenSessione)
+		r.Header.Set("X-theLAAP-Token", sessionToken)
 	}
 	w := httptest.NewRecorder()
 	m.ServeHTTP(w, r)
@@ -42,9 +42,9 @@ func chiedi(t *testing.T, m *http.ServeMux, metodo, percorso string, token bool)
 }
 
 func TestRotteInLetturaRispondonoJSONValido(t *testing.T) {
-	tokenSessione = "prova-token"
-	portaInAscolto = 7070
-	m := rotteDiProva()
+	sessionToken = "prova-token"
+	listeningPort = 7070
+	m := testRoutes()
 
 	for _, p := range []string{
 		"/api/runtime", "/api/memoria", "/api/capacita", "/api/regimi",
@@ -70,9 +70,9 @@ func TestRotteInLetturaRispondonoJSONValido(t *testing.T) {
 }
 
 func TestRotteMutantiProtette(t *testing.T) {
-	tokenSessione = "prova-token"
-	portaInAscolto = 7070
-	m := rotteDiProva()
+	sessionToken = "prova-token"
+	listeningPort = 7070
+	m := testRoutes()
 
 	for _, p := range []string{"/api/modello/rimuovi", "/api/modello/ripristina",
 		"/api/modello/elimina", "/api/credenziale", "/api/regime"} {
@@ -100,13 +100,13 @@ func TestRotteMutantiProtette(t *testing.T) {
 // Il pannello legge chiavi API dai file dei client per interrogare i provider,
 // e basta una struct serializzata con disattenzione per rimandarle al browser.
 func TestNessunaRispostaContieneCredenziali(t *testing.T) {
-	tokenSessione = "prova-token"
-	portaInAscolto = 7070
-	m := rotteDiProva()
+	sessionToken = "prova-token"
+	listeningPort = 7070
+	m := testRoutes()
 
 	// Le chiavi vere di questa macchina, lette dai file dei client.
 	var segreti []string
-	for _, p := range leggiProvider() {
+	for _, p := range readProviders() {
 		if len(p.apiKey) >= 8 {
 			segreti = append(segreti, p.apiKey)
 		}
@@ -135,7 +135,7 @@ func TestNessunaRispostaContieneCredenziali(t *testing.T) {
 }
 
 func TestGuardiaRifiutaDallaRete(t *testing.T) {
-	m := rotteDiProva()
+	m := testRoutes()
 	r := httptest.NewRequest(http.MethodGet, "/api/memoria", nil)
 	r.RemoteAddr = "192.168.1.99:1234"
 	w := httptest.NewRecorder()
@@ -146,12 +146,12 @@ func TestGuardiaRifiutaDallaRete(t *testing.T) {
 }
 
 // Le tre rotte che restituiscono i file dei client chiedono il token anche in
-// lettura: e' la' che il pannello scrive la chiave dei provider (scriviChiave).
+// lettura: e' la' che il pannello scrive la chiave dei provider (writeKey).
 // Restavano aperte a chiunque riuscisse a farsi passare per same-origin.
 func TestLeRotteDiConfigurazioneNonSiLeggonoSenzaToken(t *testing.T) {
-	tokenSessione = "prova-token"
-	portaInAscolto = 7070
-	m := rotteDiProva()
+	sessionToken = "prova-token"
+	listeningPort = 7070
+	m := testRoutes()
 
 	for _, p := range []string{"/api/documenti", "/api/documento?id=thelaap", "/api/grezzo?file=pi"} {
 		t.Run(p, func(t *testing.T) {

@@ -44,29 +44,29 @@ type RuntimeCfg struct {
 	ModelloResidente bool `json:"modelloResidente,omitempty"`
 }
 
-type ClienteCfg struct {
+type ClientCfg struct {
 	Nome    string `json:"nome"`
 	File    string `json:"file"`
 	Formato string `json:"formato"` // "pi" oppure "opencode"
 }
 
-type StrumentoCfg struct {
+type ToolCfg struct {
 	ID      string `json:"id"`
 	Nome    string `json:"nome"`
 	Durata  string `json:"durata,omitempty"`
 	Cosa    string `json:"cosa,omitempty"`
-	Comando string `json:"comando"`
+	Command string `json:"comando"`
 	Rischio bool   `json:"rischio,omitempty"`
 }
 
 type Config struct {
-	Porta          int            `json:"porta"`
-	ModelloAiuto   string         `json:"modelloAiuto,omitempty"` // vuoto = lo sceglie da sé
-	Runtime        []RuntimeCfg   `json:"runtime"`
-	Clienti        []ClienteCfg   `json:"clienti"`
-	Strumenti      []StrumentoCfg `json:"strumenti"`
-	FermaTutto     string         `json:"fermaTutto,omitempty"`
-	RiaccendiTutto string         `json:"riaccendiTutto,omitempty"`
+	Porta          int          `json:"porta"`
+	ModelloAiuto   string       `json:"modelloAiuto,omitempty"` // vuoto = lo sceglie da sé
+	Runtime        []RuntimeCfg `json:"runtime"`
+	Clienti        []ClientCfg  `json:"clienti"`
+	Strumenti      []ToolCfg    `json:"strumenti"`
+	FermaTutto     string       `json:"fermaTutto,omitempty"`
+	RiaccendiTutto string       `json:"riaccendiTutto,omitempty"`
 	// Configurazioni di macchina che si accendono e si spengono tutte insieme.
 	// Vedi regimes.go.
 	Regimi []RegimeCfg `json:"regimi,omitempty"`
@@ -78,7 +78,7 @@ type Config struct {
 	RiservaSistemaGB float64 `json:"riservaSistemaGB,omitempty"`
 	// Cartelle aggiuntive dove cercare i modelli, oltre a quelle standard dei
 	// prodotti. Serve a chi tiene i modelli in un posto suo.
-	RadiciModelli []string `json:"radiciModelli,omitempty"`
+	ModelRoots []string `json:"radiciModelli,omitempty"`
 	// Sopra questa soglia un modello è "grande" e ne resta uno solo alla volta.
 	// Zero = usa il valore predefinito.
 	SogliaModelloGrandeGB float64 `json:"sogliaModelloGrandeGB,omitempty"`
@@ -98,11 +98,11 @@ const (
 	minimoSottoIlTettoGBDefault = 12.0
 )
 
-// scaricoNoto: cosa sappiamo di un programma già presente in una vecchia
+// knownDownload: cosa sappiamo di un programma già presente in una vecchia
 // configurazione. Si cerca per chiave nella tabella dei candidati, così la
 // verità sta in un posto solo.
-func scaricoNoto(chiave string) (comando, nota string) {
-	for _, k := range CANDIDATI {
+func knownDownload(chiave string) (comando, nota string) {
+	for _, k := range CANDIDATES {
 		if k.chiave != chiave {
 			continue
 		}
@@ -112,7 +112,7 @@ func scaricoNoto(chiave string) (comando, nota string) {
 			// al primo rilevamento, altrimenti si lascia il nome nudo.
 			primo := strings.Split(comando, " ")[0]
 			for _, b := range k.binari {
-				if esisteBinario(b) {
+				if binaryExists(b) {
 					comando = strings.Replace(comando, primo, espandi(b), 1)
 					break
 				}
@@ -123,14 +123,14 @@ func scaricoNoto(chiave string) (comando, nota string) {
 	return "", ""
 }
 
-func riservaSistemaGB() float64 {
+func systemReserveGB() float64 {
 	if v := cfg().RiservaSistemaGB; v > 0 {
 		return v
 	}
 	return riservaSistemaGBDefault
 }
 
-func sogliaModelloGrandeGB() float64 {
+func largeModelThresholdGB() float64 {
 	if v := cfg().SogliaModelloGrandeGB; v > 0 {
 		return v
 	}
@@ -149,8 +149,8 @@ func cfg() Config {
 	return CFG
 }
 
-// caricaConfig legge il file; se non c'è lo crea rilevando la macchina.
-func caricaConfig() {
+// loadConfig legge il file; se non c'è lo crea rilevando la macchina.
+func loadConfig() {
 	b, err := os.ReadFile(CFGFILE)
 	if err == nil {
 		var c Config
@@ -170,7 +170,7 @@ func caricaConfig() {
 				// scritta prima non le ha, e senza questo rattoppo il pannello
 				// direbbe che nessun programma sa scaricare un modello.
 				if c.Runtime[i].ScaricaModello == "" && c.Runtime[i].NotaScarico == "" {
-					if s, n := scaricoNoto(c.Runtime[i].Chiave); s != "" || n != "" {
+					if s, n := knownDownload(c.Runtime[i].Chiave); s != "" || n != "" {
 						c.Runtime[i].ScaricaModello, c.Runtime[i].NotaScarico = s, n
 						cambiata = true
 					}
@@ -181,35 +181,35 @@ func caricaConfig() {
 				// andato tutto bene. bootout/bootstrap fanno la cosa giusta.
 				// Chi tiene il modello sempre in memoria: campo aggiunto dopo, quindi
 				// le configurazioni scritte prima non ce l'hanno.
-				if !c.Runtime[i].ModelloResidente && residenteNoto(c.Runtime[i].Chiave) {
+				if !c.Runtime[i].ModelloResidente && knownResident(c.Runtime[i].Chiave) {
 					c.Runtime[i].ModelloResidente, cambiata = true, true
 				}
-				if ammodernaComandiLaunchd(&c.Runtime[i]) {
+				if modernizeLaunchdCommands(&c.Runtime[i]) {
 					cambiata = true
 				}
 			}
 			if c.FermaTutto == "" || c.RiaccendiTutto == "" {
-				c.FermaTutto, c.RiaccendiTutto = comandiFermaTutto(c.Runtime)
+				c.FermaTutto, c.RiaccendiTutto = stopAllCommands(c.Runtime)
 				cambiata = true
 			}
 			cfgMu.Lock()
 			CFG = c
 			cfgMu.Unlock()
 			if cambiata {
-				salvaConfig()
+				saveConfig()
 			}
 			return
 		}
 		fmt.Fprintf(os.Stderr, "configurazione illeggibile, la rigenero: %s\n", CFGFILE)
 	}
-	c := rilevaMacchina()
+	c := detectMachine()
 	cfgMu.Lock()
 	CFG = c
 	cfgMu.Unlock()
-	salvaConfig()
+	saveConfig()
 }
 
-func salvaConfig() error {
+func saveConfig() error {
 	cfgMu.RLock()
 	b, err := json.MarshalIndent(CFG, "", "  ")
 	cfgMu.RUnlock()
@@ -237,7 +237,7 @@ type candidato struct {
 	comandi  []string // eseguibili da cercare nel PATH
 	caricati string   // comando che elenca i modelli in memoria
 	// Su macOS l'etichetta launchd NON si dichiara: cambia da installazione a
-	// installazione e viene scoperta (etichettaLaunchd in system_darwin.go).
+	// installazione e viene scoperta (launchdLabel in system_darwin.go).
 	unitaLinux string // unità systemd --user, se usa systemd
 	// Come togliere UN solo modello dalla memoria. {modello} = il nome.
 	// Vuoto = non sa farlo, e `notaScarico` spiega perché.
@@ -246,7 +246,7 @@ type candidato struct {
 	residente   bool
 }
 
-var CANDIDATI = []candidato{
+var CANDIDATES = []candidato{
 	{chiave: "ollama", chiaveOC: "ollama", nome: "Ollama", cosa: "esegue modelli in formato GGUF",
 		porta: 11434, elenco: "/api/tags", comandi: []string{"ollama"},
 		caricati: "ollama ps", unitaLinux: "ollama",
@@ -281,37 +281,37 @@ func espandi(p string) string {
 	return p
 }
 
-func esisteBinario(p string) bool {
+func binaryExists(p string) bool {
 	st, err := os.Stat(espandi(p))
 	return err == nil && !st.IsDir()
 }
 
-func nelPath(nome string) bool {
+func inPath(nome string) bool {
 	_, err := exec_LookPath(nome)
 	return err == nil
 }
 
-func rilevaMacchina() Config {
+func detectMachine() Config {
 	c := Config{Porta: 7070, Runtime: []RuntimeCfg{},
-		Clienti: []ClienteCfg{}, Strumenti: []StrumentoCfg{}}
+		Clienti: []ClientCfg{}, Strumenti: []ToolCfg{}}
 
-	for _, k := range CANDIDATI {
+	for _, k := range CANDIDATES {
 		trovato := false
 		binario := ""
 		for _, b := range k.binari {
-			if esisteBinario(b) {
+			if binaryExists(b) {
 				trovato, binario = true, espandi(b)
 				break
 			}
 		}
 		for _, cmd := range k.comandi {
-			if nelPath(cmd) {
+			if inPath(cmd) {
 				trovato, binario = true, cmd
 				break
 			}
 		}
 		// se non è installato ma risponde sulla porta, vale lo stesso
-		if !trovato && rispondeSuPorta(k.porta, k.elenco) {
+		if !trovato && answersOnPort(k.porta, k.elenco) {
 			trovato = true
 		}
 		if !trovato {
@@ -330,32 +330,32 @@ func rilevaMacchina() Config {
 		}
 		r.NotaScarico = k.notaScarico
 		r.ModelloResidente = k.residente
-		r.Avvia, r.Ferma, r.Riavvia = comandiServizio(k, binario)
+		r.Avvia, r.Ferma, r.Riavvia = serviceCommands(k, binario)
 		c.Runtime = append(c.Runtime, r)
 	}
 
 	// client noti, se le loro configurazioni esistono
-	for _, cl := range []ClienteCfg{
+	for _, cl := range []ClientCfg{
 		{Nome: "Pi", File: "~/.pi/agent/models.json", Formato: "pi"},
 		{Nome: "OpenCode", File: "~/.config/opencode/opencode.json", Formato: "opencode"},
 	} {
-		if esisteBinario(cl.File) {
+		if binaryExists(cl.File) {
 			c.Clienti = append(c.Clienti, cl)
 		}
 	}
 
-	c.Strumenti = strumentiRilevati()
-	c.FermaTutto, c.RiaccendiTutto = comandiFermaTutto(c.Runtime)
+	c.Strumenti = detectedTools()
+	c.FermaTutto, c.RiaccendiTutto = stopAllCommands(c.Runtime)
 	return c
 }
 
-// rispondeSuPorta: un programma può girare senza che il suo eseguibile sia
+// answersOnPort: un programma può girare senza che il suo eseguibile sia
 // dove ce lo aspettiamo (container, installazione strana): se risponde, c'è.
-func rispondeSuPorta(porta int, path string) bool {
+func answersOnPort(porta int, path string) bool {
 	return httpGet(fmt.Sprintf("http://127.0.0.1:%d%s", porta, path), 900_000_000) != nil
 }
 
-func apiConfigurazione(w http.ResponseWriter, r *http.Request) {
+func apiSetup(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		var c Config
 		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
@@ -369,26 +369,26 @@ func apiConfigurazione(w http.ResponseWriter, r *http.Request) {
 		cfgMu.Lock()
 		CFG = c
 		cfgMu.Unlock()
-		if err := salvaConfig(); err != nil {
+		if err := saveConfig(); err != nil {
 			errJSON(w, err.Error())
 			return
 		}
-		scriviJSON(w, map[string]any{"ok": true, "messaggio": "configurazione salvata in " + CFGFILE})
+		writeJSON(w, map[string]any{"ok": true, "messaggio": "configurazione salvata in " + CFGFILE})
 		return
 	}
 	if r.URL.Query().Get("rileva") == "1" {
-		scriviJSON(w, map[string]any{"proposta": rilevaMacchina(), "file": CFGFILE,
+		writeJSON(w, map[string]any{"proposta": detectMachine(), "file": CFGFILE,
 			"sistema": runtime.GOOS})
 		return
 	}
-	scriviJSON(w, map[string]any{"config": cfg(), "file": CFGFILE, "sistema": runtime.GOOS})
+	writeJSON(w, map[string]any{"config": cfg(), "file": CFGFILE, "sistema": runtime.GOOS})
 }
 
-// strumentiRilevati: i comandi di manutenzione che esistono su questa macchina.
+// detectedTools: i comandi di manutenzione che esistono su questa macchina.
 // Si cercano gli script noti dello stack; quelli che non ci sono non compaiono,
 // e restano solo le voci che il pannello sa fare da sé.
-func strumentiRilevati() []StrumentoCfg {
-	var out []StrumentoCfg
+func detectedTools() []ToolCfg {
+	var out []ToolCfg
 	base := ""
 	for _, d := range []string{"~/Desktop/AI/localstack", "~/AI/localstack", "~/localstack"} {
 		if st, err := os.Stat(espandi(d)); err == nil && st.IsDir() {
@@ -430,31 +430,31 @@ func strumentiRilevati() []StrumentoCfg {
 		case "aggiorna":
 			cmd += " apply"
 		}
-		out = append(out, StrumentoCfg{ID: n.id, Nome: n.nome, Durata: n.durata,
-			Cosa: n.cosa, Comando: cmd, Rischio: n.rischio})
+		out = append(out, ToolCfg{ID: n.id, Nome: n.nome, Durata: n.durata,
+			Cosa: n.cosa, Command: cmd, Rischio: n.rischio})
 	}
 	// Script liberi accanto agli altri. Dal 16/08/2026 il modello grande è
 	// DeepSeek V4 Flash su ds4.sh; laguna.sh resta come ripiego finché esiste,
 	// così un'installazione non ancora migrata continua a funzionare.
 	grande := filepath.Join(base, "ds4.sh")
-	if !esisteBinario(grande) {
+	if !binaryExists(grande) {
 		grande = filepath.Join(base, "laguna.sh")
 	}
-	if f := grande; esisteBinario(f) {
+	if f := grande; binaryExists(f) {
 		out = append(out,
-			StrumentoCfg{ID: "modello-grande-on", Nome: "Attiva il modello grande", Durata: "un minuto",
+			ToolCfg{ID: "modello-grande-on", Nome: "Attiva il modello grande", Durata: "un minuto",
 				Cosa:    "Spegne gli altri programmi e carica il modello che vuole la macchina libera.",
-				Comando: f + " on"},
-			StrumentoCfg{ID: "modello-grande-off", Nome: "Disattiva il modello grande", Durata: "pochi secondi",
-				Cosa: "Rimette in piedi i programmi normali.", Comando: f + " off"})
+				Command: f + " on"},
+			ToolCfg{ID: "modello-grande-off", Nome: "Disattiva il modello grande", Durata: "pochi secondi",
+				Cosa: "Rimette in piedi i programmi normali.", Command: f + " off"})
 	}
 	return out
 }
 
-// ammodernaComandiLaunchd sostituisce load/unload con bootout/bootstrap
+// modernizeLaunchdCommands sostituisce load/unload con bootout/bootstrap
 // conservando l'etichetta già scoperta. Tocca solo i comandi che riconosce:
 // qualunque altra cosa l'utente abbia scritto resta com'è.
-func ammodernaComandiLaunchd(r *RuntimeCfg) bool {
+func modernizeLaunchdCommands(r *RuntimeCfg) bool {
 	etichetta := ""
 	for _, c := range []string{r.Ferma, r.Avvia, r.Riavvia} {
 		if i := strings.Index(c, "LaunchAgents/"); i >= 0 {
@@ -482,11 +482,11 @@ func ammodernaComandiLaunchd(r *RuntimeCfg) bool {
 	return true
 }
 
-// residenteNoto: sappiamo che questo programma tiene il modello sempre in
+// knownResident: sappiamo che questo programma tiene il modello sempre in
 // memoria? Serve solo a riempire il campo nelle configurazioni scritte prima
 // che esistesse.
-func residenteNoto(chiave string) bool {
-	for _, k := range CANDIDATI {
+func knownResident(chiave string) bool {
+	for _, k := range CANDIDATES {
 		if k.chiave == chiave {
 			return k.residente
 		}

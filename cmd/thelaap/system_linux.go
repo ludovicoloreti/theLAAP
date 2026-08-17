@@ -12,11 +12,11 @@ import (
 // Versione per Linux. Su una macchina con GPU dedicata la memoria di sistema e
 // quella della scheda video sono separate: leggiamo entrambe.
 
-const SISTEMA = "Linux"
+const SYSTEM = "Linux"
 
 func exec_LookPath(nome string) (string, error) { return exec.LookPath(nome) }
 
-func memoriaSistema() (totale, libera, wired, compressa, swap float64) {
+func systemMemory() (totale, libera, wired, compressa, swap float64) {
 	b, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
 		return
@@ -36,8 +36,8 @@ func memoriaSistema() (totale, libera, wired, compressa, swap float64) {
 	return
 }
 
-// tettoGraficaGB: la memoria della scheda video, se c'è una NVIDIA o una AMD.
-func tettoGraficaGB() float64 {
+// graphicsCeilingGB: la memoria della scheda video, se c'è una NVIDIA o una AMD.
+func graphicsCeilingGB() float64 {
 	if o := sh("nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1"); o != "" {
 		return parseFloat(o) / 1024 // MiB → GB
 	}
@@ -47,7 +47,7 @@ func tettoGraficaGB() float64 {
 	return 0
 }
 
-func temaScuro() bool {
+func darkTheme() bool {
 	// GNOME e derivati
 	o := sh("gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null")
 	if strings.Contains(o, "dark") {
@@ -64,15 +64,15 @@ func temaScuro() bool {
 	return true // in dubbio, scuro: è il caso più comune sui sistemi da sviluppo
 }
 
-func dimensioneCartella(path string) float64 {
+func folderSize(path string) float64 {
 	if o := sh("du -sk " + shQuote(path) + " 2>/dev/null | cut -f1"); o != "" {
 		return parseFloat(o) / 1e6
 	}
 	return 0
 }
 
-// comandiServizio: su Linux si usa systemd per utente, quando l'unità esiste.
-func comandiServizio(k candidato, binario string) (avvia, ferma, riavvia string) {
+// serviceCommands: su Linux si usa systemd per utente, quando l'unità esiste.
+func serviceCommands(k candidato, binario string) (avvia, ferma, riavvia string) {
 	if k.unitaLinux != "" {
 		u := k.unitaLinux
 		if sh("systemctl --user list-unit-files "+u+".service 2>/dev/null | grep -c "+u) != "0" {
@@ -88,7 +88,7 @@ func comandiServizio(k candidato, binario string) (avvia, ferma, riavvia string)
 	return "", "", ""
 }
 
-func comandiFermaTutto(rr []RuntimeCfg) (ferma, riaccendi string) {
+func stopAllCommands(rr []RuntimeCfg) (ferma, riaccendi string) {
 	var f, r []string
 	for _, x := range rr {
 		if x.Ferma != "" {

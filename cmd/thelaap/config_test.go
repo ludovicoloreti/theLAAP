@@ -23,7 +23,7 @@ func TestScriviConfigRispettaIClientSeparatiEListaVuota(t *testing.T) {
 	cfgMu.Lock()
 	CFG = Config{
 		Runtime: []RuntimeCfg{{Chiave: "x", ChiaveOC: "x", Nome: "X", Porta: 8000, Elenco: "/v1/models"}},
-		Clienti: []ClienteCfg{{Nome: "Pi", File: piPath, Formato: "pi"},
+		Clienti: []ClientCfg{{Nome: "Pi", File: piPath, Formato: "pi"},
 			{Nome: "OpenCode", File: ocPath, Formato: "opencode"}},
 	}
 	cfgMu.Unlock()
@@ -34,30 +34,30 @@ func TestScriviConfigRispettaIClientSeparatiEListaVuota(t *testing.T) {
 		cfgMu.Unlock()
 	})
 
-	modelli := []Modello{
+	modelli := []Model{
 		{Runtime: "x", ID: "solo-pi", Nome: "Solo Pi", Context: 8192, MaxTokens: 1024, InPi: true},
 		{Runtime: "x", ID: "solo-oc", Nome: "Solo OC", Context: 8192, MaxTokens: 1024, InOC: true},
 	}
-	if err := scriviConfig(modelli); err != nil {
+	if err := writeConfig(modelli); err != nil {
 		t.Fatal(err)
 	}
-	pi := leggiMappaTest(t, piPath)
+	pi := readTestMap(t, piPath)
 	piModels := pi["providers"].(map[string]any)["x"].(map[string]any)["models"].([]any)
 	if len(piModels) != 1 || piModels[0].(map[string]any)["id"] != "solo-pi" {
 		t.Fatalf("Pi ha ricevuto i modelli sbagliati: %+v", piModels)
 	}
-	oc := leggiMappaTest(t, ocPath)
+	oc := readTestMap(t, ocPath)
 	ocModels := oc["provider"].(map[string]any)["x"].(map[string]any)["models"].(map[string]any)
 	if len(ocModels) != 1 || ocModels["solo-oc"] == nil {
 		t.Fatalf("OpenCode ha ricevuto i modelli sbagliati: %+v", ocModels)
 	}
 
-	if err := scriviConfig([]Modello{}); err != nil {
+	if err := writeConfig([]Model{}); err != nil {
 		t.Fatalf("non si puo' rimuovere l'ultimo modello: %v", err)
 	}
-	pi = leggiMappaTest(t, piPath)
+	pi = readTestMap(t, piPath)
 	piModels = pi["providers"].(map[string]any)["x"].(map[string]any)["models"].([]any)
-	oc = leggiMappaTest(t, ocPath)
+	oc = readTestMap(t, ocPath)
 	ocModels = oc["provider"].(map[string]any)["x"].(map[string]any)["models"].(map[string]any)
 	if len(piModels) != 0 || len(ocModels) != 0 {
 		t.Fatal("la lista vuota non ha rimosso tutti i modelli")
@@ -88,7 +88,7 @@ func TestScriviConfigPreservaLaThinkingLevelMap(t *testing.T) {
 	cfgMu.Lock()
 	CFG = Config{
 		Runtime: []RuntimeCfg{{Chiave: "x", ChiaveOC: "x", Nome: "X", Porta: 8000, Elenco: "/v1/models"}},
-		Clienti: []ClienteCfg{{Nome: "Pi", File: piPath, Formato: "pi"},
+		Clienti: []ClientCfg{{Nome: "Pi", File: piPath, Formato: "pi"},
 			{Nome: "OpenCode", File: ocPath, Formato: "opencode"}},
 	}
 	cfgMu.Unlock()
@@ -99,15 +99,15 @@ func TestScriviConfigPreservaLaThinkingLevelMap(t *testing.T) {
 		cfgMu.Unlock()
 	})
 
-	modelli, errori := statoConfig()
+	modelli, errori := configState()
 	if len(errori) > 0 {
 		t.Fatalf("lettura della config fallita: %v", errori)
 	}
-	if err := scriviConfig(modelli); err != nil {
+	if err := writeConfig(modelli); err != nil {
 		t.Fatal(err)
 	}
 
-	pi := leggiMappaTest(t, piPath)
+	pi := readTestMap(t, piPath)
 	voci := pi["providers"].(map[string]any)["x"].(map[string]any)["models"].([]any)
 	if len(voci) != 1 {
 		t.Fatalf("attesa 1 voce, trovate %d", len(voci))
@@ -125,7 +125,7 @@ func TestScriviConfigPreservaLaThinkingLevelMap(t *testing.T) {
 	}
 }
 
-func leggiMappaTest(t *testing.T, path string) map[string]any {
+func readTestMap(t *testing.T, path string) map[string]any {
 	t.Helper()
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -165,7 +165,7 @@ func TestSalvareDalPannelloNonPerdeLaThinkingLevelMap(t *testing.T) {
 	cfgMu.Lock()
 	CFG = Config{
 		Runtime: []RuntimeCfg{{Chiave: "x", ChiaveOC: "x", Nome: "X", Porta: 8000, Elenco: "/v1/models"}},
-		Clienti: []ClienteCfg{{Nome: "Pi", File: piPath, Formato: "pi"},
+		Clienti: []ClientCfg{{Nome: "Pi", File: piPath, Formato: "pi"},
 			{Nome: "OpenCode", File: ocPath, Formato: "opencode"}},
 	}
 	cfgMu.Unlock()
@@ -176,14 +176,14 @@ func TestSalvareDalPannelloNonPerdeLaThinkingLevelMap(t *testing.T) {
 		cfgMu.Unlock()
 	})
 
-	modelli, _ := statoConfig()
+	modelli, _ := configState()
 
 	// il giro attraverso il browser, senza scorciatoie
 	fuori, err := json.Marshal(modelli)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var dentro []Modello
+	var dentro []Model
 	if err := json.Unmarshal(fuori, &dentro); err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestSalvareDalPannelloNonPerdeLaThinkingLevelMap(t *testing.T) {
 			dentro[i].Nome = "Nome cambiato dall'utente"
 		}
 	}
-	if err := scriviConfig(dentro); err != nil {
+	if err := writeConfig(dentro); err != nil {
 		t.Fatal(err)
 	}
 

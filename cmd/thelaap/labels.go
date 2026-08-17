@@ -17,10 +17,10 @@ import (
 // dimensione. Resta una proposta: si può correggere a mano, e l'etichetta scritta
 // dall'utente vince sempre.
 
-// fattiDi: quello che sappiamo per certo di un modello, in prosa. È l'unico
+// factsAbout: quello che sappiamo per certo di un modello, in prosa. È l'unico
 // materiale che il modellino riceve: non gli si chiede di ricordare, gli si
 // chiede di riassumere.
-func fattiDi(s Scheda) string {
+func factsAbout(s Card) string {
 	var tratti []string
 	for _, i := range s.Indizi {
 		tratti = append(tratti, i.Tratto)
@@ -44,12 +44,12 @@ func fattiDi(s Scheda) string {
 	return fatti
 }
 
-// chiediAlModellino: una domanda al modello locale dell'aiuto. Sta in una
+// askTheHelper: una domanda al modello locale dell'aiuto. Sta in una
 // funzione sola perché etichetta e descrizione differiscono nelle regole e nel
 // tetto di parole, non nel modo di chiedere.
-func chiediAlModellino(regole, fatti string, maxTok int) (string, error) {
+func askTheHelper(regole, fatti string, maxTok int) (string, error) {
 	corpo, _ := json.Marshal(map[string]any{
-		"model": modelloAiuto(),
+		"model": helperModel(),
 		"messages": []any{
 			map[string]any{"role": "system", "content": regole},
 			map[string]any{"role": "user", "content": fatti},
@@ -58,7 +58,7 @@ func chiediAlModellino(regole, fatti string, maxTok int) (string, error) {
 		"temperature": 0.3,
 	})
 	cl := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := cl.Post("http://127.0.0.1:"+itoa(portaAiuto())+"/v1/chat/completions",
+	resp, err := cl.Post("http://127.0.0.1:"+itoa(helperPort())+"/v1/chat/completions",
 		"application/json", bytes.NewReader(corpo))
 	if err != nil {
 		return "", err
@@ -89,10 +89,10 @@ func chiediAlModellino(regole, fatti string, maxTok int) (string, error) {
 // non veniva detto quali nomi erano già presi — ha i fatti per differenziare
 // (identificativo, tratti, velocità, peso), gli mancava il vincolo.
 
-// chiaveEtichetta: la forma su cui due nomi si confrontano. Maiuscole, accenti,
+// labelKey: la forma su cui due nomi si confrontano. Maiuscole, accenti,
 // trattini e spazi doppi non sono differenze: «Chat-Veloce» e «chat veloce» sono
 // lo stesso nome, e accettarli entrambi rimetterebbe il problema.
-func chiaveEtichetta(s string) string {
+func labelKey(s string) string {
 	var b []rune
 	spazio := false
 	for _, r := range strings.ToLower(strings.TrimSpace(s)) {
@@ -121,16 +121,16 @@ func chiaveEtichetta(s string) string {
 	return string(b)
 }
 
-// etichetteInUso: i nomi già assegnati ad ALTRI modelli, dalla chiave normalizzata
+// labelsInUse: i nomi già assegnati ad ALTRI modelli, dalla chiave normalizzata
 // al nome come si legge. Il modello escluso è quello per cui stiamo proponendo:
 // il suo nome attuale non deve impedirgli di riconfermarlo.
-func etichetteInUso(ss []Scheda, escludiRuntime, escludiID string) map[string]string {
+func labelsInUse(ss []Card, escludiRuntime, escludiID string) map[string]string {
 	out := map[string]string{}
 	for _, s := range ss {
 		if s.Runtime == escludiRuntime && s.ID == escludiID {
 			continue
 		}
-		if k := chiaveEtichetta(s.Etichetta); k != "" {
+		if k := labelKey(s.Etichetta); k != "" {
 			out[k] = s.Etichetta
 		}
 	}
@@ -139,18 +139,18 @@ func etichetteInUso(ss []Scheda, escludiRuntime, escludiID string) map[string]st
 
 // Le parole dei fatti che passiamo al modellino, che lui a volte ricopia nel
 // nome. «Analisi del contesto e delle regole» non dice un mestiere: ripete quello
-// che gli abbiamo dato. Sono le stesse parole che REGOLE vieta all'assistente del
+// che gli abbiamo dato. Sono le stesse parole che RULES vieta all'assistente del
 // pannello, per la stessa ragione — chi legge non deve incontrarle.
 // Radici, non parole intere: «contesto» al singolare passava e «contesti» al
 // plurale no — il test l'ha preso prima che finisse in un nome. «esperti» resta
 // intero di proposito: «Esperto di codice» sarebbe un buon nome, ed è «misto di
 // esperti» il gergo da tenere fuori.
-var paroleTecniche = []string{"token", "contest", "parametr", "esperti", "miliard", "quantizz"}
+var technicalWords = []string{"token", "contest", "parametr", "esperti", "miliard", "quantizz"}
 
-// etichettaSensata: è utilizzabile come NOME? Il modellino è piccolo, e chiederlo
+// labelMakesSense: è utilizzabile come NOME? Il modellino è piccolo, e chiederlo
 // nelle regole non basta: risponde con frasi di sei parole e ricopia il gergo.
 // Verificato qui, e in caso si richiede — è lo stesso trattamento dei doppioni.
-func etichettaSensata(proposta string) error {
+func labelMakesSense(proposta string) error {
 	parole := strings.Fields(proposta)
 	if len(parole) == 0 {
 		return fmt.Errorf("vuoto")
@@ -158,8 +158,8 @@ func etichettaSensata(proposta string) error {
 	if len(parole) > 5 {
 		return fmt.Errorf("%d parole: è una frase, non un nome", len(parole))
 	}
-	k := chiaveEtichetta(proposta)
-	for _, t := range paroleTecniche {
+	k := labelKey(proposta)
+	for _, t := range technicalWords {
 		if strings.Contains(k, t) {
 			return fmt.Errorf("contiene «%s», che è gergo: il nome deve dire il mestiere", t)
 		}
@@ -167,8 +167,8 @@ func etichettaSensata(proposta string) error {
 	return nil
 }
 
-func etichettaLibera(proposta string, presi map[string]string) bool {
-	k := chiaveEtichetta(proposta)
+func labelFree(proposta string, presi map[string]string) bool {
+	k := labelKey(proposta)
 	if k == "" {
 		return false
 	}
@@ -176,23 +176,23 @@ func etichettaLibera(proposta string, presi map[string]string) bool {
 	return !c
 }
 
-// etichettaNuova: chiede un nome finché non ne arriva uno diverso dagli altri.
+// newLabel: chiede un nome finché non ne arriva uno diverso dagli altri.
 // Tre tentativi e non di più: ogni giro è una chiamata al modello, e se non
 // differenzia in tre volte non differenzia. Meglio nessun nome che un doppione:
 // senza etichetta la pagina mostra l'identificativo, che almeno è unico.
-func etichettaNuova(s Scheda, presi map[string]string) (string, error) {
+func newLabel(s Card, presi map[string]string) (string, error) {
 	var ultimo error
 	for i := 0; i < 3; i++ {
-		nome, err := proponiEtichetta(s, presi)
+		nome, err := proposeLabel(s, presi)
 		if err != nil {
 			ultimo = err
 			continue
 		}
-		if err := etichettaSensata(nome); err != nil {
+		if err := labelMakesSense(nome); err != nil {
 			ultimo = fmt.Errorf("«%s»: %w", nome, err)
 			continue
 		}
-		if etichettaLibera(nome, presi) {
+		if labelFree(nome, presi) {
 			return nome, nil
 		}
 		ultimo = fmt.Errorf("«%s» è già il nome di un altro modello", nome)
@@ -200,7 +200,7 @@ func etichettaNuova(s Scheda, presi map[string]string) (string, error) {
 	return "", ultimo
 }
 
-func proponiEtichetta(s Scheda, presi map[string]string) (string, error) {
+func proposeLabel(s Card, presi map[string]string) (string, error) {
 	regole := `Dai un nome breve e utile a un modello di intelligenza artificiale, per un elenco.
 REGOLE:
 - Da 2 a 4 parole, in italiano, in forma di ruolo: dice A COSA SERVE, non com'è fatto.
@@ -221,7 +221,7 @@ REGOLE:
 			". Scegline uno DIVERSO, e non una variante minima di questi: il nome serve a distinguere."
 	}
 
-	testo, err := chiediAlModellino(regole, fattiDi(s), 30)
+	testo, err := askTheHelper(regole, factsAbout(s), 30)
 	if err != nil {
 		return "", err
 	}
@@ -240,12 +240,12 @@ REGOLE:
 	return testo, nil
 }
 
-// proponiNota: due righe su cosa fa questo modello e quando conviene usarlo.
+// proposeNote: due righe su cosa fa questo modello e quando conviene usarlo.
 //
 // Si genera una volta e si salva in profili.json, come l'etichetta. È la
 // ragione per cui il modellino da 1,8 GB non deve stare in RAM per sempre:
 // serve a scrivere frasi che non cambiano, non a rispondere in continuazione.
-func proponiNota(s Scheda) (string, error) {
+func proposeNote(s Card) (string, error) {
 	regole := `Descrivi un modello di intelligenza artificiale a chi deve decidere se usarlo.
 REGOLE:
 - Due frasi al massimo, in italiano, meno di 40 parole in tutto.
@@ -254,7 +254,7 @@ REGOLE:
 - Niente gergo di marketing, niente elenchi, niente virgolette, niente titoli.
 - Rispondi SOLO con le due frasi.`
 
-	testo, err := chiediAlModellino(regole, fattiDi(s), 160)
+	testo, err := askTheHelper(regole, factsAbout(s), 160)
 	if err != nil {
 		return "", err
 	}
@@ -266,7 +266,7 @@ REGOLE:
 	return trunc(testo, 300), nil
 }
 
-// apiEtichettaAuto: propone nome e descrizione e li salva in profili.json.
+// apiAutoLabel: propone nome e descrizione e li salva in profili.json.
 // Uno alla volta: il modellino è piccolo ma non istantaneo.
 //
 // Tre modi, tutti dalla query perché il corpo non serve:
@@ -276,12 +276,12 @@ REGOLE:
 //	?id=…      un modello solo, e lo rifà sempre (il pulsante «ridescrivi»)
 //
 // I modelli remoti si saltano: girano altrove e il nome glielo dà chi li ospita.
-func apiEtichettaAuto(w http.ResponseWriter, r *http.Request) {
+func apiAutoLabel(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	uno, tutte := strings.TrimSpace(q.Get("id")), q.Get("tutte") == "1"
 	fatte := []map[string]string{}
 	for _, s := range schede() {
-		if provRemoto(s.Runtime) {
+		if provRemote(s.Runtime) {
 			continue
 		}
 		if uno != "" && !strings.EqualFold(s.ID, uno) {
@@ -292,17 +292,17 @@ func apiEtichettaAuto(w http.ResponseWriter, r *http.Request) {
 		if rifai || s.Etichetta == "" {
 			// I nomi già presi si rileggono a ogni giro: dentro una sola corsa si
 			// assegnano più etichette, e la seconda deve vedere la prima.
-			presi := etichetteInUso(schede(), s.Runtime, s.ID)
-			if nome, err := etichettaNuova(s, presi); err == nil {
-				aggiornaProfilo(s.Runtime, s.ID, func(p *Profilo) { p.Etichetta = nome })
+			presi := labelsInUse(schede(), s.Runtime, s.ID)
+			if nome, err := newLabel(s, presi); err == nil {
+				updateProfile(s.Runtime, s.ID, func(p *Profile) { p.Etichetta = nome })
 				voce["etichetta"] = nome
 			} else {
 				voce["etichettaMancata"] = err.Error()
 			}
 		}
 		if rifai || s.Note == "" {
-			if nota, err := proponiNota(s); err == nil {
-				aggiornaProfilo(s.Runtime, s.ID, func(p *Profilo) { p.Note = nota })
+			if nota, err := proposeNote(s); err == nil {
+				updateProfile(s.Runtime, s.ID, func(p *Profile) { p.Note = nota })
 				voce["note"] = nota
 			}
 		}
@@ -310,5 +310,5 @@ func apiEtichettaAuto(w http.ResponseWriter, r *http.Request) {
 			fatte = append(fatte, voce)
 		}
 	}
-	scriviJSON(w, map[string]any{"ok": true, "fatte": fatte, "quante": len(fatte)})
+	writeJSON(w, map[string]any{"ok": true, "fatte": fatte, "quante": len(fatte)})
 }

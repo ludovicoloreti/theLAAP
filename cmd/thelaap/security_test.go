@@ -28,7 +28,7 @@ func TestOriginAmmesso(t *testing.T) {
 	}
 	for _, c := range casi {
 		t.Run(c.nome, func(t *testing.T) {
-			if got := originAmmesso(c.origine, c.porta); got != c.vuole {
+			if got := allowedOrigin(c.origine, c.porta); got != c.vuole {
 				t.Errorf("originAmmesso(%q, %d) = %v, volevo %v", c.origine, c.porta, got, c.vuole)
 			}
 		})
@@ -43,14 +43,14 @@ func TestIndirizzoLocale(t *testing.T) {
 		"10.0.0.5:1234":   false,
 	}
 	for remoto, vuole := range casi {
-		if got := indirizzoLocale(remoto); got != vuole {
+		if got := localAddress(remoto); got != vuole {
 			t.Errorf("indirizzoLocale(%q) = %v, volevo %v", remoto, got, vuole)
 		}
 	}
 }
 
 // chiamata prepara una richiesta gia' passata per la guardia.
-func richiestaGuardata(t *testing.T, metodo, origine, token string) *httptest.ResponseRecorder {
+func guardedRequest(t *testing.T, metodo, origine, token string) *httptest.ResponseRecorder {
 	t.Helper()
 	raggiunto := false
 	h := guardia(func(w http.ResponseWriter, r *http.Request) {
@@ -76,46 +76,46 @@ func richiestaGuardata(t *testing.T, metodo, origine, token string) *httptest.Re
 }
 
 func TestGuardiaBloccaCSRF(t *testing.T) {
-	tokenSessione = "token-di-prova"
-	portaInAscolto = 7070
+	sessionToken = "token-di-prova"
+	listeningPort = 7070
 
 	t.Run("POST da sito esterno con token indovinato", func(t *testing.T) {
-		w := richiestaGuardata(t, http.MethodPost, "http://sito-cattivo.invalid", "token-di-prova")
+		w := guardedRequest(t, http.MethodPost, "http://sito-cattivo.invalid", "token-di-prova")
 		if w.Code != http.StatusForbidden {
 			t.Errorf("una pagina esterna è passata: codice %d", w.Code)
 		}
 	})
 
 	t.Run("POST senza Origin (form cross-site)", func(t *testing.T) {
-		w := richiestaGuardata(t, http.MethodPost, "", "token-di-prova")
+		w := guardedRequest(t, http.MethodPost, "", "token-di-prova")
 		if w.Code != http.StatusForbidden {
 			t.Errorf("richiesta senza Origin è passata: codice %d", w.Code)
 		}
 	})
 
 	t.Run("POST con Origin giusto ma senza token", func(t *testing.T) {
-		w := richiestaGuardata(t, http.MethodPost, "http://127.0.0.1:7070", "")
+		w := guardedRequest(t, http.MethodPost, "http://127.0.0.1:7070", "")
 		if w.Code != http.StatusForbidden {
 			t.Errorf("richiesta senza token è passata: codice %d", w.Code)
 		}
 	})
 
 	t.Run("POST con token sbagliato", func(t *testing.T) {
-		w := richiestaGuardata(t, http.MethodPost, "http://127.0.0.1:7070", "altro")
+		w := guardedRequest(t, http.MethodPost, "http://127.0.0.1:7070", "altro")
 		if w.Code != http.StatusForbidden {
 			t.Errorf("token sbagliato è passato: codice %d", w.Code)
 		}
 	})
 
 	t.Run("POST legittimo dal pannello", func(t *testing.T) {
-		w := richiestaGuardata(t, http.MethodPost, "http://127.0.0.1:7070", "token-di-prova")
+		w := guardedRequest(t, http.MethodPost, "http://127.0.0.1:7070", "token-di-prova")
 		if w.Code != http.StatusOK {
 			t.Errorf("richiesta legittima rifiutata: codice %d, corpo %q", w.Code, w.Body.String())
 		}
 	})
 
 	t.Run("GET in lettura passa senza token", func(t *testing.T) {
-		w := richiestaGuardata(t, http.MethodGet, "", "")
+		w := guardedRequest(t, http.MethodGet, "", "")
 		if w.Code != http.StatusOK {
 			t.Errorf("lettura rifiutata: codice %d", w.Code)
 		}
@@ -152,7 +152,7 @@ func TestHostAmmesso(t *testing.T) {
 		{"127.0.0.1.sito-cattivo.invalid:7070", 7070, false},
 	}
 	for _, c := range casi {
-		if got := hostAmmesso(c.host, c.porta); got != c.vuole {
+		if got := allowedHost(c.host, c.porta); got != c.vuole {
 			t.Errorf("hostAmmesso(%q, %d) = %v, volevo %v", c.host, c.porta, got, c.vuole)
 		}
 	}
@@ -161,7 +161,7 @@ func TestHostAmmesso(t *testing.T) {
 // Il rebinding attacca le GET, che non chiedono ne' Origin ne' token: se la
 // guardia controllasse l'Host solo sulle POST non servirebbe a niente.
 func TestLaGuardiaControllaLHostAncheInLettura(t *testing.T) {
-	portaInAscolto = 7070
+	listeningPort = 7070
 	h := guardia(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 	r := httptest.NewRequest(http.MethodGet, "/api/modelli", nil)
 	r.RemoteAddr = "127.0.0.1:54321"
@@ -176,8 +176,8 @@ func TestLaGuardiaControllaLHostAncheInLettura(t *testing.T) {
 // /api/grezzo e /api/documento restituiscono i file dei client, dove sta la
 // chiave dei provider. In lettura non basta l'Host.
 func TestLetturaRiservataChiedeIlToken(t *testing.T) {
-	tokenSessione = "token-di-prova"
-	h := letturaRiservata(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	sessionToken = "token-di-prova"
+	h := restrictedRead(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 
 	r := httptest.NewRequest(http.MethodGet, "/api/grezzo?file=pi", nil)
 	w := httptest.NewRecorder()
@@ -213,7 +213,7 @@ func TestLaPaginaMandaIlTokenAncheSulleGET(t *testing.T) {
 }
 
 func TestSoloPost(t *testing.T) {
-	h := soloPost(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	h := postOnly(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 
 	// Il caso concreto: <img src="/api/esegui?cmd=ferma-tutto"> da una pagina
 	// qualunque. Prima bastava questo per spegnere lo stack.
@@ -233,10 +233,10 @@ func TestSoloPost(t *testing.T) {
 }
 
 func TestGeneraTokenDiversoOgniVolta(t *testing.T) {
-	generaToken()
-	a := tokenSessione
-	generaToken()
-	if a == tokenSessione {
+	generateToken()
+	a := sessionToken
+	generateToken()
+	if a == sessionToken {
 		t.Error("due token consecutivi identici")
 	}
 	if len(a) != 64 {

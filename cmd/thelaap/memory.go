@@ -15,8 +15,8 @@ import (
 	"github.com/ludovicoloreti/theLAAP/internal/budget"
 )
 
-// MemStato — fotografia della memoria unificata e di chi la sta occupando.
-type MemStato struct {
+// MemState — fotografia della memoria unificata e di chi la sta occupando.
+type MemState struct {
 	TotaleGB    float64 `json:"totaleGB"`
 	LiberaGB    float64 `json:"liberaGB"`
 	UsataGB     float64 `json:"usataGB"`
@@ -26,8 +26,8 @@ type MemStato struct {
 	WiredCapGB  float64 `json:"wiredCapGB"` // iogpu.wired_limit_mb
 	// Tetto per singolo modello, se il runtime lo dichiara in /health.
 	// Non tutti lo fanno: zero significa "non lo so", non "nessun limite".
-	CeilingGB float64        `json:"ceilingGB"`
-	Caricati  []ModelloInRAM `json:"caricati"`
+	CeilingGB float64      `json:"ceilingGB"`
+	Caricati  []ModelInRAM `json:"caricati"`
 	// Quanto occupa davvero ogni programma acceso, misurato sul processo.
 	// `Caricati` dice quali modelli ci sono e quanto pesano i loro file;
 	// `Processi` dice quanta memoria tengono davvero, e le due cose
@@ -44,7 +44,7 @@ type MemStato struct {
 	EtaSecondi int       `json:"etaSecondi"`
 }
 
-type ModelloInRAM struct {
+type ModelInRAM struct {
 	Nome    string  `json:"nome"`
 	Runtime string  `json:"runtime"`
 	GB      float64 `json:"gb"`
@@ -81,14 +81,14 @@ var (
 	cacheGBMu sync.RWMutex
 )
 
-func dimensioneGB(path string) float64 {
+func sizeGB(path string) float64 {
 	cacheGBMu.RLock()
 	v, ok := cacheGB[path]
 	cacheGBMu.RUnlock()
 	if ok {
 		return v
 	}
-	gb := dimensioneCartella(path)
+	gb := folderSize(path)
 	cacheGBMu.Lock()
 	cacheGB[path] = gb
 	cacheGBMu.Unlock()
@@ -100,18 +100,18 @@ func parseFloat(s string) float64 {
 	return f
 }
 
-// leggeMemoria mette insieme vm_stat, sysctl e lo stato dei runtime.
-func leggeMemoria() MemStato {
+// readsMemory mette insieme vm_stat, sysctl e lo stato dei runtime.
+func readsMemory() MemState {
 	// liste sempre inizializzate: se restano nil il JSON esce con "null" e la
 	// pagina va in errore appena prova a scorrerle
 	adesso := time.Now()
-	m := MemStato{Aggiornato: adesso.Format("15:04:05"), Istante: adesso,
-		Caricati: []ModelloInRAM{}, Avvisi: []string{}}
+	m := MemState{Aggiornato: adesso.Format("15:04:05"), Istante: adesso,
+		Caricati: []ModelInRAM{}, Avvisi: []string{}}
 
 	// letture di sistema: l'implementazione cambia per sistema operativo
-	m.TotaleGB, m.LiberaGB, m.WiredGB, m.CompressaGB, m.SwapUsatoGB = memoriaSistema()
+	m.TotaleGB, m.LiberaGB, m.WiredGB, m.CompressaGB, m.SwapUsatoGB = systemMemory()
 	m.UsataGB = m.TotaleGB - m.LiberaGB
-	m.WiredCapGB = tettoGraficaGB()
+	m.WiredCapGB = graphicsCeilingGB()
 
 	// Quali modelli sono in memoria: ogni programma lo dice a modo suo, e il
 	// comando è dichiarato nella configurazione. Il formato atteso è tabellare,
@@ -155,7 +155,7 @@ func leggeMemoria() MemStato {
 		// niente. Prima erano indistinguibili e non lo sapeva nessuno.
 		if e.err != nil {
 			m.Avvisi = append(m.Avvisi, fmt.Sprintf(
-				"non riesco a sapere cosa ha in memoria %s: %s", rc.Nome, senzaAnsi(e.err.Error())))
+				"non riesco a sapere cosa ha in memoria %s: %s", rc.Nome, withoutAnsi(e.err.Error())))
 			continue
 		}
 		if out == "" {
@@ -168,7 +168,7 @@ func leggeMemoria() MemStato {
 				continue
 			}
 			for i := 1; i < len(campi); i++ {
-				gb, ok := misuraGB(campi, i)
+				gb, ok := measureGB(campi, i)
 				if !ok {
 					continue
 				}
@@ -178,7 +178,7 @@ func leggeMemoria() MemStato {
 						stato = s
 					}
 				}
-				m.Caricati = append(m.Caricati, ModelloInRAM{
+				m.Caricati = append(m.Caricati, ModelInRAM{
 					Nome: campi[0], Runtime: rc.Nome, GB: gb, Stato: stato})
 				break
 			}
@@ -228,12 +228,12 @@ func leggeMemoria() MemStato {
 		case h.Model != "":
 			gb := 0.0
 			if h.ModelPath != "" {
-				gb = dimensioneGB(h.ModelPath)
+				gb = sizeGB(h.ModelPath)
 			}
-			m.Caricati = append(m.Caricati, ModelloInRAM{
+			m.Caricati = append(m.Caricati, ModelInRAM{
 				Nome: h.Model, Runtime: rc.Nome, GB: gb, Stato: "residente"})
 		case h.EnginePool.LoadedCount > 0 && h.EnginePool.CurrentMemory > 0:
-			m.Caricati = append(m.Caricati, ModelloInRAM{
+			m.Caricati = append(m.Caricati, ModelInRAM{
 				Nome: "modello attivo", Runtime: rc.Nome,
 				GB: h.EnginePool.CurrentMemory / 1e9, Stato: "caricato"})
 		}
@@ -241,7 +241,7 @@ func leggeMemoria() MemStato {
 
 	// Quanto tengono davvero i processi. Va dopo la raccolta dei modelli
 	// perché associa a ogni programma i modelli che ha dentro.
-	m.Processi = occupazioniRuntime(m.Caricati)
+	m.Processi = runtimeFootprints(m.Caricati)
 
 	// avvisi utili
 	//
@@ -263,7 +263,7 @@ func leggeMemoria() MemStato {
 	// Gli avvisi si riferiscono a quello che è caricato ADESSO, non a modelli
 	// per nome: se domani i modelli sono altri, questi messaggi restano validi.
 	var somma float64
-	var piuGrosso ModelloInRAM
+	var piuGrosso ModelInRAM
 	for _, c := range m.Caricati {
 		somma += c.GB
 		if c.GB > piuGrosso.GB {
@@ -289,36 +289,36 @@ func leggeMemoria() MemStato {
 // Quindi: un lavoratore in sottofondo aggiorna la fotografia, e la richiesta
 // restituisce subito l'ultima disponibile.
 var (
-	ultimaMem   MemStato
+	ultimaMem   MemState
 	ultimaMemMu sync.RWMutex
 )
 
 // Tutto in sottofondo, compresa la prima raccolta: il server deve mettersi in
 // ascolto subito. Se la prima fotografia costa secondi — o si impianta — la
 // porta non si apre e l'app sembra non partita.
-func avviaMonitorMemoria() {
+func startMemoryMonitor() {
 	go func() {
 		for {
-			giroDiLettura()
+			readCycle()
 			// Un rinfresco su richiesta (dopo aver scaricato un modello) evita
 			// che l'interfaccia mostri ancora quello che è appena stato tolto.
 			select {
-			case <-rinfrescoOra:
+			case <-refreshedAt:
 			case <-time.After(4 * time.Second):
 			}
 		}
 	}()
 }
 
-// giroDiLettura è una funzione a sé per una ragione precisa: il recover() deve
+// readCycle è una funzione a sé per una ragione precisa: il recover() deve
 // far cadere il singolo giro, non il ciclo.
 //
-// leggeMemoria fa parsing di output di programmi esterni — indicizza slice,
+// readsMemory fa parsing di output di programmi esterni — indicizza slice,
 // converte numeri — cioè proprio il codice che può andare fuori indice quando
 // un programma cambia formato. E in Go un panic dentro una goroutine che non
 // sia un handler HTTP **termina l'intero processo**: il pannello sparirebbe
 // senza lasciare traccia, e da fuori sembrerebbe semplicemente "non parte".
-func giroDiLettura() {
+func readCycle() {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("monitor memoria: giro saltato per un errore interno: %v", r)
@@ -328,32 +328,32 @@ func giroDiLettura() {
 			ultimaMemMu.Unlock()
 		}
 	}()
-	m := leggeMemoria()
+	m := readsMemory()
 	ultimaMemMu.Lock()
 	ultimaMem = m
 	ultimaMemMu.Unlock()
 }
 
-// memoriaCorrente: l'ultima fotografia disponibile.
-func memoriaCorrente() MemStato {
+// currentMemory: l'ultima fotografia disponibile.
+func currentMemory() MemState {
 	ultimaMemMu.RLock()
 	defer ultimaMemMu.RUnlock()
 	return ultimaMem
 }
 
-func apiMemoria(w http.ResponseWriter, r *http.Request) {
-	m := memoriaCorrente()
+func apiMemory(w http.ResponseWriter, r *http.Request) {
+	m := currentMemory()
 	// Quanti secondi ha questa fotografia. Senza, l'interfaccia non può
 	// distinguere un dato fresco da uno fermo da mezz'ora perché il monitor
 	// è morto: mostrerebbe numeri stantii con l'aria di essere aggiornati.
 	if !m.Istante.IsZero() {
 		m.EtaSecondi = int(time.Since(m.Istante).Seconds())
 	}
-	scriviJSON(w, m)
+	writeJSON(w, m)
 }
 
-// misuraGB riconosce "29.3 GB", "29.3GB" e "30012 MB" dentro una riga tabellare.
-func misuraGB(campi []string, i int) (float64, bool) {
+// measureGB riconosce "29.3 GB", "29.3GB" e "30012 MB" dentro una riga tabellare.
+func measureGB(campi []string, i int) (float64, bool) {
 	c := campi[i]
 	unita := ""
 	if i+1 < len(campi) {

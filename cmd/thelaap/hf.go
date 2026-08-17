@@ -17,7 +17,7 @@ import (
 // Filtriamo su MLX 8-bit: è il formato che i runtime di questa macchina usano,
 // e 8-bit è la regola dello stack (mai 4-bit, salvo MoE molto grossi).
 
-type Trovato struct {
+type Found struct {
 	ID          string  `json:"id"`
 	GB          float64 `json:"gb"`
 	Downloads   int     `json:"downloads"`
@@ -47,14 +47,14 @@ func formato(id string) (string, bool, string) {
 	return "?", false, "formato non riconosciuto"
 }
 
-func inCache(id string) bool {
+func cached(id string) bool {
 	h, _ := os.UserHomeDir()
 	d := filepath.Join(h, ".cache/huggingface/hub", "models--"+strings.ReplaceAll(id, "/", "--"))
 	_, err := os.Stat(d)
 	return err == nil
 }
 
-func apiHFCerca(w http.ResponseWriter, r *http.Request) {
+func apiHFSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q == "" {
 		errJSON(w, "scrivi cosa cerchi")
@@ -80,7 +80,7 @@ func apiHFCerca(w http.ResponseWriter, r *http.Request) {
 	// le dimensioni richiedono una chiamata per repo: le prendo in parallelo, solo per i candidati buoni
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	out := []Trovato{} // mai nil: nil diventa "null" nel JSON
+	out := []Found{} // mai nil: nil diventa "null" nel JSON
 	sem := make(chan struct{}, 8)
 	for _, g := range grezzi {
 		fmt_, ok, nota := formato(g.ID)
@@ -92,8 +92,8 @@ func apiHFCerca(w http.ResponseWriter, r *http.Request) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			t := Trovato{ID: id, Downloads: dl, Formato: f, Nota: nota,
-				GiaPresente: inCache(id), Consigliato: f == "MLX 8-bit"}
+			t := Found{ID: id, Downloads: dl, Formato: f, Nota: nota,
+				GiaPresente: cached(id), Consigliato: f == "MLX 8-bit"}
 			if len(mod) >= 10 {
 				t.Aggiornato = mod[:10]
 			}
@@ -142,11 +142,11 @@ func apiHFCerca(w http.ResponseWriter, r *http.Request) {
 	if len(out) > 25 {
 		out = out[:25]
 	}
-	scriviJSON(w, out)
+	writeJSON(w, out)
 }
 
 // ── download ────────────────────────────────────────────────
-type Scarico struct {
+type Download struct {
 	Repo   string    `json:"repo"`
 	Stato  string    `json:"stato"` // in corso | finito | errore
 	GB     float64   `json:"gb"`
@@ -155,17 +155,17 @@ type Scarico struct {
 }
 
 var (
-	scarichi   = map[string]*Scarico{}
+	scarichi   = map[string]*Download{}
 	scarichiMu sync.Mutex
 )
 
-// scarichiInCorso: i repo che stiamo scaricando adesso.
+// downloadsInProgress: i repo che stiamo scaricando adesso.
 //
 // Sta qui, accanto alla mappa, perché la fonte deve essere una: states.go la usa
 // per dire "in-arrivo" e /api/hf/stato per disegnare l'avanzamento. Se le due
 // cose leggessero due posti diversi, un modello potrebbe risultare spento
 // mentre la barra del download cresce.
-func scarichiInCorso() []string {
+func downloadsInProgress() []string {
 	scarichiMu.Lock()
 	defer scarichiMu.Unlock()
 	out := []string{}
@@ -177,7 +177,7 @@ func scarichiInCorso() []string {
 	return out
 }
 
-func apiHFScarica(w http.ResponseWriter, r *http.Request) {
+func apiHFDownload(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Repo string `json:"repo"`
 	}
@@ -196,10 +196,10 @@ func apiHFScarica(w http.ResponseWriter, r *http.Request) {
 	scarichiMu.Lock()
 	if s, ok := scarichi[req.Repo]; ok && s.Stato == "in corso" {
 		scarichiMu.Unlock()
-		scriviJSON(w, map[string]any{"ok": true, "messaggio": "già in corso"})
+		writeJSON(w, map[string]any{"ok": true, "messaggio": "già in corso"})
 		return
 	}
-	scarichi[req.Repo] = &Scarico{Repo: req.Repo, Stato: "in corso", Da: time.Now()}
+	scarichi[req.Repo] = &Download{Repo: req.Repo, Stato: "in corso", Da: time.Now()}
 	scarichiMu.Unlock()
 
 	go func(repo string) {
@@ -224,14 +224,14 @@ func apiHFScarica(w http.ResponseWriter, r *http.Request) {
 		}
 	}(req.Repo)
 
-	scriviJSON(w, map[string]any{"ok": true,
+	writeJSON(w, map[string]any{"ok": true,
 		"messaggio": fmt.Sprintf("scarico %s — resta pure sulla pagina, ti aggiorno qui", req.Repo)})
 }
 
-func apiHFStato(w http.ResponseWriter, r *http.Request) {
+func apiHFStatus(w http.ResponseWriter, r *http.Request) {
 	scarichiMu.Lock()
 	defer scarichiMu.Unlock()
-	var out []Scarico
+	var out []Download
 	for _, s := range scarichi {
 		c := *s
 		if c.Stato == "in corso" {
@@ -245,5 +245,5 @@ func apiHFStato(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, c)
 	}
-	scriviJSON(w, out)
+	writeJSON(w, out)
 }

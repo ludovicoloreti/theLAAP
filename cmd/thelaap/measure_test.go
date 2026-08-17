@@ -69,7 +69,7 @@ func TestMisuraGB(t *testing.T) {
 	}
 	for _, c := range casi {
 		t.Run(c.nome, func(t *testing.T) {
-			got, ok := misuraGB(c.campi, c.i)
+			got, ok := measureGB(c.campi, c.i)
 			if ok != c.valido {
 				t.Fatalf("valido = %v, volevo %v", ok, c.valido)
 			}
@@ -80,7 +80,7 @@ func TestMisuraGB(t *testing.T) {
 	}
 }
 
-// misuraGB indicizza uno slice: un output storto non deve far cadere il
+// measureGB indicizza uno slice: un output storto non deve far cadere il
 // processo, perché gira dentro il monitor in sottofondo.
 func TestMisuraGBNonVaInPanico(t *testing.T) {
 	casi := [][]string{
@@ -96,7 +96,7 @@ func TestMisuraGBNonVaInPanico(t *testing.T) {
 						t.Errorf("panico con campi=%v i=%d: %v", campi, i, r)
 					}
 				}()
-				misuraGB(campi, i)
+				measureGB(campi, i)
 			}()
 		}
 	}

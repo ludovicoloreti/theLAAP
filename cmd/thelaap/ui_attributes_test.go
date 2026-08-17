@@ -23,10 +23,10 @@ import (
 // The fix is arg(), which quotes with single quotes and escapes for both
 // contexts. These tests are here because the defect leaves no trace at runtime.
 
-var attributoOnclick = regexp.MustCompile(`onclick="[^"]*"`)
+var onclickAttribute = regexp.MustCompile(`onclick="[^"]*"`)
 
 func TestNessunJSONDentroUnAttributoOnclick(t *testing.T) {
-	for _, a := range attributoOnclick.FindAllString(UI, -1) {
+	for _, a := range onclickAttribute.FindAllString(UI, -1) {
 		if strings.Contains(a, "JSON.stringify") {
 			t.Errorf("JSON.stringify emette virgolette doppie e chiude l'attributo: %s", a)
 		}
@@ -40,17 +40,17 @@ func TestNessunJSONDentroUnAttributoOnclick(t *testing.T) {
 // arrives from the configuration or from the model catalogue, so text that can
 // hold a quote, an apostrophe or an accent. Interpolating one of these without
 // arg() is the defect above, and these are the sites where it hurts.
-var gestoriConDati = []string{"scegli(", "ridescrivi(", "prova(", "archivia(",
+var handlersWithData = []string{"scegli(", "ridescrivi(", "prova(", "archivia(",
 	"applicaNomi(", "chiedi(", "daFermare:"}
 
 func TestIGestoriConDatiPassanoDaArg(t *testing.T) {
-	for _, a := range attributoOnclick.FindAllString(UI, -1) {
+	for _, a := range onclickAttribute.FindAllString(UI, -1) {
 		// senza '+ non c'è interpolazione: il gestore legge dal DOM al clic,
 		// e lì non passa da questo attributo nessun testo da sfuggire.
 		if !strings.Contains(a, "'+") {
 			continue
 		}
-		for _, g := range gestoriConDati {
+		for _, g := range handlersWithData {
 			if strings.Contains(a, g) && !strings.Contains(a, "arg") {
 				t.Errorf("%s riceve dati senza arg(): %s", g, a)
 			}

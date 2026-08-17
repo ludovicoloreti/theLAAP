@@ -25,7 +25,7 @@ func TestNomeSicuroRifiutaLaRisalita(t *testing.T) {
 		"con\nritorno",
 	}
 	for _, c := range cattivi {
-		if nomeSicuro(c) {
+		if safeName(c) {
 			t.Errorf("accettato un identificativo pericoloso: %q", c)
 		}
 	}
@@ -42,7 +42,7 @@ func TestNomeSicuroRifiutaLaRisalita(t *testing.T) {
 		"mlx-community--Qwen3.5-122B-A10B-4bit",
 	}
 	for _, b := range buoni {
-		if !nomeSicuro(b) {
+		if !safeName(b) {
 			t.Errorf("rifiutato un identificativo legittimo: %q", b)
 		}
 	}
@@ -56,9 +56,9 @@ func TestArchivioNuovoSiPuoRipristinare(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vecchieRadici, vecchioDeposito := RadiciModelli, DepositoModelli
-	RadiciModelli, DepositoModelli = []string{radice}, deposito
-	t.Cleanup(func() { RadiciModelli, DepositoModelli = vecchieRadici, vecchioDeposito })
+	vecchieRadici, vecchioDeposito := ModelRoots, ModelStore
+	ModelRoots, ModelStore = []string{radice}, deposito
+	t.Cleanup(func() { ModelRoots, ModelStore = vecchieRadici, vecchioDeposito })
 
 	originale := filepath.Join(radice, "models--tizio--prova")
 	if err := os.MkdirAll(originale, 0o755); err != nil {
@@ -67,21 +67,21 @@ func TestArchivioNuovoSiPuoRipristinare(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(originale, "peso.bin"), []byte("pesi"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	posto := esaminaCartella(originale)
-	configurata := Modello{Runtime: "omlx", ID: "tizio--prova", Nome: "Prova", InPi: true, InOC: true}
-	voce, err := archivia(EsameModello{ID: configurata.ID, Posti: []PostoSuDisco{posto}, GBTotali: posto.GB},
-		configurata.Runtime, []Modello{configurata})
+	posto := examineFolder(originale)
+	configurata := Model{Runtime: "omlx", ID: "tizio--prova", Nome: "Prova", InPi: true, InOC: true}
+	voce, err := archivia(ModelExam{ID: configurata.ID, Posti: []DiskSpace{posto}, GBTotali: posto.GB},
+		configurata.Runtime, []Model{configurata})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(originale); !os.IsNotExist(err) {
 		t.Fatal("il modello e' rimasto nella radice dopo l'archiviazione")
 	}
-	if voci := elencoArchivio(); len(voci) != 1 || !voci[0].Ripristinabile {
+	if voci := archiveList(); len(voci) != 1 || !voci[0].Ripristinabile {
 		t.Fatalf("archivio inatteso: %+v", voci)
 	}
 
-	m, err := ripristinaArchivio(voce.ID)
+	m, err := restoreArchived(voce.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,16 +91,16 @@ func TestArchivioNuovoSiPuoRipristinare(t *testing.T) {
 	if len(m.Configurazioni) != 1 || m.Configurazioni[0].ID != configurata.ID {
 		t.Fatalf("configurazione non conservata: %+v", m.Configurazioni)
 	}
-	if len(elencoArchivio()) != 0 {
+	if len(archiveList()) != 0 {
 		t.Fatal("la voce e' rimasta nell'archivio dopo il ripristino")
 	}
 }
 
 func TestEliminazioneDefinitivaRestaDentroIlDeposito(t *testing.T) {
 	deposito := t.TempDir()
-	vecchio := DepositoModelli
-	DepositoModelli = deposito
-	t.Cleanup(func() { DepositoModelli = vecchio })
+	vecchio := ModelStore
+	ModelStore = deposito
+	t.Cleanup(func() { ModelStore = vecchio })
 
 	bersaglio := filepath.Join(deposito, "2026-08-15", "modello-a")
 	fratello := filepath.Join(deposito, "2026-08-15", "modello-b")
@@ -116,7 +116,7 @@ func TestEliminazioneDefinitivaRestaDentroIlDeposito(t *testing.T) {
 	b, _ := json.Marshal(map[string]string{"id": id, "conferma": "ELIMINA " + id})
 	r := httptest.NewRequest(http.MethodPost, "/api/modello/elimina", bytes.NewReader(b))
 	w := httptest.NewRecorder()
-	apiEliminaArchivio(w, r)
+	apiDeleteArchived(w, r)
 	if w.Code != http.StatusOK {
 		t.Fatalf("codice %d: %s", w.Code, w.Body.String())
 	}
@@ -128,7 +128,7 @@ func TestEliminazioneDefinitivaRestaDentroIlDeposito(t *testing.T) {
 	}
 
 	for _, idCattivo := range []string{"../fuori", "2026-08-15/../../fuori", "/tmp/fuori"} {
-		if _, err := percorsoArchivio(idCattivo); err == nil {
+		if _, err := archivePath(idCattivo); err == nil {
 			t.Errorf("percorso pericoloso accettato: %q", idCattivo)
 		}
 	}
@@ -139,7 +139,7 @@ func TestEliminazioneDefinitivaRestaDentroIlDeposito(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(fuori, filepath.Join(deposito, "collegamento")); err == nil {
-		if _, err := percorsoArchivio("collegamento/modello"); err == nil {
+		if _, err := archivePath("collegamento/modello"); err == nil {
 			t.Fatal("componente simbolico intermedio accettato")
 		}
 	}
@@ -150,9 +150,9 @@ func TestEliminazioneDefinitivaRestaDentroIlDeposito(t *testing.T) {
 // altrimenti si toglie una copia e si lascia l'altra a puntare nel vuoto.
 func TestRiconosceLeDueFormeDelNome(t *testing.T) {
 	radice := t.TempDir()
-	vecchie := RadiciModelli
-	RadiciModelli = []string{radice}
-	t.Cleanup(func() { RadiciModelli = vecchie })
+	vecchie := ModelRoots
+	ModelRoots = []string{radice}
+	t.Cleanup(func() { ModelRoots = vecchie })
 
 	// forma cache HF
 	hf := filepath.Join(radice, "models--lmstudio-community--gemma-4-26B-A4B-it-MLX-8bit")
@@ -164,7 +164,7 @@ func TestRiconosceLeDueFormeDelNome(t *testing.T) {
 	os.MkdirAll(lm, 0o755)
 	os.WriteFile(filepath.Join(lm, "peso.bin"), make([]byte, 1024), 0o644)
 
-	posti := trovaSuDisco("lmstudio-community--gemma-4-26B-A4B-it-MLX-8bit")
+	posti := findOnDisk("lmstudio-community--gemma-4-26B-A4B-it-MLX-8bit")
 	if len(posti) != 2 {
 		var p []string
 		for _, x := range posti {
@@ -187,10 +187,10 @@ func TestDistingueCollegamentiDaFileVeri(t *testing.T) {
 	os.MkdirAll(link, 0o755)
 	os.Symlink(filepath.Join(veri, "peso.bin"), filepath.Join(link, "peso.bin"))
 
-	if p := esaminaCartella(veri); p.Collegamenti {
+	if p := examineFolder(veri); p.Collegamenti {
 		t.Error("una cartella di file veri è stata presa per collegamenti")
 	}
-	p := esaminaCartella(link)
+	p := examineFolder(link)
 	if !p.Collegamenti {
 		t.Error("una cartella di soli collegamenti non è stata riconosciuta")
 	}
@@ -203,18 +203,18 @@ func TestDistingueCollegamentiDaFileVeri(t *testing.T) {
 // usa per il proprio riquadro di aiuto, convinto che non lo usasse nessuno.
 func TestNonRimuoveIlModelloDellAiuto(t *testing.T) {
 	radice := t.TempDir()
-	vecchie := RadiciModelli
-	RadiciModelli = []string{radice}
-	t.Cleanup(func() { RadiciModelli = vecchie })
+	vecchie := ModelRoots
+	ModelRoots = []string{radice}
+	t.Cleanup(func() { ModelRoots = vecchie })
 
 	id := "lmstudio-community--gemma-4-E2B-it-MLX-8bit"
 	p := filepath.Join(radice, "models--"+id)
 	os.MkdirAll(p, 0o755)
 	os.WriteFile(filepath.Join(p, "peso.bin"), make([]byte, 1024), 0o644)
 
-	vecchioFisso := MODELLO_SPIEGA_FISSO
-	MODELLO_SPIEGA_FISSO = id
-	t.Cleanup(func() { MODELLO_SPIEGA_FISSO = vecchioFisso })
+	vecchioFisso := EXPLAIN_MODEL_PINNED
+	EXPLAIN_MODEL_PINNED = id
+	t.Cleanup(func() { EXPLAIN_MODEL_PINNED = vecchioFisso })
 
 	e := esamina(id)
 	if e.Rimovibile {
@@ -235,9 +235,9 @@ func TestNonRimuoveIlModelloDellAiuto(t *testing.T) {
 // non è un errore: va detto, non si può togliere di qui.
 func TestModelloRemotoNonEUnErrore(t *testing.T) {
 	radice := t.TempDir()
-	vecchie := RadiciModelli
-	RadiciModelli = []string{radice}
-	t.Cleanup(func() { RadiciModelli = vecchie })
+	vecchie := ModelRoots
+	ModelRoots = []string{radice}
+	t.Cleanup(func() { ModelRoots = vecchie })
 
 	e := esamina("qwen-aziendale-su-server-remoto")
 	if len(e.Posti) != 0 {
@@ -260,9 +260,9 @@ func TestModelloRemotoNonEUnErrore(t *testing.T) {
 // publisher, cioè anche i modelli da tenere). Lo SEGNALA: chi legge decide.
 func TestAvvisaChiPuntaAlModello(t *testing.T) {
 	radice := t.TempDir()
-	vecchie := RadiciModelli
-	RadiciModelli = []string{radice}
-	t.Cleanup(func() { RadiciModelli = vecchie })
+	vecchie := ModelRoots
+	ModelRoots = []string{radice}
+	t.Cleanup(func() { ModelRoots = vecchie })
 
 	hf := filepath.Join(radice, "models--tizio--modello-it-8bit", "snapshots", "abc")
 	os.MkdirAll(hf, 0o755)
@@ -292,16 +292,16 @@ func TestAvvisaChiPuntaAlModello(t *testing.T) {
 // come "posti" e facevano dire "2 posti" per un modello solo.
 func TestIgnoraLeCartelleDiServizio(t *testing.T) {
 	radice := t.TempDir()
-	vecchie := RadiciModelli
-	RadiciModelli = []string{radice}
-	t.Cleanup(func() { RadiciModelli = vecchie })
+	vecchie := ModelRoots
+	ModelRoots = []string{radice}
+	t.Cleanup(func() { ModelRoots = vecchie })
 
 	for _, d := range []string{"models--tizio--m", ".locks/models--tizio--m"} {
 		p := filepath.Join(radice, d)
 		os.MkdirAll(p, 0o755)
 		os.WriteFile(filepath.Join(p, "x.bin"), make([]byte, 512), 0o644)
 	}
-	for _, p := range trovaSuDisco("tizio--m") {
+	for _, p := range findOnDisk("tizio--m") {
 		if strings.Contains(p.Percorso, ".locks") {
 			t.Errorf("ha incluso una cartella di servizio: %s", p.Percorso)
 		}

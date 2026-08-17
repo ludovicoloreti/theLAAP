@@ -37,7 +37,7 @@ func TestTagliaDalNomeContaITotaliNonGliAttivi(t *testing.T) {
 		{"qwen3-a3b-instruct", 0, "dichiara solo i parametri attivi"},
 	}
 	for _, c := range casi {
-		if got := parametriMiliardi(c.id); got != c.atteso {
+		if got := paramsBillions(c.id); got != c.atteso {
 			t.Errorf("%s → %.1f, atteso %.1f  (%s)", c.id, got, c.atteso, c.perche)
 		}
 	}
@@ -51,7 +51,7 @@ func TestChiNonPuoFareLAiuto(t *testing.T) {
 		"bge-m3:latest", "mlx-community--Whisper-Large-v3", "diffusiongemma-26b-mlx",
 	}
 	for _, id := range fuori {
-		if !nonPuoFareAiuto(id) {
+		if !cannotHelp(id) {
 			t.Errorf("%s verrebbe proposto come aiuto, ma non conversa", id)
 		}
 	}
@@ -60,7 +60,7 @@ func TestChiNonPuoFareLAiuto(t *testing.T) {
 		"qwen3.8-27b-mtp", "Basher17--Qwen3.6-27B-heretic-v2-oQ8e-mtp",
 	}
 	for _, id := range dentro {
-		if nonPuoFareAiuto(id) {
+		if cannotHelp(id) {
 			t.Errorf("%s è un modello di chat e verrebbe scartato", id)
 		}
 	}
@@ -69,10 +69,10 @@ func TestChiNonPuoFareLAiuto(t *testing.T) {
 // Sopra il tetto non è un modellino: la regola esiste perché il ripiego sia
 // riconoscibile, non perché sia comodo.
 func TestIlTettoDelModellinoScartaIGrossi(t *testing.T) {
-	if parametriMiliardi("gemma-4-26b-a4b-it-mlx") <= tettoModellinoB {
+	if paramsBillions("gemma-4-26b-a4b-it-mlx") <= helperCeilingB {
 		t.Error("un 26B passerebbe per modellino")
 	}
-	if parametriMiliardi("lmstudio-community--gemma-4-E2B-it-MLX-8bit") > tettoModellinoB {
+	if paramsBillions("lmstudio-community--gemma-4-E2B-it-MLX-8bit") > helperCeilingB {
 		t.Error("un 2B non passa per modellino")
 	}
 }
@@ -89,7 +89,7 @@ func TestSceglieIlPiuPiccoloCheConversa(t *testing.T) {
 	}
 
 	t.Run("col 2B in elenco sceglie quello", func(t *testing.T) {
-		scelto, ripiego := scegliModellino(append(append([]string{}, lmstudio...), omlx...))
+		scelto, ripiego := pickHelper(append(append([]string{}, lmstudio...), omlx...))
 		if scelto != "lmstudio-community--gemma-4-E2B-it-MLX-8bit" {
 			t.Errorf("scelto %q: doveva essere il 2B", scelto)
 		}
@@ -105,21 +105,21 @@ func TestSceglieIlPiuPiccoloCheConversa(t *testing.T) {
 	// e messo in cache per tutta la vita del processo. Riprodotto compilando il
 	// vecchio codice a parte: rispondeva «gemma-4-26b-a4b-it-mlx».
 	t.Run("senza modelli piccoli è un ripiego, e lo dice", func(t *testing.T) {
-		scelto, ripiego := scegliModellino(lmstudio)
+		scelto, ripiego := pickHelper(lmstudio)
 		if scelto == "" {
 			t.Fatal("nessuna scelta: senza aiuto il pannello perde descrizioni e chat")
 		}
 		if !ripiego {
 			t.Errorf("scelto %q senza dire che è un ripiego: pesa %.0f miliardi",
-				scelto, parametriMiliardi(scelto))
+				scelto, paramsBillions(scelto))
 		}
-		if nonPuoFareAiuto(scelto) {
+		if cannotHelp(scelto) {
 			t.Errorf("anche di ripiego ha scelto %q, che non conversa", scelto)
 		}
 	})
 
 	t.Run("solo modelli che non conversano: nessuna scelta", func(t *testing.T) {
-		scelto, _ := scegliModellino([]string{"GLM-OCR-8bit", "bge-m3:latest", "diffusiongemma-26b-mlx"})
+		scelto, _ := pickHelper([]string{"GLM-OCR-8bit", "bge-m3:latest", "diffusiongemma-26b-mlx"})
 		if scelto != "" {
 			t.Errorf("scelto %q, che non sa rispondere a una domanda", scelto)
 		}
@@ -131,8 +131,8 @@ func TestSceglieIlPiuPiccoloCheConversa(t *testing.T) {
 // Visto sullo schermo: «Analisi testi lunghi» su ds4, lmstudio e mtplx insieme.
 func TestNomiUgualiRifiutati(t *testing.T) {
 	presi := map[string]string{
-		chiaveEtichetta("Analisi testi lunghi"): "Analisi testi lunghi",
-		chiaveEtichetta("Chat veloce"):          "Chat veloce",
+		labelKey("Analisi testi lunghi"): "Analisi testi lunghi",
+		labelKey("Chat veloce"):          "Chat veloce",
 	}
 	casi := []struct {
 		proposta string
@@ -149,7 +149,7 @@ func TestNomiUgualiRifiutati(t *testing.T) {
 		{"   ", false, "nemmeno solo spazi"},
 	}
 	for _, c := range casi {
-		if got := etichettaLibera(c.proposta, presi); got != c.libera {
+		if got := labelFree(c.proposta, presi); got != c.libera {
 			t.Errorf("%q → libera=%v, atteso %v  (%s)", c.proposta, got, c.libera, c.perche)
 		}
 	}
@@ -162,7 +162,7 @@ func TestUnNomeNonEUnaFrase(t *testing.T) {
 	buoni := []string{"Chat veloce", "Scrivere codice", "Chat senza filtri",
 		"Trascrizione audio", "Elaborazione testi lunga", "Lavori lunghi sul codice"}
 	for _, n := range buoni {
-		if err := etichettaSensata(n); err != nil {
+		if err := labelMakesSense(n); err != nil {
 			t.Errorf("%q rifiutato: %v", n, err)
 		}
 	}
@@ -175,7 +175,7 @@ func TestUnNomeNonEUnaFrase(t *testing.T) {
 		{"   ", "solo spazi"},
 	}
 	for _, c := range cattivi {
-		if err := etichettaSensata(c.nome); err == nil {
+		if err := labelMakesSense(c.nome); err == nil {
 			t.Errorf("%q accettato, ma %s", c.nome, c.perche)
 		}
 	}
@@ -184,16 +184,16 @@ func TestUnNomeNonEUnaFrase(t *testing.T) {
 // Il nome che un modello ha già non deve impedirgli di riconfermarlo: rifacendo
 // le etichette, il suo stesso nome non è un doppione.
 func TestIlProprioNomeNonEUnDoppione(t *testing.T) {
-	ss := []Scheda{
-		{Modello: Modello{Runtime: "mtplx", ID: "qwen"}, Etichetta: "Scrivere codice"},
-		{Modello: Modello{Runtime: "lmstudio", ID: "gemma"}, Etichetta: "Chat veloce"},
-		{Modello: Modello{Runtime: "omlx", ID: "senzanome"}},
+	ss := []Card{
+		{Model: Model{Runtime: "mtplx", ID: "qwen"}, Etichetta: "Scrivere codice"},
+		{Model: Model{Runtime: "lmstudio", ID: "gemma"}, Etichetta: "Chat veloce"},
+		{Model: Model{Runtime: "omlx", ID: "senzanome"}},
 	}
-	presi := etichetteInUso(ss, "mtplx", "qwen")
-	if !etichettaLibera("Scrivere codice", presi) {
+	presi := labelsInUse(ss, "mtplx", "qwen")
+	if !labelFree("Scrivere codice", presi) {
 		t.Error("il modello non può riconfermare il proprio nome")
 	}
-	if etichettaLibera("Chat veloce", presi) {
+	if labelFree("Chat veloce", presi) {
 		t.Error("il nome di un altro modello viene accettato")
 	}
 	if len(presi) != 1 {

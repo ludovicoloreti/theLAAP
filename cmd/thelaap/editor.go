@@ -16,10 +16,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DocumentoConfig e' un file che il pannello puo' mostrare nell'editor.
+// ConfigDocument e' un file che il pannello puo' mostrare nell'editor.
 // L'identificativo viene scelto dal server: il browser non puo' passare un
 // percorso arbitrario e usare il pannello come editor di tutto il disco.
-type DocumentoConfig struct {
+type ConfigDocument struct {
 	ID          string `json:"id"`
 	Nome        string `json:"nome"`
 	File        string `json:"file"`
@@ -28,19 +28,19 @@ type DocumentoConfig struct {
 	Esiste      bool   `json:"esiste"`
 }
 
-type documentoLetto struct {
-	DocumentoConfig
+type documentRead struct {
+	ConfigDocument
 	FormatoNativo string `json:"formatoNativo"`
 	Contenuto     string `json:"contenuto"`
 	Revisione     string `json:"revisione"`
 }
 
-// documentiConfigurazione e' anche la lista bianca di file modificabili.
+// configDocuments e' anche la lista bianca di file modificabili.
 // Oltre al file di theLAAP include tutti i client dichiarati nella
 // configurazione, quindi un client YAML aggiunto domani compare senza cambiare
 // il codice.
-func documentiConfigurazione() []DocumentoConfig {
-	docs := []DocumentoConfig{{
+func configDocuments() []ConfigDocument {
+	docs := []ConfigDocument{{
 		ID:          "thelaap",
 		Nome:        "theLAAP",
 		File:        CFGFILE,
@@ -48,11 +48,11 @@ func documentiConfigurazione() []DocumentoConfig {
 		Descrizione: "runtime, percorsi, regimi e limiti di memoria",
 	}}
 	for i, c := range cfg().Clienti {
-		docs = append(docs, DocumentoConfig{
+		docs = append(docs, ConfigDocument{
 			ID:          "client-" + strconv.Itoa(i),
 			Nome:        c.Nome,
-			File:        espandiHome(c.File),
-			Formato:     formatoDocumento(c.File, c.Formato),
+			File:        expandHome(c.File),
+			Formato:     documentFormat(c.File, c.Formato),
 			Descrizione: "configurazione del client " + c.Nome,
 		})
 	}
@@ -63,7 +63,7 @@ func documentiConfigurazione() []DocumentoConfig {
 	return docs
 }
 
-func formatoDocumento(path, dichiarato string) string {
+func documentFormat(path, dichiarato string) string {
 	f := strings.ToLower(strings.TrimSpace(dichiarato))
 	if f == "yaml" || f == "yml" {
 		return "yaml"
@@ -75,13 +75,13 @@ func formatoDocumento(path, dichiarato string) string {
 	return "json"
 }
 
-func trovaDocumento(id string) (DocumentoConfig, bool) {
-	for _, d := range documentiConfigurazione() {
+func findDocument(id string) (ConfigDocument, bool) {
+	for _, d := range configDocuments() {
 		if d.ID == id {
 			return d, true
 		}
 	}
-	return DocumentoConfig{}, false
+	return ConfigDocument{}, false
 }
 
 func revisione(b []byte) string {
@@ -89,9 +89,9 @@ func revisione(b []byte) string {
 	return hex.EncodeToString(s[:])
 }
 
-// validaDocumento usa un parser vero anche per YAML. Controllare soltanto
+// validateDocument usa un parser vero anche per YAML. Controllare soltanto
 // parentesi e indentazione lascerebbe passare file che poi il client rifiuta.
-func validaDocumento(d DocumentoConfig, contenuto string) error {
+func validateDocument(d ConfigDocument, contenuto string) error {
 	if strings.TrimSpace(contenuto) == "" {
 		return errors.New("il file e' vuoto")
 	}
@@ -132,11 +132,11 @@ func validaDocumento(d DocumentoConfig, contenuto string) error {
 	return nil
 }
 
-// convertiDocumento permette di lavorare anche in YAML su un file che sul
+// convertDocument permette di lavorare anche in YAML su un file che sul
 // disco resta JSON (e viceversa). E' particolarmente utile per i file grandi:
 // si sceglie la sintassi piu' leggibile senza cambiare il formato atteso dal
 // programma che lo usa.
-func convertiDocumento(contenuto, da, a string) (string, error) {
+func convertDocument(contenuto, da, a string) (string, error) {
 	if da == a {
 		return contenuto, nil
 	}
@@ -183,7 +183,7 @@ func convertiDocumento(contenuto, da, a string) (string, error) {
 	return string(b), nil
 }
 
-func scriviAtomico(path string, b []byte) error {
+func writeAtomic(path string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -215,20 +215,20 @@ func scriviAtomico(path string, b []byte) error {
 	return os.Rename(nomeTmp, path)
 }
 
-func apiDocumenti(w http.ResponseWriter, r *http.Request) {
+func apiDocuments(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", "GET")
 		errJSONStatus(w, http.StatusMethodNotAllowed, "serve GET")
 		return
 	}
-	scriviJSON(w, documentiConfigurazione())
+	writeJSON(w, configDocuments())
 }
 
-// apiDocumento legge, valida e salva i file della lista bianca. La revisione
+// apiDocument legge, valida e salva i file della lista bianca. La revisione
 // evita di sovrascrivere in silenzio una modifica fatta nel frattempo da un
 // altro programma o da un terminale.
-func apiDocumento(w http.ResponseWriter, r *http.Request) {
-	d, ok := trovaDocumento(r.URL.Query().Get("id"))
+func apiDocument(w http.ResponseWriter, r *http.Request) {
+	d, ok := findDocument(r.URL.Query().Get("id"))
 	if !ok {
 		errJSONStatus(w, http.StatusNotFound, "file di configurazione sconosciuto")
 		return
@@ -244,13 +244,13 @@ func apiDocumento(w http.ResponseWriter, r *http.Request) {
 		if vista != "json" && vista != "yaml" {
 			vista = nativo
 		}
-		contenuto, err := convertiDocumento(string(b), nativo, vista)
+		contenuto, err := convertDocument(string(b), nativo, vista)
 		if err != nil {
 			errJSON(w, "non riesco a convertire il file: "+err.Error())
 			return
 		}
 		d.Formato = vista
-		scriviJSON(w, documentoLetto{DocumentoConfig: d, FormatoNativo: nativo,
+		writeJSON(w, documentRead{ConfigDocument: d, FormatoNativo: nativo,
 			Contenuto: contenuto, Revisione: revisione(b)})
 		return
 	}
@@ -279,21 +279,21 @@ func apiDocumento(w http.ResponseWriter, r *http.Request) {
 	}
 	dInput := d
 	dInput.Formato = formatoInput
-	if err := validaDocumento(dInput, req.Contenuto); err != nil {
+	if err := validateDocument(dInput, req.Contenuto); err != nil {
 		errJSON(w, err.Error())
 		return
 	}
-	contenutoNativo, err := convertiDocumento(req.Contenuto, formatoInput, d.Formato)
+	contenutoNativo, err := convertDocument(req.Contenuto, formatoInput, d.Formato)
 	if err != nil {
 		errJSON(w, "non riesco a convertire il file: "+err.Error())
 		return
 	}
-	if err := validaDocumento(d, contenutoNativo); err != nil {
+	if err := validateDocument(d, contenutoNativo); err != nil {
 		errJSON(w, err.Error())
 		return
 	}
 	if req.SoloValida {
-		scriviJSON(w, map[string]any{"ok": true, "messaggio": strings.ToUpper(formatoInput) + " valido"})
+		writeJSON(w, map[string]any{"ok": true, "messaggio": strings.ToUpper(formatoInput) + " valido"})
 		return
 	}
 
@@ -313,7 +313,7 @@ func apiDocumento(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := scriviAtomico(d.File, []byte(contenutoNativo)); err != nil {
+	if err := writeAtomic(d.File, []byte(contenutoNativo)); err != nil {
 		errJSON(w, "non riesco a salvare: "+err.Error())
 		return
 	}
@@ -328,10 +328,10 @@ func apiDocumento(w http.ResponseWriter, r *http.Request) {
 		CFG = c
 		cfgMu.Unlock()
 	}
-	scordaRemoto()
-	rinfrescaMemoria()
+	forgetRemote()
+	refreshMemory()
 	nuova := revisione([]byte(contenutoNativo))
-	scriviJSON(w, map[string]any{
+	writeJSON(w, map[string]any{
 		"ok": true, "revisione": nuova,
 		"messaggio": "salvato " + filepath.Base(d.File) + " (copia di sicurezza in " + BACKUP + ")",
 	})

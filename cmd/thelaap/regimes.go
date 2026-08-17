@@ -47,7 +47,7 @@ type RegimeCfg struct {
 	Segno string `json:"segno,omitempty"`
 }
 
-type StatoRegime struct {
+type RegimeState struct {
 	RegimeCfg
 	Attivo bool `json:"attivo"`
 	// Quali programmi verrebbero fermati entrando: mostrarlo PRIMA evita la
@@ -55,7 +55,7 @@ type StatoRegime struct {
 	Fermera []string `json:"fermera,omitempty"`
 }
 
-func regimeAttivo(r RegimeCfg) bool {
+func activeRegime(r RegimeCfg) bool {
 	if strings.TrimSpace(r.Segno) == "" {
 		return false
 	}
@@ -71,35 +71,35 @@ func regimeAttivo(r RegimeCfg) bool {
 	return err == nil
 }
 
-// daFermare: i programmi accesi che il regime spegnerebbe.
-func daFermare(r RegimeCfg) []string {
+// toStop: i programmi accesi che il regime spegnerebbe.
+func toStop(r RegimeCfg) []string {
 	var out []string
 	for _, rc := range cfg().Runtime {
 		if rc.Chiave == r.RuntimeAttivo || rc.Ferma == "" {
 			continue
 		}
-		if _, err := pidInAscoltoSuPorta(rc.Porta); err == nil {
+		if _, err := pidListeningOnPort(rc.Porta); err == nil {
 			out = append(out, rc.Nome)
 		}
 	}
 	return out
 }
 
-func apiRegimi(w http.ResponseWriter, r *http.Request) {
-	out := []StatoRegime{}
+func apiRegimes(w http.ResponseWriter, r *http.Request) {
+	out := []RegimeState{}
 	for _, rg := range cfg().Regimi {
-		s := StatoRegime{RegimeCfg: rg, Attivo: regimeAttivo(rg)}
+		s := RegimeState{RegimeCfg: rg, Attivo: activeRegime(rg)}
 		if !s.Attivo {
-			s.Fermera = daFermare(rg)
+			s.Fermera = toStop(rg)
 		}
 		out = append(out, s)
 	}
-	scriviJSON(w, out)
+	writeJSON(w, out)
 }
 
 // apiRegime esegue il passaggio e ne trasmette l'output riga per riga.
 //
-// Riusa la stessa macchina di apiEsegui invece di inventarne una: il
+// Riusa la stessa macchina di apiRun invece di inventarne una: il
 // passaggio ferma servizi e riavvia un programma che carica decine di GB, ci
 // mette minuti, e una richiesta che resta muta per minuti sembra bloccata.
 func apiRegime(w http.ResponseWriter, r *http.Request) {
@@ -128,21 +128,21 @@ func apiRegime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	linea := componiRegime(*rg, req.Azione)
+	linea := composeRegime(*rg, req.Azione)
 	if strings.TrimSpace(linea) == "" {
 		http.Error(w, "questo regime non ha niente da eseguire", http.StatusBadRequest)
 		return
 	}
-	streamComando(w, r, linea)
+	streamCommand(w, r, linea)
 }
 
-// componiRegime costruisce la sequenza di shell del passaggio.
+// composeRegime costruisce la sequenza di shell del passaggio.
 //
 // Entrando si fermano prima gli altri programmi e poi si allargano i margini:
 // l'ordine non è estetico. Allargare i margini mentre un altro modello è
 // ancora residente è precisamente la configurazione che ha fatto panicare la
 // macchina. Uscendo, l'ordine si inverte per lo stesso motivo.
-func componiRegime(rg RegimeCfg, azione string) string {
+func composeRegime(rg RegimeCfg, azione string) string {
 	var passi []string
 	eco := func(s string) string { return "echo " + shQuote(s) }
 

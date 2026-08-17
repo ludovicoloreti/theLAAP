@@ -32,29 +32,29 @@ import (
 //     di LM Studio sono collegamenti dentro la cache: togliere dalla cache
 //     rompe anche LM Studio, e da fuori sembrano due modelli distinti.
 
-// RadiciModelli: dove cercare i modelli sul disco.
+// ModelRoots: dove cercare i modelli sul disco.
 //
 // I primi due sono percorsi standard dei rispettivi prodotti, uguali su ogni
 // macchina. Cartelle scelte dall'utente (per esempio quella passata a un
 // runtime con --model-dir) si aggiungono in configurazione con "radiciModelli":
 // scriverne una qui renderebbe il pannello sbagliato su tutti gli altri
 // computer.
-var RadiciModelli = []string{
+var ModelRoots = []string{
 	"~/.cache/huggingface/hub",
 	"~/.lmstudio/models",
 }
 
 // radici: quelle note più quelle dichiarate dall'utente.
 func radici() []string {
-	out := append([]string{}, RadiciModelli...)
-	return append(out, cfg().RadiciModelli...)
+	out := append([]string{}, ModelRoots...)
+	return append(out, cfg().ModelRoots...)
 }
 
-// DepositoModelli: dove finisce cio' che si rimuove. E' una variabile per
+// ModelStore: dove finisce cio' che si rimuove. E' una variabile per
 // poter collaudare archiviazione e ripristino in una cartella temporanea.
-var DepositoModelli = "~/.modelli-rimossi"
+var ModelStore = "~/.modelli-rimossi"
 
-func espandiHome(p string) string {
+func expandHome(p string) string {
 	if strings.HasPrefix(p, "~/") {
 		h, err := os.UserHomeDir()
 		if err != nil {
@@ -65,10 +65,10 @@ func espandiHome(p string) string {
 	return p
 }
 
-// nomeSicuro rifiuta gli identificativi che potrebbero uscire dalle radici.
+// safeName rifiuta gli identificativi che potrebbero uscire dalle radici.
 // Gli id dei modelli arrivano da servizi di terzi: senza questo, un nome con
 // "../.." trasformerebbe una rimozione in una cancellazione arbitraria.
-func nomeSicuro(id string) bool {
+func safeName(id string) bool {
 	if strings.TrimSpace(id) == "" || len(id) > 200 {
 		return false
 	}
@@ -81,50 +81,50 @@ func nomeSicuro(id string) bool {
 	return true
 }
 
-// PostoSuDisco: una copia fisica del modello.
-type PostoSuDisco struct {
+// DiskSpace: una copia fisica del modello.
+type DiskSpace struct {
 	Percorso     string  `json:"percorso"`
 	GB           float64 `json:"gb"`
 	Collegamenti bool    `json:"collegamenti"` // true = punta altrove, non occupa spazio suo
 }
 
-// Dipendenza: qualcosa che smetterebbe di funzionare.
-type Dipendenza struct {
+// Dependency: qualcosa che smetterebbe di funzionare.
+type Dependency struct {
 	Cosa   string `json:"cosa"`
 	Perche string `json:"perche"`
 	Grave  bool   `json:"grave"` // true = sconsiglio di procedere
 }
 
-type EsameModello struct {
-	ID         string         `json:"id"`
-	Posti      []PostoSuDisco `json:"posti"`
-	GBTotali   float64        `json:"gbTotali"`
-	Dipendenze []Dipendenza   `json:"dipendenze"`
-	Rimovibile bool           `json:"rimovibile"`
-	Nota       string         `json:"nota,omitempty"`
+type ModelExam struct {
+	ID         string       `json:"id"`
+	Posti      []DiskSpace  `json:"posti"`
+	GBTotali   float64      `json:"gbTotali"`
+	Dipendenze []Dependency `json:"dipendenze"`
+	Rimovibile bool         `json:"rimovibile"`
+	Nota       string       `json:"nota,omitempty"`
 }
 
-type fileArchivio struct {
+type archiveFiles struct {
 	Originale  string `json:"originale"`
 	Archiviato string `json:"archiviato"` // percorso relativo dentro la voce
 }
 
-type manifestoArchivio struct {
+type archiveManifest struct {
 	Versione       int            `json:"versione"`
 	ID             string         `json:"id"`
-	Modello        string         `json:"modello"`
+	Model          string         `json:"modello"`
 	Runtime        string         `json:"runtime,omitempty"`
 	Creato         time.Time      `json:"creato"`
 	GB             float64        `json:"gb"`
-	File           []fileArchivio `json:"file"`
-	Configurazioni []Modello      `json:"configurazioni,omitempty"`
+	File           []archiveFiles `json:"file"`
+	Configurazioni []Model        `json:"configurazioni,omitempty"`
 }
 
-// VoceArchivio e' la vista sicura mandata al browser. I percorsi originali
+// ArchiveEntry e' la vista sicura mandata al browser. I percorsi originali
 // restano nel manifesto locale e servono soltanto al ripristino.
-type VoceArchivio struct {
+type ArchiveEntry struct {
 	ID              string  `json:"id"`
-	Modello         string  `json:"modello"`
+	Model           string  `json:"modello"`
 	GB              float64 `json:"gb"`
 	Creato          string  `json:"creato"`
 	Posti           int     `json:"posti"`
@@ -134,12 +134,12 @@ type VoceArchivio struct {
 	Nota            string  `json:"nota,omitempty"`
 }
 
-// trovaSuDisco cerca le cartelle che contengono il modello.
+// findOnDisk cerca le cartelle che contengono il modello.
 //
 // Un modello può stare in più posti con nomi diversi: la cache HuggingFace usa
 // "models--<publisher>--<nome>", LM Studio "<publisher>/<nome>". Si confronta
 // sulla forma normalizzata.
-func trovaSuDisco(id string) []PostoSuDisco {
+func findOnDisk(id string) []DiskSpace {
 	// Il prefisso "models--" della cache HuggingFace va TOLTO, non sostituito
 	// con un separatore: sostituendolo resta un trattino iniziale e la forma
 	// della cache non combacia mai con quella di LM Studio.
@@ -152,13 +152,13 @@ func trovaSuDisco(id string) []PostoSuDisco {
 		return strings.Trim(s, "-")
 	}
 	bersaglio := norm(id)
-	var out []PostoSuDisco
+	var out []DiskSpace
 	// Percorsi reali già trovati: servono a riconoscere le cartelle che
 	// puntano QUI con altri nomi (vedi sotto).
 	visti := map[string]bool{}
 
 	for _, radice := range radici() {
-		r := espandiHome(radice)
+		r := expandHome(radice)
 		st, err := os.Stat(r)
 		if err != nil || !st.IsDir() {
 			continue
@@ -173,7 +173,7 @@ func trovaSuDisco(id string) []PostoSuDisco {
 			}
 			p1 := filepath.Join(r, v.Name())
 			if norm(v.Name()) == bersaglio {
-				out = append(out, esaminaCartella(p1))
+				out = append(out, examineFolder(p1))
 				visti[p1] = true
 				continue
 			}
@@ -184,7 +184,7 @@ func trovaSuDisco(id string) []PostoSuDisco {
 				}
 				if norm(v.Name()+"/"+s.Name()) == bersaglio || norm(s.Name()) == bersaglio {
 					q := filepath.Join(p1, s.Name())
-					out = append(out, esaminaCartella(q))
+					out = append(out, examineFolder(q))
 					visti[q] = true
 				}
 			}
@@ -198,18 +198,18 @@ func trovaSuDisco(id string) []PostoSuDisco {
 	// proporre di spostare la cartella di un publisher, cioè anche i modelli
 	// che si volevano tenere. Meglio trovare la cartella vera e AVVISARE che
 	// qualcuno ci punta: chi legge decide, invece di fidarsi di un elenco che
-	// a volte mente. Vedi collegamentiVerso().
+	// a volte mente. Vedi linksTo().
 	return out
 }
 
-// collegamentiVerso: chi punta a questi posti da fuori.
+// linksTo: chi punta a questi posti da fuori.
 //
 // Solo per avvisare, non per spostare: si scende al massimo di due livelli
 // nelle radici note e si guarda dove finiscono i collegamenti.
-func collegamentiVerso(posti []PostoSuDisco) []string {
+func linksTo(posti []DiskSpace) []string {
 	var out []string
 	for _, radice := range radici() {
-		r := espandiHome(radice)
+		r := expandHome(radice)
 		var scendi func(string, int)
 		scendi = func(dir string, prof int) {
 			if prof > 2 || len(out) > 8 {
@@ -224,7 +224,7 @@ func collegamentiVerso(posti []PostoSuDisco) []string {
 					continue
 				}
 				q := filepath.Join(dir, v.Name())
-				if dentroUnPosto(q, posti) {
+				if containedIn(q, posti) {
 					continue
 				}
 				info, err := os.Lstat(q)
@@ -232,7 +232,7 @@ func collegamentiVerso(posti []PostoSuDisco) []string {
 					continue
 				}
 				if info.Mode()&os.ModeSymlink != 0 {
-					if reale, err := filepath.EvalSymlinks(q); err == nil && dentroRadici(reale, posti) {
+					if reale, err := filepath.EvalSymlinks(q); err == nil && insideRoots(reale, posti) {
 						h, _ := os.UserHomeDir()
 						out = append(out, strings.Replace(q, h, "~", 1))
 					}
@@ -248,8 +248,8 @@ func collegamentiVerso(posti []PostoSuDisco) []string {
 	return out
 }
 
-// dentroRadici: questo percorso reale finisce dentro uno dei posti trovati?
-func dentroRadici(reale string, posti []PostoSuDisco) bool {
+// insideRoots: questo percorso reale finisce dentro uno dei posti trovati?
+func insideRoots(reale string, posti []DiskSpace) bool {
 	for _, p := range posti {
 		r, err := filepath.EvalSymlinks(p.Percorso)
 		if err != nil {
@@ -262,8 +262,8 @@ func dentroRadici(reale string, posti []PostoSuDisco) bool {
 	return false
 }
 
-// dentroUnPosto: questa cartella sta già dentro un posto trovato?
-func dentroUnPosto(dir string, posti []PostoSuDisco) bool {
+// containedIn: questa cartella sta già dentro un posto trovato?
+func containedIn(dir string, posti []DiskSpace) bool {
 	for _, p := range posti {
 		if strings.HasPrefix(dir, p.Percorso+string(filepath.Separator)) {
 			return true
@@ -272,12 +272,12 @@ func dentroUnPosto(dir string, posti []PostoSuDisco) bool {
 	return false
 }
 
-// puntaDentro: i file di questa cartella risolvono dentro uno dei posti trovati?
+// pointsInside: i file di questa cartella risolvono dentro uno dei posti trovati?
 //
 // Entrambi i lati vanno risolti prima di confrontarli: su macOS /var è un
 // collegamento a /private/var, quindi il percorso risolto di un file e quello
 // memorizzato della cartella non combaciano mai per prefisso.
-func puntaDentro(dir string, posti []PostoSuDisco) bool {
+func pointsInside(dir string, posti []DiskSpace) bool {
 	voci, err := os.ReadDir(dir)
 	if err != nil {
 		return false
@@ -305,9 +305,9 @@ func puntaDentro(dir string, posti []PostoSuDisco) bool {
 	return false
 }
 
-// esaminaCartella misura una cartella e capisce se contiene file veri o solo
+// examineFolder misura una cartella e capisce se contiene file veri o solo
 // collegamenti verso un'altra copia.
-func esaminaCartella(p string) PostoSuDisco {
+func examineFolder(p string) DiskSpace {
 	var byte0 int64
 	var file, link int
 	filepath.WalkDir(p, func(q string, d os.DirEntry, err error) error {
@@ -326,7 +326,7 @@ func esaminaCartella(p string) PostoSuDisco {
 		byte0 += info.Size()
 		return nil
 	})
-	return PostoSuDisco{
+	return DiskSpace{
 		Percorso:     p,
 		GB:           float64(byte0) / 1e9,
 		Collegamenti: link > 0 && file <= link,
@@ -334,15 +334,15 @@ func esaminaCartella(p string) PostoSuDisco {
 }
 
 // esamina raccoglie tutto ciò che serve per decidere, senza toccare niente.
-func esamina(id string) EsameModello {
-	e := EsameModello{ID: id, Posti: []PostoSuDisco{}, Dipendenze: []Dipendenza{}}
-	if !nomeSicuro(id) {
+func esamina(id string) ModelExam {
+	e := ModelExam{ID: id, Posti: []DiskSpace{}, Dipendenze: []Dependency{}}
+	if !safeName(id) {
 		e.Nota = "identificativo non valido"
 		return e
 	}
 	// Mai nil: una lista nil esce come "null" nel JSON e la pagina va in
-	// errore appena prova a scorrerla — stessa cautela di leggeMemoria().
-	if p := trovaSuDisco(id); p != nil {
+	// errore appena prova a scorrerla — stessa cautela di readsMemory().
+	if p := findOnDisk(id); p != nil {
 		e.Posti = p
 	}
 	for _, p := range e.Posti {
@@ -357,8 +357,8 @@ func esamina(id string) EsameModello {
 	basso := strings.ToLower(id)
 
 	// È il modello che il pannello usa per rispondere alle domande?
-	if m := modelloAiuto(); m != "" && strings.EqualFold(m, id) {
-		e.Dipendenze = append(e.Dipendenze, Dipendenza{
+	if m := helperModel(); m != "" && strings.EqualFold(m, id) {
+		e.Dipendenze = append(e.Dipendenze, Dependency{
 			Cosa:   "il riquadro di aiuto di questo pannello",
 			Perche: "è il modello che risponde alle domande; senza, ripiegherebbe su uno molto più grosso",
 			Grave:  true,
@@ -366,9 +366,9 @@ func esamina(id string) EsameModello {
 	}
 
 	// È caricato in memoria adesso?
-	for _, c := range memoriaCorrente().Caricati {
+	for _, c := range currentMemory().Caricati {
 		if strings.EqualFold(c.Nome, id) {
-			e.Dipendenze = append(e.Dipendenze, Dipendenza{
+			e.Dipendenze = append(e.Dipendenze, Dependency{
 				Cosa:   "è in memoria adesso",
 				Perche: "va prima scaricato, altrimenti il programma che lo usa può comportarsi male",
 				Grave:  true,
@@ -378,13 +378,13 @@ func esamina(id string) EsameModello {
 
 	// Lo cita qualche client?
 	for _, cl := range cfg().Clienti {
-		f := espandiHome(cl.File)
+		f := expandHome(cl.File)
 		b, err := os.ReadFile(f)
 		if err != nil {
 			continue
 		}
 		if strings.Contains(strings.ToLower(string(b)), basso) {
-			e.Dipendenze = append(e.Dipendenze, Dipendenza{
+			e.Dipendenze = append(e.Dipendenze, Dependency{
 				Cosa:   cl.Nome + " lo ha in configurazione",
 				Perche: "dopo la rimozione resterebbe una voce che punta a un modello inesistente",
 				Grave:  false,
@@ -393,8 +393,8 @@ func esamina(id string) EsameModello {
 	}
 
 	// Chi ci punta da fuori: togliere la cartella lo lascia nel vuoto.
-	if q := collegamentiVerso(e.Posti); len(q) > 0 {
-		e.Dipendenze = append(e.Dipendenze, Dipendenza{
+	if q := linksTo(e.Posti); len(q) > 0 {
+		e.Dipendenze = append(e.Dipendenze, Dependency{
 			Cosa: "altri programmi ci puntano: " + strings.Join(q, ", "),
 			Perche: "sono collegamenti alla stessa copia, non copie separate: " +
 				"spostandola smetteranno di vedere il modello",
@@ -411,14 +411,14 @@ func esamina(id string) EsameModello {
 	return e
 }
 
-func apiEsaminaModello(w http.ResponseWriter, r *http.Request) {
+func apiExamineModel(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
-	scriviJSON(w, esamina(id))
+	writeJSON(w, esamina(id))
 }
 
-const nomeManifestoArchivio = "archivio.json"
+const archiveManifestName = "archivio.json"
 
-func slugArchivio(s string) string {
+func archiveSlug(s string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(s) {
 		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
@@ -433,7 +433,7 @@ func slugArchivio(s string) string {
 	return strings.Trim(b.String(), "-")
 }
 
-func rollbackSpostamenti(file []fileArchivio, voce string) error {
+func rollbackMoves(file []archiveFiles, voce string) error {
 	var errori []string
 	for i := len(file) - 1; i >= 0; i-- {
 		src := filepath.Join(voce, filepath.FromSlash(file[i].Archiviato))
@@ -458,16 +458,16 @@ func rollbackSpostamenti(file []fileArchivio, voce string) error {
 // appiattiva i nomi dentro una cartella per data: dopo non era piu' possibile
 // sapere con certezza dove rimetterli. Il manifesto rende il ripristino un
 // pulsante e permette il rollback se uno degli spostamenti fallisce.
-func archivia(e EsameModello, runtime string, configurazioni []Modello) (VoceArchivio, error) {
-	radice := espandiHome(DepositoModelli)
+func archivia(e ModelExam, runtime string, configurazioni []Model) (ArchiveEntry, error) {
+	radice := expandHome(ModelStore)
 	if err := os.MkdirAll(radice, 0o700); err != nil {
-		return VoceArchivio{}, err
+		return ArchiveEntry{}, err
 	}
 	if st, err := os.Lstat(radice); err != nil || st.Mode()&os.ModeSymlink != 0 || !st.IsDir() {
-		return VoceArchivio{}, errors.New("la radice dell'archivio non e' una cartella reale")
+		return ArchiveEntry{}, errors.New("la radice dell'archivio non e' una cartella reale")
 	}
 	adesso := time.Now()
-	base := adesso.Format("20060102-150405.000000000") + "-" + slugArchivio(e.ID)
+	base := adesso.Format("20060102-150405.000000000") + "-" + archiveSlug(e.ID)
 	if strings.HasSuffix(base, "-") {
 		base += "modello"
 	}
@@ -479,79 +479,79 @@ func archivia(e EsameModello, runtime string, configurazioni []Modello) (VoceArc
 			break
 		}
 		if !os.IsExist(err) {
-			return VoceArchivio{}, err
+			return ArchiveEntry{}, err
 		}
 		id = fmt.Sprintf("%s-%d", base, n)
 		voce = filepath.Join(radice, id)
 	}
 	if err := os.Mkdir(filepath.Join(voce, "file"), 0o700); err != nil {
 		_ = os.Remove(voce)
-		return VoceArchivio{}, err
+		return ArchiveEntry{}, err
 	}
 
-	man := manifestoArchivio{Versione: 1, ID: id, Modello: e.ID, Runtime: runtime,
-		Creato: adesso, GB: e.GBTotali, File: []fileArchivio{}, Configurazioni: configurazioni}
+	man := archiveManifest{Versione: 1, ID: id, Model: e.ID, Runtime: runtime,
+		Creato: adesso, GB: e.GBTotali, File: []archiveFiles{}, Configurazioni: configurazioni}
 	for i, p := range e.Posti {
 		nome := fmt.Sprintf("file/%02d-%s", i+1, filepath.Base(p.Percorso))
-		man.File = append(man.File, fileArchivio{Originale: p.Percorso, Archiviato: nome})
+		man.File = append(man.File, archiveFiles{Originale: p.Percorso, Archiviato: nome})
 	}
 	// Il manifesto nasce prima degli spostamenti: se il processo viene chiuso a
 	// meta', al prossimo avvio sappiamo ancora quali elementi sono gia' tornati
 	// e quali sono rimasti nel deposito.
 	b, err := json.MarshalIndent(man, "", "  ")
 	if err == nil {
-		err = scriviAtomico(filepath.Join(voce, nomeManifestoArchivio), append(b, '\n'))
+		err = writeAtomic(filepath.Join(voce, archiveManifestName), append(b, '\n'))
 	}
 	if err != nil {
 		_ = os.RemoveAll(voce)
-		return VoceArchivio{}, fmt.Errorf("non riesco a registrare il ripristino: %w", err)
+		return ArchiveEntry{}, fmt.Errorf("non riesco a registrare il ripristino: %w", err)
 	}
 
-	spostati := []fileArchivio{}
+	spostati := []archiveFiles{}
 	for _, f := range man.File {
 		dest := filepath.Join(voce, filepath.FromSlash(f.Archiviato))
 		p := f.Originale
 		if _, err := os.Lstat(p); err != nil {
-			if rb := rollbackSpostamenti(spostati, voce); rb == nil {
+			if rb := rollbackMoves(spostati, voce); rb == nil {
 				_ = os.RemoveAll(voce)
-				return VoceArchivio{}, fmt.Errorf("%s non e' piu' disponibile: %w", p, err)
+				return ArchiveEntry{}, fmt.Errorf("%s non e' piu' disponibile: %w", p, err)
 			}
-			return VoceArchivio{}, fmt.Errorf("%s non e' piu' disponibile e il rollback e' incompleto; non cancello il deposito %s", p, voce)
+			return ArchiveEntry{}, fmt.Errorf("%s non e' piu' disponibile e il rollback e' incompleto; non cancello il deposito %s", p, voce)
 		}
 		if err := os.Rename(p, dest); err != nil {
-			if rb := rollbackSpostamenti(spostati, voce); rb == nil {
+			if rb := rollbackMoves(spostati, voce); rb == nil {
 				_ = os.RemoveAll(voce)
-				return VoceArchivio{}, fmt.Errorf("spostamento fallito per %s: %w", p, err)
+				return ArchiveEntry{}, fmt.Errorf("spostamento fallito per %s: %w", p, err)
 			}
-			return VoceArchivio{}, fmt.Errorf("spostamento fallito e rollback incompleto; non cancello il deposito %s", voce)
+			return ArchiveEntry{}, fmt.Errorf("spostamento fallito e rollback incompleto; non cancello il deposito %s", voce)
 		}
 		spostati = append(spostati, f)
 	}
-	return VoceArchivio{
-		ID: id, Modello: e.ID, GB: e.GBTotali, Creato: adesso.Format(time.RFC3339),
+	return ArchiveEntry{
+		ID: id, Model: e.ID, GB: e.GBTotali, Creato: adesso.Format(time.RFC3339),
 		Posti: len(man.File), Runtime: runtime, Ripristinabile: true,
 	}, nil
 }
 
-func leggiManifesto(voce string) (manifestoArchivio, error) {
-	b, err := os.ReadFile(filepath.Join(voce, nomeManifestoArchivio))
+func readManifest(voce string) (archiveManifest, error) {
+	b, err := os.ReadFile(filepath.Join(voce, archiveManifestName))
 	if err != nil {
-		return manifestoArchivio{}, err
+		return archiveManifest{}, err
 	}
-	var m manifestoArchivio
+	var m archiveManifest
 	if err := json.Unmarshal(b, &m); err != nil {
-		return manifestoArchivio{}, err
+		return archiveManifest{}, err
 	}
 	if m.Versione != 1 || m.ID == "" || len(m.File) == 0 {
-		return manifestoArchivio{}, errors.New("manifesto incompleto")
+		return archiveManifest{}, errors.New("manifesto incompleto")
 	}
 	return m, nil
 }
 
-// percorsoArchivio accetta soltanto una voce diretta nuova oppure
+// archivePath accetta soltanto una voce diretta nuova oppure
 // data/nome per gli archivi creati dalla versione precedente. Non segue un
 // collegamento simbolico usato per far uscire una cancellazione dal deposito.
-func percorsoArchivio(id string) (string, error) {
+func archivePath(id string) (string, error) {
 	if id == "" || filepath.IsAbs(id) || strings.Contains(id, "..") || strings.ContainsAny(id, "\x00\n\r") {
 		return "", errors.New("voce di archivio non valida")
 	}
@@ -559,7 +559,7 @@ func percorsoArchivio(id string) (string, error) {
 	if len(parti) > 2 {
 		return "", errors.New("voce di archivio non valida")
 	}
-	radice := filepath.Clean(espandiHome(DepositoModelli))
+	radice := filepath.Clean(expandHome(ModelStore))
 	stRadice, err := os.Lstat(radice)
 	if err != nil {
 		return "", err
@@ -588,20 +588,20 @@ func percorsoArchivio(id string) (string, error) {
 	return p, nil
 }
 
-func elencoArchivio() []VoceArchivio {
-	radice := espandiHome(DepositoModelli)
+func archiveList() []ArchiveEntry {
+	radice := expandHome(ModelStore)
 	voci, err := os.ReadDir(radice)
 	if err != nil {
-		return []VoceArchivio{}
+		return []ArchiveEntry{}
 	}
-	out := []VoceArchivio{}
+	out := []ArchiveEntry{}
 	for _, v := range voci {
 		if !v.IsDir() || strings.HasPrefix(v.Name(), ".") {
 			continue
 		}
 		p := filepath.Join(radice, v.Name())
-		if m, err := leggiManifesto(p); err == nil {
-			out = append(out, VoceArchivio{ID: v.Name(), Modello: m.Modello, GB: m.GB,
+		if m, err := readManifest(p); err == nil {
+			out = append(out, ArchiveEntry{ID: v.Name(), Model: m.Model, GB: m.GB,
 				Creato: m.Creato.Format(time.RFC3339), Posti: len(m.File), Runtime: m.Runtime, Ripristinabile: true})
 			continue
 		}
@@ -617,9 +617,9 @@ func elencoArchivio() []VoceArchivio {
 				continue
 			}
 			q := filepath.Join(p, f.Name())
-			misura := esaminaCartella(q)
-			out = append(out, VoceArchivio{
-				ID: v.Name() + "/" + f.Name(), Modello: f.Name(), GB: misura.GB,
+			misura := examineFolder(q)
+			out = append(out, ArchiveEntry{
+				ID: v.Name() + "/" + f.Name(), Model: f.Name(), GB: misura.GB,
 				Creato: v.Name(), Posti: 1, Ripristinabile: false, ArchivioVecchio: true,
 				Nota: "archiviato da una versione precedente: il percorso originale non era registrato",
 			})
@@ -629,68 +629,68 @@ func elencoArchivio() []VoceArchivio {
 	return out
 }
 
-func ripristinaArchivio(id string) (manifestoArchivio, error) {
-	voce, err := percorsoArchivio(id)
+func restoreArchived(id string) (archiveManifest, error) {
+	voce, err := archivePath(id)
 	if err != nil {
-		return manifestoArchivio{}, err
+		return archiveManifest{}, err
 	}
-	m, err := leggiManifesto(voce)
+	m, err := readManifest(voce)
 	if err != nil || m.ID != id {
-		return manifestoArchivio{}, errors.New("questo vecchio archivio non contiene i dati necessari al ripristino automatico")
+		return archiveManifest{}, errors.New("questo vecchio archivio non contiene i dati necessari al ripristino automatico")
 	}
 	// Tutti i conflitti si controllano prima di muovere il primo byte.
 	for _, f := range m.File {
-		if !percorsoInRadiceModelli(f.Originale) {
-			return manifestoArchivio{}, fmt.Errorf("il percorso originale non e' piu' fra le radici dei modelli: %s", f.Originale)
+		if !pathInModelRoot(f.Originale) {
+			return archiveManifest{}, fmt.Errorf("il percorso originale non e' piu' fra le radici dei modelli: %s", f.Originale)
 		}
 		_, errOriginale := os.Lstat(f.Originale)
 		originaleEsiste := errOriginale == nil
 		if errOriginale != nil && !os.IsNotExist(errOriginale) {
-			return manifestoArchivio{}, errOriginale
+			return archiveManifest{}, errOriginale
 		}
 		src := filepath.Join(voce, filepath.FromSlash(f.Archiviato))
 		rel, err := filepath.Rel(voce, src)
 		if err != nil || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return manifestoArchivio{}, errors.New("manifesto con percorso non valido")
+			return archiveManifest{}, errors.New("manifesto con percorso non valido")
 		}
 		_, errArchivio := os.Lstat(src)
 		archivioEsiste := errArchivio == nil
 		if errArchivio != nil && !os.IsNotExist(errArchivio) {
-			return manifestoArchivio{}, errArchivio
+			return archiveManifest{}, errArchivio
 		}
 		if originaleEsiste && archivioEsiste {
-			return manifestoArchivio{}, fmt.Errorf("non sovrascrivo %s: esiste sia sul disco sia nell'archivio", f.Originale)
+			return archiveManifest{}, fmt.Errorf("non sovrascrivo %s: esiste sia sul disco sia nell'archivio", f.Originale)
 		}
 		if !originaleEsiste && !archivioEsiste {
-			return manifestoArchivio{}, fmt.Errorf("manca %s sia dal disco sia dall'archivio", f.Archiviato)
+			return archiveManifest{}, fmt.Errorf("manca %s sia dal disco sia dall'archivio", f.Archiviato)
 		}
 	}
-	spostati := []fileArchivio{}
+	spostati := []archiveFiles{}
 	for _, f := range m.File {
 		src := filepath.Join(voce, filepath.FromSlash(f.Archiviato))
 		if _, err := os.Lstat(src); os.IsNotExist(err) {
 			continue // era gia' tornato durante un rollback interrotto
 		}
 		if err := os.MkdirAll(filepath.Dir(f.Originale), 0o755); err != nil {
-			rollbackRipristino(spostati, voce)
-			return manifestoArchivio{}, err
+			rollbackRestore(spostati, voce)
+			return archiveManifest{}, err
 		}
 		if err := os.Rename(src, f.Originale); err != nil {
-			rollbackRipristino(spostati, voce)
-			return manifestoArchivio{}, fmt.Errorf("ripristino fallito: %w", err)
+			rollbackRestore(spostati, voce)
+			return archiveManifest{}, fmt.Errorf("ripristino fallito: %w", err)
 		}
 		spostati = append(spostati, f)
 	}
 	if err := os.RemoveAll(voce); err != nil {
-		return manifestoArchivio{}, fmt.Errorf("modello ripristinato, ma non riesco a pulire il manifesto: %w", err)
+		return archiveManifest{}, fmt.Errorf("modello ripristinato, ma non riesco a pulire il manifesto: %w", err)
 	}
 	return m, nil
 }
 
-func percorsoInRadiceModelli(p string) bool {
+func pathInModelRoot(p string) bool {
 	p = filepath.Clean(p)
 	for _, r := range radici() {
-		radice := filepath.Clean(espandiHome(r))
+		radice := filepath.Clean(expandHome(r))
 		rel, err := filepath.Rel(radice, p)
 		if err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			return true
@@ -699,7 +699,7 @@ func percorsoInRadiceModelli(p string) bool {
 	return false
 }
 
-func rollbackRipristino(spostati []fileArchivio, voce string) {
+func rollbackRestore(spostati []archiveFiles, voce string) {
 	for i := len(spostati) - 1; i >= 0; i-- {
 		f := spostati[i]
 		_ = os.MkdirAll(filepath.Dir(filepath.Join(voce, filepath.FromSlash(f.Archiviato))), 0o700)
@@ -707,9 +707,9 @@ func rollbackRipristino(spostati []fileArchivio, voce string) {
 	}
 }
 
-// apiRimuoviModello archivia il modello. La cancellazione definitiva e'
+// apiRemoveModel archivia il modello. La cancellazione definitiva e'
 // deliberatamente separata e puo' agire soltanto su una voce gia' nel deposito.
-func apiRimuoviModello(w http.ResponseWriter, r *http.Request) {
+func apiRemoveModel(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID      string `json:"id"`
 		Runtime string `json:"runtime"`
@@ -734,8 +734,8 @@ func apiRimuoviModello(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, "non lo archivio: "+strings.Join(motivi, "; "))
 		return
 	}
-	configurate, _ := statoConfig()
-	associate := []Modello{}
+	configurate, _ := configState()
+	associate := []Model{}
 	for _, m := range configurate {
 		if strings.EqualFold(m.ID, req.ID) {
 			associate = append(associate, m)
@@ -746,23 +746,23 @@ func apiRimuoviModello(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, err.Error())
 		return
 	}
-	rinfrescaMemoria()
-	scriviJSON(w, map[string]any{
+	refreshMemory()
+	writeJSON(w, map[string]any{
 		"ok": true, "gb": voce.GB, "archivio": voce,
 		"comeTornareIndietro": "apri Modelli archiviati e premi Ripristina",
 	})
 }
 
-func apiArchivioModelli(w http.ResponseWriter, r *http.Request) {
+func apiModelArchive(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", "GET")
 		errJSONStatus(w, http.StatusMethodNotAllowed, "serve GET")
 		return
 	}
-	scriviJSON(w, elencoArchivio())
+	writeJSON(w, archiveList())
 }
 
-func apiRipristinaModello(w http.ResponseWriter, r *http.Request) {
+func apiRestoreModel(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID string `json:"id"`
 	}
@@ -770,17 +770,17 @@ func apiRipristinaModello(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, "corpo non leggibile")
 		return
 	}
-	m, err := ripristinaArchivio(req.ID)
+	m, err := restoreArchived(req.ID)
 	if err != nil {
 		errJSON(w, err.Error())
 		return
 	}
-	rinfrescaMemoria()
-	scriviJSON(w, map[string]any{"ok": true, "modello": m.Modello, "runtime": m.Runtime,
+	refreshMemory()
+	writeJSON(w, map[string]any{"ok": true, "modello": m.Model, "runtime": m.Runtime,
 		"gb": m.GB, "configurazioni": m.Configurazioni})
 }
 
-func apiEliminaArchivio(w http.ResponseWriter, r *http.Request) {
+func apiDeleteArchived(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID       string `json:"id"`
 		Conferma string `json:"conferma"`
@@ -793,12 +793,12 @@ func apiEliminaArchivio(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, "conferma non valida")
 		return
 	}
-	p, err := percorsoArchivio(req.ID)
+	p, err := archivePath(req.ID)
 	if err != nil {
 		errJSON(w, err.Error())
 		return
 	}
-	misura := esaminaCartella(p).GB
+	misura := examineFolder(p).GB
 	if err := os.RemoveAll(p); err != nil {
 		errJSON(w, "cancellazione fallita: "+err.Error())
 		return
@@ -808,5 +808,5 @@ func apiEliminaArchivio(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(filepath.ToSlash(req.ID), "/") {
 		_ = os.Remove(filepath.Dir(p))
 	}
-	scriviJSON(w, map[string]any{"ok": true, "gb": misura, "id": req.ID})
+	writeJSON(w, map[string]any{"ok": true, "gb": misura, "id": req.ID})
 }

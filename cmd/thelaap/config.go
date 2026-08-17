@@ -47,8 +47,8 @@ func home(p string) string {
 	return filepath.Join(h, p)
 }
 
-// Modello — vista unificata di una voce presente nelle config dei client.
-type Modello struct {
+// Model — vista unificata di una voce presente nelle config dei client.
+type Model struct {
 	Runtime   string `json:"runtime"`   // chiave Pi: mtplx / omlx / lmstudio / ...
 	ID        string `json:"id"`        // id esposto dal server
 	Nome      string `json:"nome"`      // etichetta leggibile
@@ -71,7 +71,7 @@ type Modello struct {
 	Servito     bool           `json:"servito"` // esiste davvero sul server?
 }
 
-func leggiJSON(path string) (map[string]any, error) {
+func readJSON(path string) (map[string]any, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -90,12 +90,12 @@ func num(v any, def int) int {
 	return def
 }
 
-// statoConfig costruisce la vista unificata dalle due config + da cosa è servito.
-func statoConfig() ([]Modello, []string) {
+// configState costruisce la vista unificata dalle due config + da cosa è servito.
+func configState() ([]Model, []string) {
 	var errori []string
-	indice := map[string]*Modello{} // chiave: runtime|id
+	indice := map[string]*Model{} // chiave: runtime|id
 
-	pi, err := leggiJSON(filePi())
+	pi, err := readJSON(filePi())
 	if err != nil {
 		errori = append(errori, "Pi: "+err.Error())
 	} else if provs, ok := pi["providers"].(map[string]any); ok {
@@ -124,7 +124,7 @@ func statoConfig() ([]Modello, []string) {
 					}
 					mappa = tlm
 				}
-				indice[k] = &Modello{
+				indice[k] = &Model{
 					Runtime: chiave, ID: id, Nome: nome, Reasoning: reas, ThinkBloccato: bloccato,
 					MappaEffort: mappa,
 					Context:     num(m["contextWindow"], 131072), MaxTokens: num(m["maxTokens"], 32768),
@@ -134,13 +134,13 @@ func statoConfig() ([]Modello, []string) {
 		}
 	}
 
-	oc, err := leggiJSON(fileOC())
+	oc, err := readJSON(fileOC())
 	if err != nil {
 		errori = append(errori, "OpenCode: "+err.Error())
 	} else if provs, ok := oc["provider"].(map[string]any); ok {
 		for chiaveOC, pv := range provs {
 			chiave := chiaveOC
-			for _, rt := range runtimeConfigurati() { // OpenCode chiama "mlx" ciò che Pi chiama "lmstudio"
+			for _, rt := range configuredRuntimes() { // OpenCode chiama "mlx" ciò che Pi chiama "lmstudio"
 				if rt.ChiaveOC == chiaveOC {
 					chiave = rt.Chiave
 					break
@@ -159,7 +159,7 @@ func statoConfig() ([]Modello, []string) {
 				if ex, ok := indice[k]; ok {
 					ex.InOC = true
 				} else {
-					indice[k] = &Modello{Runtime: chiave, ID: id, Nome: nome,
+					indice[k] = &Model{Runtime: chiave, ID: id, Nome: nome,
 						Context: ctx, MaxTokens: out, InOC: true}
 				}
 			}
@@ -168,14 +168,14 @@ func statoConfig() ([]Modello, []string) {
 
 	// incrocia con ciò che i server servono davvero
 	serviti := map[string]bool{}
-	for _, rt := range scopriRuntime() {
+	for _, rt := range discoverRuntimes() {
 		for _, id := range rt.Modelli {
 			serviti[rt.Chiave+"|"+id] = true
 		}
 	}
-	out := []Modello{}
+	out := []Model{}
 	for k, m := range indice {
-		m.Servito = serviti[k] || provRemoto(m.Runtime)
+		m.Servito = serviti[k] || provRemote(m.Runtime)
 		out = append(out, *m)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -200,19 +200,19 @@ func backup(path string) error {
 	return os.WriteFile(dst, b, 0o644)
 }
 
-// scriviConfig rigenera le sezioni "models" di entrambe le config dalla lista data,
+// writeConfig rigenera le sezioni "models" di entrambe le config dalla lista data,
 // lasciando intatto tutto il resto (agent, compat, provider non gestiti).
-func scriviConfig(modelli []Modello) error {
-	pi, err := leggiJSON(filePi())
+func writeConfig(modelli []Model) error {
+	pi, err := readJSON(filePi())
 	if err != nil {
 		return err
 	}
-	oc, err := leggiJSON(fileOC())
+	oc, err := readJSON(fileOC())
 	if err != nil {
 		return err
 	}
 
-	perRuntime := map[string][]Modello{}
+	perRuntime := map[string][]Model{}
 	for _, m := range modelli {
 		perRuntime[m.Runtime] = append(perRuntime[m.Runtime], m)
 	}
@@ -291,7 +291,7 @@ func scriviConfig(modelli []Modello) error {
 	provsOC, _ := oc["provider"].(map[string]any)
 	for chiaveOC, pv := range provsOC {
 		chiave := chiaveOC
-		for _, rt := range runtimeConfigurati() {
+		for _, rt := range configuredRuntimes() {
 			if rt.ChiaveOC == chiaveOC {
 				chiave = rt.Chiave
 				break
@@ -341,10 +341,10 @@ func scriviConfig(modelli []Modello) error {
 		}
 	}
 	for i, s := range scritture {
-		if err := scriviAtomico(s.path, s.nuovo); err != nil {
+		if err := writeAtomic(s.path, s.nuovo); err != nil {
 			var rollback []string
 			for j := 0; j < i; j++ {
-				if e := scriviAtomico(scritture[j].path, scritture[j].vecchio); e != nil {
+				if e := writeAtomic(scritture[j].path, scritture[j].vecchio); e != nil {
 					rollback = append(rollback, scritture[j].nome+": "+e.Error())
 				}
 			}
@@ -358,10 +358,10 @@ func scriviConfig(modelli []Modello) error {
 	return nil
 }
 
-// apiGrezzo: modalità esperto — i due file di configurazione così come sono,
+// apiRaw: modalità esperto — i due file di configurazione così come sono,
 // leggibili e modificabili senza aprire un editor. In scrittura valida il JSON
 // e fa la copia di sicurezza come per il resto.
-func apiGrezzo(w http.ResponseWriter, r *http.Request) {
+func apiRaw(w http.ResponseWriter, r *http.Request) {
 	quale := r.URL.Query().Get("file")
 	path := filePi()
 	if quale == "opencode" {
@@ -397,7 +397,7 @@ func apiGrezzo(w http.ResponseWriter, r *http.Request) {
 			errJSON(w, err.Error())
 			return
 		}
-		scriviJSON(w, map[string]any{"ok": true,
+		writeJSON(w, map[string]any{"ok": true,
 			"messaggio": "salvato " + filepath.Base(path) + " (copia di sicurezza in " + BACKUP + ")"})
 		return
 	}
@@ -406,27 +406,27 @@ func apiGrezzo(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, err.Error())
 		return
 	}
-	scriviJSON(w, map[string]any{"file": path, "contenuto": string(b)})
+	writeJSON(w, map[string]any{"file": path, "contenuto": string(b)})
 }
 
 func apiConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
-		var modelli []Modello
+		var modelli []Model
 		if err := json.NewDecoder(r.Body).Decode(&modelli); err != nil {
 			errJSON(w, "corpo non valido: "+err.Error())
 			return
 		}
-		if err := scriviConfig(modelli); err != nil {
+		if err := writeConfig(modelli); err != nil {
 			errJSON(w, err.Error())
 			return
 		}
 		// I provider possono essere cambiati: la cache locale/remoto non vale più.
-		scordaRemoto()
-		dopo, errori := statoConfig()
-		scriviJSON(w, map[string]any{"ok": true, "modelli": dopo, "errori": errori,
+		forgetRemote()
+		dopo, errori := configState()
+		writeJSON(w, map[string]any{"ok": true, "modelli": dopo, "errori": errori,
 			"messaggio": fmt.Sprintf("salvate %d voci in Pi e OpenCode (backup in %s)", len(modelli), BACKUP)})
 		return
 	}
-	modelli, errori := statoConfig()
-	scriviJSON(w, map[string]any{"modelli": modelli, "errori": errori})
+	modelli, errori := configState()
+	writeJSON(w, map[string]any{"modelli": modelli, "errori": errori})
 }

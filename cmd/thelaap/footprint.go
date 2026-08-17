@@ -9,19 +9,19 @@ import (
 	"time"
 )
 
-// Occupazione: quanto pesa un processo in memoria fisica.
+// Footprint: quanto pesa un processo in memoria fisica.
 //
 // Stimato distingue una misura da un ripiego meno preciso. L'interfaccia deve
 // mostrare la differenza: presentare una stima come misura è il modo in cui si
 // prendono decisioni sbagliate con la coscienza a posto.
-type Occupazione struct {
+type Footprint struct {
 	CorrenteByte uint64 `json:"correnteByte"`
 	PiccoByte    uint64 `json:"piccoByte"`
 	Stimato      bool   `json:"stimato"`
 }
 
-func (o Occupazione) CorrenteGB() float64 { return float64(o.CorrenteByte) / 1e9 }
-func (o Occupazione) PiccoGB() float64    { return float64(o.PiccoByte) / 1e9 }
+func (o Footprint) CurrentGB() float64 { return float64(o.CorrenteByte) / 1e9 }
+func (o Footprint) PeakGB() float64    { return float64(o.PiccoByte) / 1e9 }
 
 // PesoDaPrevedere: su quale numero decidere se un modello ci sta.
 //
@@ -30,7 +30,7 @@ func (o Occupazione) PiccoGB() float64    { return float64(o.PiccoByte) / 1e9 }
 // dei 59 significa autorizzare un sovraccarico che si manifesta dopo, quando
 // è tardi. Misurato su questa macchina: mtplx è passato da 30 GB appena
 // avviato a 71 GB in una sessione, con picco 79.
-func (o Occupazione) PesoDaPrevedereByte() uint64 {
+func (o Footprint) ExpectedWeightBytes() uint64 {
 	if o.PiccoByte > o.CorrenteByte {
 		return o.PiccoByte
 	}
@@ -68,6 +68,6 @@ func shErr(limite time.Duration, linea string) (string, error) {
 // d'errore mostrato in una pagina web, diventano caratteri incomprensibili.
 var reAnsi = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
 
-func senzaAnsi(s string) string {
+func withoutAnsi(s string) string {
 	return strings.TrimSpace(reAnsi.ReplaceAllString(s, ""))
 }

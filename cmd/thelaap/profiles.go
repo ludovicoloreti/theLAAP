@@ -18,9 +18,9 @@ import (
 //	2. quello che il runtime DICHIARA (contesto, dimensione su disco)
 //	3. quello che si deduce dal nome, come ultima spiaggia e sempre dichiarandolo
 //
-// Il risultato si chiama Profilo e vive su disco, così le misure non si perdono.
+// Il risultato si chiama Profile e vive su disco, così le misure non si perdono.
 
-type Profilo struct {
+type Profile struct {
 	ID        string    `json:"id"`
 	Runtime   string    `json:"runtime"`
 	TokS      float64   `json:"tokS"`      // misurato
@@ -33,7 +33,7 @@ type Profilo struct {
 }
 
 var (
-	profili   = map[string]*Profilo{}
+	profili   = map[string]*Profile{}
 	profiliMu sync.RWMutex
 	// Sta accanto alla configurazione, non nella cartella del progetto.
 	//
@@ -51,12 +51,12 @@ var (
 	PROFILI = home(".config/thelaap/profili.json")
 )
 
-func caricaProfili() {
+func loadProfiles() {
 	b, err := os.ReadFile(PROFILI)
 	if err != nil {
 		return
 	}
-	var lista []Profilo
+	var lista []Profile
 	if json.Unmarshal(b, &lista) != nil {
 		return
 	}
@@ -68,9 +68,9 @@ func caricaProfili() {
 	}
 }
 
-func salvaProfili() {
+func saveProfiles() {
 	profiliMu.RLock()
-	var lista []Profilo
+	var lista []Profile
 	for _, p := range profili {
 		lista = append(lista, *p)
 	}
@@ -83,7 +83,7 @@ func salvaProfili() {
 	os.WriteFile(PROFILI, b, 0o644)
 }
 
-func leggiProfilo(runtime, id string) *Profilo {
+func readProfile(runtime, id string) *Profile {
 	profiliMu.RLock()
 	defer profiliMu.RUnlock()
 	if p, ok := profili[runtime+"|"+id]; ok {
@@ -93,27 +93,27 @@ func leggiProfilo(runtime, id string) *Profilo {
 	return nil
 }
 
-func aggiornaProfilo(runtime, id string, f func(*Profilo)) {
+func updateProfile(runtime, id string, f func(*Profile)) {
 	profiliMu.Lock()
 	k := runtime + "|" + id
 	if profili[k] == nil {
-		profili[k] = &Profilo{ID: id, Runtime: runtime}
+		profili[k] = &Profile{ID: id, Runtime: runtime}
 	}
 	f(profili[k])
 	profiliMu.Unlock()
-	salvaProfili()
+	saveProfiles()
 }
 
 // ── deduzioni dal nome: solo indizi, mai certezze ────────────────
 // Ogni indizio porta con sé il MOTIVO, così l'interfaccia può dire
 // "lo deduco dal nome" invece di far finta di saperlo.
 
-type Indizio struct {
+type Hint struct {
 	Tratto string `json:"tratto"` // "senza-filtri", "ragiona", "misto-esperti", "programmazione"…
 	Perche string `json:"perche"` // in italiano, mostrabile all'utente
 }
 
-var SEGNALI = []struct {
+var SIGNALS = []struct {
 	tratto string
 	chiavi []string
 	perche string
@@ -136,17 +136,17 @@ var SEGNALI = []struct {
 		"la dimensione nel nome indica un modello molto piccolo"},
 }
 
-func indizi(id string) []Indizio {
+func indizi(id string) []Hint {
 	l := strings.ToLower(id)
-	var out []Indizio
+	var out []Hint
 	visti := map[string]bool{}
-	for _, s := range SEGNALI {
+	for _, s := range SIGNALS {
 		if visti[s.tratto] {
 			continue
 		}
 		for _, k := range s.chiavi {
 			if strings.Contains(l, k) {
-				out = append(out, Indizio{s.tratto, s.perche})
+				out = append(out, Hint{s.tratto, s.perche})
 				visti[s.tratto] = true
 				break
 			}
@@ -155,15 +155,15 @@ func indizi(id string) []Indizio {
 	return out
 }
 
-// Scheda: tutto quello che l'interfaccia deve sapere per disegnare un modello,
+// Card: tutto quello che l'interfaccia deve sapere per disegnare un modello,
 // già messo insieme e con l'origine di ogni informazione.
-type Scheda struct {
-	Modello
-	TokS      float64   `json:"tokS"`
-	GB        float64   `json:"gb"`
-	Provato   string    `json:"provato"`
-	Indizi    []Indizio `json:"indizi"`
-	Etichetta string    `json:"etichetta"`
+type Card struct {
+	Model
+	TokS      float64 `json:"tokS"`
+	GB        float64 `json:"gb"`
+	Provato   string  `json:"provato"`
+	Indizi    []Hint  `json:"indizi"`
+	Etichetta string  `json:"etichetta"`
 	// Note: le due frasi scritte dal modellino, salvate una volta in
 	// profili.json. Senza questo campo l'interfaccia non ha da dove leggerle e
 	// il riquadro «descritto dal modellino» resta vuoto per sempre.
@@ -171,12 +171,12 @@ type Scheda struct {
 	Misurato bool   `json:"misurato"` // false = non l'abbiamo mai provato
 }
 
-func schede() []Scheda {
-	modelli, _ := statoConfig()
-	out := make([]Scheda, 0, len(modelli)) // mai nil: il client la scorre sempre
+func schede() []Card {
+	modelli, _ := configState()
+	out := make([]Card, 0, len(modelli)) // mai nil: il client la scorre sempre
 	for _, m := range modelli {
-		s := Scheda{Modello: m, Indizi: indizi(m.ID)}
-		if p := leggiProfilo(m.Runtime, m.ID); p != nil {
+		s := Card{Model: m, Indizi: indizi(m.ID)}
+		if p := readProfile(m.Runtime, m.ID); p != nil {
 			s.TokS, s.GB, s.Etichetta, s.Note = p.TokS, p.GB, p.Etichetta, p.Note
 			s.Misurato = !p.Provato.IsZero()
 			if s.Misurato {
@@ -188,12 +188,12 @@ func schede() []Scheda {
 	return out
 }
 
-func apiSchede(w http.ResponseWriter, r *http.Request) {
-	scriviJSON(w, schede())
+func apiCards(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, schede())
 }
 
-// apiEtichetta: il nome che l'utente dà a un modello. Vince su ogni deduzione.
-func apiEtichetta(w http.ResponseWriter, r *http.Request) {
+// apiLabel: il nome che l'utente dà a un modello. Vince su ogni deduzione.
+func apiLabel(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Runtime   string `json:"runtime"`
 		ID        string `json:"id"`
@@ -204,11 +204,11 @@ func apiEtichetta(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, "corpo non valido")
 		return
 	}
-	aggiornaProfilo(req.Runtime, req.ID, func(p *Profilo) {
+	updateProfile(req.Runtime, req.ID, func(p *Profile) {
 		p.Etichetta = trunc(req.Etichetta, 80)
 		if req.Note != "" {
 			p.Note = trunc(req.Note, 300)
 		}
 	})
-	scriviJSON(w, map[string]any{"ok": true})
+	writeJSON(w, map[string]any{"ok": true})
 }

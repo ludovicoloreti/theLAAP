@@ -18,7 +18,7 @@ import (
 // aprire il JSON a mano. È capitato il 29/07/2026 ed è per questo che esiste
 // questo file.
 //
-// REGOLE, non negoziabili:
+// RULES, non negoziabili:
 //   - la chiave attuale non si mostra MAI, nemmeno all'utente che l'ha scritta:
 //     si dice se c'è e quanto è lunga, e si mostrano gli ultimi caratteri per
 //     riconoscerla. Basta per capire "è quella nuova o la vecchia?", e non
@@ -27,7 +27,7 @@ import (
 //   - si scrive prima su file temporaneo e poi si rinomina, con copia di
 //     sicurezza: un pannello che corrompe models.json ti lascia senza client.
 
-type StatoCredenziale struct {
+type CredentialState struct {
 	Provider  string `json:"provider"`
 	Nome      string `json:"nome"`
 	Impostata bool   `json:"impostata"`
@@ -35,36 +35,36 @@ type StatoCredenziale struct {
 	// Ultimi caratteri, per riconoscere quale chiave c'è senza rivelarla.
 	Coda   string `json:"coda,omitempty"`
 	Remoto bool   `json:"remoto"`
-	// Esito dell'ultima verifica, se richiesta.
+	// Outcome dell'ultima verifica, se richiesta.
 	Verifica string `json:"verifica,omitempty"`
 }
 
-func mascheraCoda(k string) string {
+func maskTail(k string) string {
 	if len(k) < 6 {
 		return ""
 	}
 	return "…" + k[len(k)-4:]
 }
 
-func apiCredenziali(w http.ResponseWriter, r *http.Request) {
-	out := []StatoCredenziale{}
-	for _, p := range leggiProvider() {
-		s := StatoCredenziale{Provider: p.chiave, Nome: p.nome, Remoto: p.remoto}
+func apiCredentials(w http.ResponseWriter, r *http.Request) {
+	out := []CredentialState{}
+	for _, p := range readProviders() {
+		s := CredentialState{Provider: p.chiave, Nome: p.nome, Remoto: p.remoto}
 		if p.apiKey != "" {
-			s.Impostata, s.Lunghezza, s.Coda = true, len(p.apiKey), mascheraCoda(p.apiKey)
+			s.Impostata, s.Lunghezza, s.Coda = true, len(p.apiKey), maskTail(p.apiKey)
 		}
 		out = append(out, s)
 	}
-	scriviJSON(w, out)
+	writeJSON(w, out)
 }
 
-// scriviChiave aggiorna la chiave nel file di un client.
+// writeKey aggiorna la chiave nel file di un client.
 //
 // Modifica solo il campo della chiave e riscrive il resto identico: il file è
 // dell'utente e può contenere di tutto, non è il pannello a decidere cosa
 // merita di sopravvivere.
-func scriviChiave(percorso, provider, chiave string, formato string) error {
-	percorso = espandiHome(percorso)
+func writeKey(percorso, provider, chiave string, formato string) error {
+	percorso = expandHome(percorso)
 	b, err := os.ReadFile(percorso)
 	if err != nil {
 		return err
@@ -110,7 +110,7 @@ func scriviChiave(percorso, provider, chiave string, formato string) error {
 	return os.Rename(tmp, percorso)
 }
 
-func apiImpostaCredenziale(w http.ResponseWriter, r *http.Request) {
+func apiSetCredential(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Provider string `json:"provider"`
 		Chiave   string `json:"chiave"`
@@ -133,7 +133,7 @@ func apiImpostaCredenziale(w http.ResponseWriter, r *http.Request) {
 
 	var scritti, errori []string
 	for _, cl := range cfg().Clienti {
-		if err := scriviChiave(cl.File, req.Provider, req.Chiave, cl.Formato); err != nil {
+		if err := writeKey(cl.File, req.Provider, req.Chiave, cl.Formato); err != nil {
 			errori = append(errori, cl.Nome+": "+err.Error())
 			continue
 		}
@@ -143,29 +143,29 @@ func apiImpostaCredenziale(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, "non sono riuscito a scriverla — "+strings.Join(errori, "; "))
 		return
 	}
-	scordaRemoto() // i provider vanno riletti
+	forgetRemote() // i provider vanno riletti
 
 	// Verifica subito: dire "salvato" senza sapere se funziona è metà del
 	// problema di partenza.
 	esito := "non verificata"
-	for _, p := range leggiProvider() {
+	for _, p := range readProviders() {
 		if p.chiave != req.Provider {
 			continue
 		}
-		if b := httpGetAut(p.baseURL+"/models", p.apiKey, 15*time.Second); b != nil {
+		if b := httpGetAuth(p.baseURL+"/models", p.apiKey, 15*time.Second); b != nil {
 			esito = "il server la accetta"
 		} else {
 			esito = "salvata, ma il server non risponde o la rifiuta"
 		}
 	}
-	scriviJSON(w, map[string]any{
+	writeJSON(w, map[string]any{
 		"ok": true, "scritti": scritti, "errori": errori, "verifica": esito,
 	})
 }
 
-// httpGetAut: come httpGet ma con credenziale. Sta qui e non in discovery.go
+// httpGetAuth: come httpGet ma con credenziale. Sta qui e non in discovery.go
 // per non far girare una chiave dentro una funzione di uso generale.
-func httpGetAut(url, chiave string, timeout time.Duration) []byte {
+func httpGetAuth(url, chiave string, timeout time.Duration) []byte {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil

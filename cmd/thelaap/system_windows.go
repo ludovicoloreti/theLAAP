@@ -10,7 +10,7 @@ import (
 // Versione per Windows. I comandi passano da PowerShell invece che da una shell
 // POSIX; il resto del programma non se ne accorge.
 
-const SISTEMA = "Windows"
+const SYSTEM = "Windows"
 
 func exec_LookPath(nome string) (string, error) {
 	if p, err := exec.LookPath(nome); err == nil {
@@ -19,7 +19,7 @@ func exec_LookPath(nome string) (string, error) {
 	return exec.LookPath(nome + ".exe")
 }
 
-func memoriaSistema() (totale, libera, wired, compressa, swap float64) {
+func systemMemory() (totale, libera, wired, compressa, swap float64) {
 	// CIM è più affidabile del vecchio WMIC, che sulle versioni recenti non c'è più
 	o := ps(`$c=Get-CimInstance Win32_OperatingSystem;
 		"$($c.TotalVisibleMemorySize) $($c.FreePhysicalMemory) $($c.SizeStoredInPagingFiles) $($c.FreeSpaceInPagingFiles)"`)
@@ -32,8 +32,8 @@ func memoriaSistema() (totale, libera, wired, compressa, swap float64) {
 	return
 }
 
-// tettoGraficaGB: memoria della scheda video, se c'è.
-func tettoGraficaGB() float64 {
+// graphicsCeilingGB: memoria della scheda video, se c'è.
+func graphicsCeilingGB() float64 {
 	if o := ps(`(Get-CimInstance Win32_VideoController | Sort-Object AdapterRAM -Descending |
 		Select-Object -First 1).AdapterRAM`); o != "" {
 		return parseFloat(o) / 1e9
@@ -44,13 +44,13 @@ func tettoGraficaGB() float64 {
 	return 0
 }
 
-func temaScuro() bool {
+func darkTheme() bool {
 	o := ps(`(Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' ` +
 		`-Name AppsUseLightTheme -ErrorAction SilentlyContinue).AppsUseLightTheme`)
 	return strings.TrimSpace(o) == "0"
 }
 
-func dimensioneCartella(path string) float64 {
+func folderSize(path string) float64 {
 	o := ps(`(Get-ChildItem -LiteralPath '` + strings.ReplaceAll(path, "'", "''") +
 		`' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Sum Length).Sum`)
 	return parseFloat(o) / 1e9
@@ -61,7 +61,7 @@ func ps(comando string) string {
 	return cmd("powershell", "-NoProfile", "-NonInteractive", "-Command", comando)
 }
 
-func comandiServizio(k candidato, binario string) (avvia, ferma, riavvia string) {
+func serviceCommands(k candidato, binario string) (avvia, ferma, riavvia string) {
 	if k.chiave == "lmstudio" && binario != "" {
 		return binario + " server start", binario + " server stop",
 			binario + " server stop; " + binario + " server start"
@@ -72,7 +72,7 @@ func comandiServizio(k candidato, binario string) (avvia, ferma, riavvia string)
 	return "", "", ""
 }
 
-func comandiFermaTutto(rr []RuntimeCfg) (ferma, riaccendi string) {
+func stopAllCommands(rr []RuntimeCfg) (ferma, riaccendi string) {
 	var f, r []string
 	for _, x := range rr {
 		if x.Ferma != "" {

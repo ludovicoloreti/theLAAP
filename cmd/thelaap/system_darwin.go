@@ -15,13 +15,13 @@ import (
 // Tutto ciò che è specifico di macOS sta qui. Gli altri sistemi hanno un file
 // gemello: il resto del programma non sa su cosa sta girando.
 
-const SISTEMA = "macOS"
+const SYSTEM = "macOS"
 
 func exec_LookPath(nome string) (string, error) { return exec.LookPath(nome) }
 
-// memoriaSistema: su Apple Silicon la memoria è unificata, quindi RAM e VRAM
+// systemMemory: su Apple Silicon la memoria è unificata, quindi RAM e VRAM
 // sono la stessa cosa e una lettura sola basta.
-func memoriaSistema() (totale, libera, wired, compressa, swap float64) {
+func systemMemory() (totale, libera, wired, compressa, swap float64) {
 	totale = parseFloat(cmd("sysctl", "-n", "hw.memsize")) / 1e9
 
 	vm := cmd("vm_stat")
@@ -54,23 +54,23 @@ func memoriaSistema() (totale, libera, wired, compressa, swap float64) {
 // GB decimali — come Monitoraggio Attività. Dividere per 1024 dava GiB, e quel
 // numero finiva nella stessa barra dei GB decimali: il tetto veniva disegnato
 // circa 8 GB più corto del vero.
-func tettoGraficaGB() float64 {
+func graphicsCeilingGB() float64 {
 	return parseFloat(cmd("sysctl", "-n", "iogpu.wired_limit_mb")) * 1048576 / 1e9
 }
 
-func temaScuro() bool {
+func darkTheme() bool {
 	return strings.TrimSpace(sh("defaults read -g AppleInterfaceStyle 2>/dev/null")) == "Dark"
 }
 
 // dimensioneCartellaGB
-func dimensioneCartella(path string) float64 {
+func folderSize(path string) float64 {
 	if o := sh("du -sk " + shQuote(path) + " 2>/dev/null | cut -f1"); o != "" {
 		return parseFloat(o) / 1e6
 	}
 	return 0
 }
 
-// etichettaLaunchd: qual è il servizio launchd che esegue questo programma.
+// launchdLabel: qual è il servizio launchd che esegue questo programma.
 //
 // NON si può indovinare dal nome del programma. Ognuno chiama i propri servizi
 // come vuole: `homebrew.mxcl.omlx` se installato con Homebrew, `com.tizio.omlx`
@@ -80,7 +80,7 @@ func dimensioneCartella(path string) float64 {
 //
 // Quindi si cerca: fra i LaunchAgent dell'utente e i servizi Homebrew, quale
 // esegue davvero il binario o nomina il programma.
-func etichettaLaunchd(chiave, binario string) string {
+func launchdLabel(chiave, binario string) string {
 	// 1) I LaunchAgent dell'utente: si guarda dentro chi esegue quel binario.
 	if h, err := os.UserHomeDir(); err == nil {
 		dir := filepath.Join(h, "Library", "LaunchAgents")
@@ -110,14 +110,14 @@ func etichettaLaunchd(chiave, binario string) string {
 	return ""
 }
 
-// comandiServizio: su macOS i servizi si governano con launchd; se un programma
+// serviceCommands: su macOS i servizi si governano con launchd; se un programma
 // non ha un'unità, si ripiega sui comandi del programma stesso.
 //
 // bootout/bootstrap, non load/unload: i primi sono deprecati, e `kickstart`
 // NON rilegge il plist — se la configurazione del servizio è cambiata,
 // riavvierebbe con quella vecchia dicendo che è andato tutto bene.
-func comandiServizio(k candidato, binario string) (avvia, ferma, riavvia string) {
-	if u := etichettaLaunchd(k.chiave, binario); u != "" {
+func serviceCommands(k candidato, binario string) (avvia, ferma, riavvia string) {
+	if u := launchdLabel(k.chiave, binario); u != "" {
 		p := "~/Library/LaunchAgents/" + u + ".plist"
 		g := "gui/$(id -u)/" + u
 		if strings.HasPrefix(u, "homebrew.") {
@@ -143,7 +143,7 @@ func comandiServizio(k candidato, binario string) (avvia, ferma, riavvia string)
 // messaggio fa pensare a un guasto quando invece non c'era niente da fare.
 // Quindi: errori silenziati, e una riga in italiano che dice cos'è successo
 // davvero, verificando prima e dopo se il programma risponde.
-func comandiFermaTutto(rr []RuntimeCfg) (ferma, riaccendi string) {
+func stopAllCommands(rr []RuntimeCfg) (ferma, riaccendi string) {
 	risponde := func(x RuntimeCfg) string {
 		return fmt.Sprintf("curl -s -m 2 http://127.0.0.1:%d%s >/dev/null 2>&1", x.Porta, x.Elenco)
 	}
