@@ -217,6 +217,32 @@ func scriviConfig(modelli []Modello) error {
 		perRuntime[m.Runtime] = append(perRuntime[m.Runtime], m)
 	}
 
+	// Le thinkingLevelMap che stanno GIÀ sul disco, indicizzate per provider|id.
+	//
+	// Serve perché MappaEffort è `json:"-"`: non esce verso il pannello e quindi
+	// non rientra. Chi salva dal pannello manda sempre nil, e senza questo la
+	// mappa su misura verrebbe sostituita da quella generica — che manda "high"
+	// a un modello che accetta solo xhigh/medium/low e fa fallire ogni richiesta
+	// con 400. È il danno del 15/08/2026, per una strada diversa da quella che il
+	// commento su MappaEffort descrive.
+	//
+	// La regola: la mappa la conosce il modello, non questo codice. Se una c'era,
+	// vince su qualunque cosa il chiamante non sappia.
+	mappeSulDisco := map[string]map[string]any{}
+	if provs, ok := pi["providers"].(map[string]any); ok {
+		for chiave, pv := range provs {
+			p, _ := pv.(map[string]any)
+			ms, _ := p["models"].([]any)
+			for _, mv := range ms {
+				m, _ := mv.(map[string]any)
+				id, _ := m["id"].(string)
+				if tlm, ok := m["thinkingLevelMap"].(map[string]any); ok && id != "" {
+					mappeSulDisco[chiave+"|"+id] = tlm
+				}
+			}
+		}
+	}
+
 	// ---- Pi ----
 	provs, _ := pi["providers"].(map[string]any)
 	for chiave, pv := range provs {
@@ -238,9 +264,15 @@ func scriviConfig(modelli []Modello) error {
 					"minimal": nil, "low": "low", "medium": "medium",
 					"high": "high", "xhigh": nil, "max": nil,
 				}
-				if m.MappaEffort != nil {
+				// Prima quella che porta il chiamante, poi quella già sul disco.
+				// La generica solo se non esiste né l'una né l'altra.
+				sorgente := m.MappaEffort
+				if sorgente == nil {
+					sorgente = mappeSulDisco[chiave+"|"+m.ID]
+				}
+				if sorgente != nil {
 					tlm = map[string]any{}
-					for k, v := range m.MappaEffort {
+					for k, v := range sorgente {
 						tlm[k] = v
 					}
 				}

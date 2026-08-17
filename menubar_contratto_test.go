@@ -42,54 +42,62 @@ func TestMenubarNonUsaGetSuEsegui(t *testing.T) {
 	}
 }
 
-// TestMenubarUsaSoloComandiAmmessi: ogni cmd citato nello Swift deve esistere fra
-// quelli che il server sa risolvere, altrimenti risponde 403 e la voce non fa nulla.
+// TestMenubarNonCablaNessunComando: il menu non deve contenere id di comandi.
 //
-// Il confronto è STATICO, fra i due sorgenti, e non passa da comandoAmmesso: quella
-// funzione legge cfg(), che nei test è vuota e direbbe di no a tutto — un test che
-// fallisce sempre non distingue il codice giusto da quello rotto.
-func TestMenubarUsaSoloComandiAmmessi(t *testing.T) {
+// Il confronto statico fra i due sorgenti serviva finché lo Swift li scriveva a
+// mano: se non combaciavano col server, la voce rispondeva 403 e non faceva
+// niente. Ora li chiede a /api/comandi, che li ricava dalla configurazione, e il
+// difetto non è più «tenuti allineati» ma «impossibile da riprodurre».
+//
+// Quello che va difeso è quindi il contrario di prima: che nello Swift non
+// ricompaia nessun id.
+func TestMenubarNonCablaNessunComando(t *testing.T) {
 	src := leggiSwift(t)
 
+	// Gli id che il server sa risolvere, estratti dal sorgente Go. Servono per
+	// riconoscerli se qualcuno li riscrive nello Swift.
 	ammessi := map[string]bool{}
-	// i due casi cablati in comandoAmmesso (services.go)
 	for _, b := range mustRead(t, "services.go") {
 		for _, m := range regexp.MustCompile(`case "([a-z0-9-]+)":`).FindAllStringSubmatch(b, -1) {
 			ammessi[m[1]] = true
 		}
 	}
-	// gli ID degli strumenti registrati (configurazione.go)
 	for _, b := range mustRead(t, "configurazione.go") {
 		for _, m := range regexp.MustCompile(`ID:\s*"([a-z0-9-]+)"`).FindAllStringSubmatch(b, -1) {
 			ammessi[m[1]] = true
 		}
-		// e quelli della tabella posizionale: {"aistack.py", "stato", "Stato rapido", ...}
-		// dove l'id è il SECONDO campo, non il primo (il primo è il nome del file).
 		for _, m := range regexp.MustCompile(`\{"[a-z0-9_.-]+\.py",\s*"([a-z0-9-]+)"`).FindAllStringSubmatch(b, -1) {
 			ammessi[m[1]] = true
 		}
 	}
 	if len(ammessi) < 3 {
-		t.Fatalf("estratti solo %d id ammessi dal sorgente Go: il test non sta guardando niente", len(ammessi))
+		t.Fatalf("estratti solo %d id dal sorgente Go: il test non sta guardando niente", len(ammessi))
 	}
 
-	var citati []string
-	for _, re := range []*regexp.Regexp{
-		regexp.MustCompile(`eseguiComando\("([a-z0-9-]+)"`),
-		regexp.MustCompile(`representedObject = "([a-z0-9-]+)"`),
-	} {
-		for _, m := range re.FindAllStringSubmatch(src, -1) {
-			citati = append(citati, m[1])
+	for id := range ammessi {
+		if strings.Contains(src, `"`+id+`"`) {
+			t.Errorf("%s cabla l'id %q. Gli id vengono da /api/comandi: scriverli qui "+
+				"rimette in piedi due elenchi da tenere allineati a mano.", sorgenteSwift, id)
 		}
 	}
-	if len(citati) == 0 {
-		t.Fatal("nessun comando trovato nel sorgente Swift: il test non sta guardando niente")
-	}
+}
 
-	for _, id := range citati {
-		if !ammessi[id] {
-			t.Errorf("il menu della barra manda cmd=%q, che il server non sa risolvere "+
-				"→ 403, e la voce non fa nulla.\nId noti: %v", id, chiavi(ammessi))
+// TestMenubarLeggeIlRegistro: e deve leggerlo davvero, altrimenti il menu resta
+// senza comandi e il test sopra passerebbe per il motivo sbagliato.
+func TestMenubarLeggeIlRegistro(t *testing.T) {
+	src := leggiSwift(t)
+	// La CHIAMATA, non la stringa: `/api/comandi` compare anche nei commenti, e
+	// cercarla lì fa passare il test anche se il menu ha smesso di chiedere il
+	// registro. Verificato togliendo la chiamata: prima non fallivo.
+	for _, atteso := range []string{`chiedi("/api/comandi"`, "struct Comando", "c.rotta"} {
+		if !strings.Contains(src, atteso) {
+			t.Errorf("%s non contiene %q: il menu non sta usando il registro", sorgenteSwift, atteso)
+		}
+	}
+	// La rotta la dice il registro, non lo Swift: nessuna rotta di comando scritta a mano.
+	for _, rotta := range []string{`"/api/esegui"`, `"/api/regime"`, `"/api/servizio"`} {
+		if strings.Contains(src, rotta) {
+			t.Errorf("%s cabla la rotta %s invece di usare quella del registro", sorgenteSwift, rotta)
 		}
 	}
 }

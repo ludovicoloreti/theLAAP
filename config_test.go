@@ -137,3 +137,78 @@ func leggiMappaTest(t *testing.T, path string) map[string]any {
 	}
 	return m
 }
+
+// Il giro vero: la pagina LEGGE le voci da /api/config, l'utente cambia un nome,
+// e la pagina le RIMANDA. In mezzo c'è JSON, e MappaEffort è `json:"-"`: non esce
+// e non rientra. Il test sopra non lo vede, perché passa la struct in memoria.
+//
+// Senza la conservazione lato scrittura, salvare dal pannello sostituisce una
+// thinkingLevelMap su misura con quella generica — che manda "high" a un modello
+// che accetta solo xhigh/medium/low e fa fallire ogni richiesta con 400. È il
+// danno del 15/08/2026, per una strada diversa.
+func TestSalvareDalPannelloNonPerdeLaThinkingLevelMap(t *testing.T) {
+	dir := t.TempDir()
+	piPath := filepath.Join(dir, "pi.json")
+	ocPath := filepath.Join(dir, "opencode.json")
+	if err := os.WriteFile(ocPath, []byte(`{"provider":{"x":{"models":{}}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(piPath, []byte(`{"providers":{"x":{"models":[{
+		"id":"qwen38","name":"Q","reasoning":true,"contextWindow":8192,"maxTokens":1024,
+		"thinkingLevelMap":{"minimal":"low","low":"low","medium":"medium",
+		                    "high":"xhigh","xhigh":"xhigh","max":"xhigh"}}]}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	vecchiaCfg, vecchioBackup := cfg(), BACKUP
+	BACKUP = filepath.Join(dir, "backup")
+	cfgMu.Lock()
+	CFG = Config{
+		Runtime: []RuntimeCfg{{Chiave: "x", ChiaveOC: "x", Nome: "X", Porta: 8000, Elenco: "/v1/models"}},
+		Clienti: []ClienteCfg{{Nome: "Pi", File: piPath, Formato: "pi"},
+			{Nome: "OpenCode", File: ocPath, Formato: "opencode"}},
+	}
+	cfgMu.Unlock()
+	t.Cleanup(func() {
+		BACKUP = vecchioBackup
+		cfgMu.Lock()
+		CFG = vecchiaCfg
+		cfgMu.Unlock()
+	})
+
+	modelli, _ := statoConfig()
+
+	// il giro attraverso il browser, senza scorciatoie
+	fuori, err := json.Marshal(modelli)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dentro []Modello
+	if err := json.Unmarshal(fuori, &dentro); err != nil {
+		t.Fatal(err)
+	}
+	for i := range dentro {
+		if dentro[i].ID == "qwen38" {
+			dentro[i].Nome = "Nome cambiato dall'utente"
+		}
+	}
+	if err := scriviConfig(dentro); err != nil {
+		t.Fatal(err)
+	}
+
+	b, _ := os.ReadFile(piPath)
+	var pi map[string]any
+	if err := json.Unmarshal(b, &pi); err != nil {
+		t.Fatal(err)
+	}
+	m := pi["providers"].(map[string]any)["x"].(map[string]any)["models"].([]any)[0].(map[string]any)
+	tlm, _ := m["thinkingLevelMap"].(map[string]any)
+	if tlm["high"] != "xhigh" {
+		t.Errorf("thinkingLevelMap[high] = %v, atteso xhigh.\n"+
+			"La mappa su misura è stata sostituita da quella generica: "+
+			"il modello riceverà \"high\" e risponderà 400.", tlm["high"])
+	}
+	if m["name"] != "Nome cambiato dall'utente" {
+		t.Errorf("il nome non è stato salvato: %v", m["name"])
+	}
+}

@@ -14,7 +14,7 @@ volta sola sul server.
 [![Swift](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white)](#-installazione)
 [![Dipendenze](https://img.shields.io/badge/dipendenze-1-brightgreen)](go.mod)
-[![Test](https://img.shields.io/badge/test-63-success)](#i-file)
+[![Test](https://img.shields.io/badge/test-65-success)](#i-file)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-blue)](LICENSE)
 
 [English](README.md) · **Italiano**
@@ -111,10 +111,16 @@ programmi dichiarati in configurazione, ognuno con la rotta e il corpo da usare.
 È il difetto del 16/08/2026 affrontato alla radice — un elenco scritto a mano
 nella pagina è un elenco che prima o poi non combacia col server.
 
-Il registro esiste anche per la voce nella barra dei menu, ma **oggi lo Swift non
-lo legge**: continua a citare due id a mano (`modello-grande-on` / `-off`), ed è
-`menubar_contratto_test.go` a tenerli allineati confrontando i sorgenti. Portare
-il menu sul registro è il passo che chiuderebbe il difetto per davvero.
+**Lo stesso registro lo legge la voce nella barra dei menu**, che costruisce le
+sue voci da `/api/comandi` ed esegue sulla rotta che ogni voce dichiara. Nello
+Swift non c'è nessun id e nessuna rotta: prima ce n'erano quattro, tenuti
+allineati al sorgente Go da un test statico. Tenere allineati due elenchi è
+meglio che non farlo, ma resta un elenco di troppo. Ora
+`menubar_contratto_test.go` verifica il contrario — che nello Swift non
+ricompaia nessun id — e che il registro venga chiesto davvero.
+
+Effetto collaterale utile: i regimi compaiono nel menu della barra, dove non
+c'erano mai stati, e le etichette sono quelle della configurazione.
 
 **Niente `confirm()`.** Le azioni distruttive si armano al primo clic e dicono
 cosa faranno — quali programmi fermano, quanta memoria liberano — e il secondo
@@ -420,7 +426,7 @@ rompendo la regola prima di scriverla:
 | `budget_test.go` | lo scenario del kernel panic del 27/07/2026 |
 | `stati_test.go` | stato, classe e registro dei comandi: una fonte sola |
 | `aiuto_test.go` | la taglia si legge dai parametri totali; i nomi sono distinti e non gergo |
-| `menubar_contratto_test.go` | barra dei menu e server dicono lo stesso numero e gli stessi id |
+| `menubar_contratto_test.go` | la barra dei menu non cabla id, legge il registro, e dice lo stesso numero del pannello |
 | `sicurezza_test.go` | localhost, Origin, token, solo POST |
 | `editor_test.go` `config_test.go` `modelli_test.go` `regimi_test.go` `misura_test.go` `server_test.go` | editor, configurazioni, disco, regimi, misure, rotte |
 

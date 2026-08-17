@@ -13,7 +13,7 @@ before it takes the machine down. Two axes per model, computed once on the serve
 [![Swift](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white)](#-install)
 [![Dependencies](https://img.shields.io/badge/dependencies-1-brightgreen)](go.mod)
-[![Tests](https://img.shields.io/badge/tests-63-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-65-success)](#-tests)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **English** · [Italiano](README.it.md)
@@ -176,7 +176,7 @@ NSWindow + WKWebView           127.0.0.1:7070, localhost only
 
 ## ✅ Tests
 
-63 tests. Each one was verified by breaking the rule before writing it: a test that
+65 tests. Each one was verified by breaking the rule before writing it: a test that
 does not tell correct code from broken code is not a test.
 
 | | |
@@ -184,7 +184,7 @@ does not tell correct code from broken code is not a test.
 | `budget_test.go` | the 27/07/2026 kernel panic scenario, without risking the machine |
 | `stati_test.go` | state, class and the command registry: one source |
 | `aiuto_test.go` | size read from total parameters; names distinct and jargon free |
-| `menubar_contratto_test.go` | menu bar and server report the same number and the same ids |
+| `menubar_contratto_test.go` | the menu bar hardcodes no id, reads the registry, and reports the same number as the panel |
 | `sicurezza_test.go` | localhost, Origin, token, POST only |
 
 ```bash
@@ -214,7 +214,10 @@ delegate method, so the panel claimed to be offline while the server answered 20
 
 **Two programs talking over HTTP have a contract, and an unverified contract rots.**
 The menu bar items silently did nothing for weeks: GET on a POST only route, ids that
-had been renamed, no token. Now a test reads the Swift source and checks the contract.
+had been renamed, no token. Keeping two hand written lists aligned with a test was
+better than not doing it, but it was still one list too many: the menu bar now builds
+its items from `/api/comandi` and executes on the route each item declares. No id and
+no route in the Swift at all, and the test verifies that none comes back.
 
 **`lms ps` costs 4 seconds** because it is Node and restarts every time. With a page
 refreshing every 5 seconds it kept the request permanently pending. A background worker

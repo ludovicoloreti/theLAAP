@@ -194,6 +194,23 @@ struct Memoria: Decodable {
 }
 struct Runtime: Decodable { let chiave: String, nome: String; let porta: Int; let attivo: Bool }
 
+/// Una voce del registro dei comandi, da /api/comandi.
+///
+/// Il menu non conosce nessun id: li chiede al server, che li ricava dalla
+/// configurazione. Prima erano scritti qui a mano, e il 16/08/2026 si e scoperto
+/// che tre non esistevano piu: le voci non facevano niente, in silenzio. Con una
+/// fonte sola quel difetto non si puo riprodurre.
+struct Comando: Decodable {
+    let id: String
+    let nome: String
+    let gruppo: String
+    let cosa: String?
+    let durata: String?
+    let rischio: Bool?
+    let rotta: String
+    let corpo: [String: String]?
+}
+
 func chiedi<T: Decodable>(_ percorso: String, _ tipo: T.Type, _ poi: @escaping (T?) -> Void) {
     guard let url = URL(string: BASE + percorso) else { return poi(nil) }
     var req = URLRequest(url: url)
@@ -415,64 +432,45 @@ final class Barra: NSObject, NSApplicationDelegate {
         avvisa("Riavvio \(chiave)", "Ci vuole qualche secondo.")
     }
 
-    /// Esegue un comando della whitelist del pannello.
-    ///
-    /// Per arrivare a destinazione servono TRE cose, e prima del 16/08/2026 questo
-    /// menu non ne aveva nessuna — le voci sembravano funzionare e non facevano nulla:
-    ///
-    ///  1. **POST**, non GET: da GET la rotta era raggiungibile con un
-    ///     `<img src="...?cmd=ferma-tutto">` da qualunque pagina web, quindi è stata
-    ///     chiusa (services.go, sicurezza_test.go). Una GET oggi risponde 405.
-    ///  2. **Origin** di questo stesso pannello, altrimenti la guardia risponde
-    ///     «richiesta non partita dal pannello» (sicurezza.go:105).
-    ///  3. **X-theLAAP-Token**, rigenerato a ogni avvio del server e mai scritto su
-    ///     disco: vive solo in memoria e viene iniettato nella pagina come
-    ///     `<meta name="thelaap-token">`. Lo si recupera con una GET su `/`, che la
-    ///     guardia lascia passare senza token.
-    func eseguiComando(_ cmd: String, timeout: Int = 300) {
+
+    /// Esegue una voce del registro, sulla rotta e col corpo che la voce dichiara.
+    /// Nessun id e nessuna rotta scritti qui: indovinarli e il difetto del
+    /// 16/08/2026, quando il menu mandava GET a una rotta che accetta solo POST.
+    func lancia(_ c: Comando, timeout: Int = 300) {
+        guard let dati = try? JSONSerialization.data(withJSONObject: c.corpo ?? [:]),
+              let json = String(data: dati, encoding: .utf8) else { return }
+        let corpo = json.replacingOccurrences(of: "'", with: "'\\''")
         let riga = """
         T=$(curl -s -m 10 '\(BASE)/' \
             | sed -n 's/.*name="thelaap-token" content="\\([a-f0-9]*\\)".*/\\1/p' | head -1); \
-        [ -n "$T" ] && curl -s -m \(timeout) -X POST '\(BASE)/api/esegui' \
+        [ -n "$T" ] && curl -s -m \(timeout) -X POST '\(BASE)\(c.rotta)' \
             -H 'Content-Type: application/json' \
             -H 'Origin: \(BASE)' \
             -H "X-theLAAP-Token: $T" \
-            -d '{"cmd":"\(cmd)"}' >/dev/null &
+            -d '\(corpo)' >/dev/null &
         """
         esegui(riga)
     }
 
-    @objc func modelloGrande(_ v: NSMenuItem) {
-        let quale = (v.representedObject as? String) ?? "modello-grande-on"
-        eseguiComando(quale, timeout: 900)
-        avvisa(quale == "modello-grande-on" ? "Attivo DeepSeek" : "Ripristino lo stack",
-               quale == "modello-grande-on" ? "Spengo gli altri e carico gli 81 GB: circa un minuto."
-                                            : "Riaccendo i programmi normali.")
-    }
-
-    @objc func aggiornamenti() {
-        eseguiComando("aggiornamenti")   // era "aiupdate": id inesistente
-        avvisa("Cerco aggiornamenti", "Apri il pannello per vedere il risultato.")
-    }
-
-    /// Freno d'emergenza: spegne i programmi e libera la memoria subito.
-    @objc func fermaTutto() {
-        let a = NSAlert()
-        a.messageText = "Fermare tutto?"
-        a.informativeText = "Spengo i programmi che tengono i modelli in memoria. "
-                          + "Smetteranno di rispondere finché non riaccendi."
-        a.addButton(withTitle: "Ferma tutto")
-        a.addButton(withTitle: "Annulla")
-        a.alertStyle = .warning
-        NSApp.activate(ignoringOtherApps: true)
-        guard a.runModal() == .alertFirstButtonReturn else { return }
-        eseguiComando("ferma-tutto")   // era "stoppa-tutto": id inesistente, non faceva nulla
-        avvisa("Sto fermando tutto", "Fra qualche secondo la memoria è libera.")
-    }
-
-    @objc func riaccendiTutto() {
-        eseguiComando("riaccendi-tutto")
-        avvisa("Riaccendo i programmi", "I modelli si ricaricano alla prima domanda.")
+    /// Un comando del registro cliccato dal menu. Quelli marcati a rischio
+    /// chiedono conferma: da qui si spengono programmi che stanno servendo.
+    @objc func comandoDelRegistro(_ v: NSMenuItem) {
+        guard let c = v.representedObject as? Comando else { return }
+        if c.rischio == true {
+            let a = NSAlert()
+            a.messageText = "\(c.nome)?"
+            a.informativeText = c.cosa ?? "Questo comando cambia lo stato della macchina."
+            a.addButton(withTitle: c.nome)
+            a.addButton(withTitle: "Annulla")
+            a.alertStyle = .warning
+            NSApp.activate(ignoringOtherApps: true)
+            guard a.runModal() == .alertFirstButtonReturn else { return }
+        }
+        // I comandi lunghi non vanno troncati a meta: la durata la dichiara la
+        // configurazione, e "minuti" non sta in trecento secondi.
+        let lungo = (c.durata ?? "").lowercased().contains("minut")
+        lancia(c, timeout: lungo ? 900 : 300)
+        avvisa(c.nome, c.cosa ?? "Apri il pannello per vedere il risultato.")
     }
 
     @objc func esci() { NSApp.terminate(nil) }
@@ -526,9 +524,11 @@ extension Barra: NSMenuDelegate {
         let gruppo = DispatchGroup()
         var mem: Memoria?
         var rts: [Runtime] = []
+        var cmds: [Comando] = []
 
         gruppo.enter(); chiedi("/api/memoria", Memoria.self) { mem = $0; gruppo.leave() }
         gruppo.enter(); chiedi("/api/runtime", [Runtime].self) { rts = $0 ?? []; gruppo.leave() }
+        gruppo.enter(); chiedi("/api/comandi", [Comando].self) { cmds = $0 ?? []; gruppo.leave() }
 
         gruppo.notify(queue: .main) {
             m.removeAllItems()
@@ -565,24 +565,26 @@ extension Barra: NSMenuDelegate {
                 m.addItem(v)
             }
 
-            m.addItem(.separator())
-            let on = NSMenuItem(title: "Attiva DeepSeek (il modello grande)",
-                                action: #selector(self.modelloGrande(_:)), keyEquivalent: "")
-            on.target = self; on.representedObject = "modello-grande-on"
-            on.toolTip = "Spegne gli altri programmi e carica gli 81 GB di DeepSeek V4 Flash."
-            m.addItem(on)
-            let off = NSMenuItem(title: "Disattiva DeepSeek",
-                                 action: #selector(self.modelloGrande(_:)), keyEquivalent: "")
-            off.target = self; off.representedObject = "modello-grande-off"
-            m.addItem(off)
-            m.addItem(self.voce("Cerca aggiornamenti", #selector(self.aggiornamenti)))
-
-            m.addItem(.separator())
-            let stop = self.voce("■ Ferma tutto e libera la memoria", #selector(self.fermaTutto))
-            stop.toolTip = "Spegne i programmi che tengono i modelli in RAM."
-            m.addItem(stop)
-            if usati > 0 || rts.contains(where: { !$0.attivo }) {
-                m.addItem(self.voce("▶ Riaccendi tutto", #selector(self.riaccendiTutto)))
+            // I comandi vengono dal registro, nell'ordine in cui il server li da:
+            // regimi e strumenti prima, i due di macchina in fondo, dove stavano.
+            // Nessun id e nessuna etichetta scritti qui.
+            for (titolo, gruppi) in [("", ["regime", "maintenance"]), ("", ["machine"])] {
+                let voci = cmds.filter { gruppi.contains($0.gruppo) }
+                if voci.isEmpty { continue }
+                m.addItem(.separator())
+                if !titolo.isEmpty { m.addItem(self.voceInerte(titolo)) }
+                for c in voci {
+                    let v = NSMenuItem(title: c.nome, action: #selector(self.comandoDelRegistro(_:)),
+                                       keyEquivalent: "")
+                    v.target = self
+                    v.representedObject = c
+                    v.toolTip = [c.cosa, c.durata].compactMap { $0 }.joined(separator: " · ")
+                    m.addItem(v)
+                }
+            }
+            if cmds.isEmpty {
+                m.addItem(.separator())
+                m.addItem(self.voceInerte("Nessun comando in configurazione"))
             }
 
             m.addItem(.separator())
