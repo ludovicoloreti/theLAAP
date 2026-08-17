@@ -441,6 +441,14 @@ remoto:{tipo:'cl',en:"Runs on a provider server. No unified memory used, and no 
 const TOKEN = (document.querySelector('meta[name="thelaap-token"]')||{}).content || '';
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const gb = v => (Number(v)||0).toFixed(1).replace('.', IT()?',':'.');
+/* Un argomento dentro un attributo onclick.
+   JSON.stringify emette virgolette DOPPIE, che chiudono l'attributo: il
+   gestore diventa spazzatura e l'elemento non risponde al clic. Succedeva su
+   dieci elementi, fra cui ogni riga della tabella dei modelli. Qui la stringa
+   esce fra apici singoli, sfuggita prima per JavaScript e poi per l'HTML. */
+const arg = v => "'" + String(v ?? '')
+  .replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n')
+  .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + "'";
 const $ = id => document.getElementById(id);
 function conToken(o){
   o = o || {};
@@ -977,7 +985,10 @@ const ico = k => '<svg class="ico" viewBox="0 0 24 24">'+ICO[k]+'</svg>';
 
 function vai(s, filtro){ S.schermo=s; if(filtro) S.filtro=filtro; S.armato=''; disegnaTutto(); }
 function vaiTab(t){ S.tab=t; disegnaInsp(); }
-function scegli(id){ S.sel=id; S.tab='modello'; S.esitoProva=''; S.avvisoProva=''; disegnaInsp(); }
+/* disegnaCentro serve: la riga evidenziata sta nella tabella, non
+   nell'ispettore. Senza, il segno della selezione arrivava col giro di
+   aggiornamento dopo, e il clic sembrava non aver fatto niente. */
+function scegli(id){ S.sel=id; S.tab='modello'; S.esitoProva=''; S.avvisoProva=''; disegnaCentro(); disegnaInsp(); }
 
 function disegnaTutto(){ disegnaTestata(); disegnaLato(); disegnaCentro(); disegnaInsp(); disegnaPiede(); }
 
@@ -997,7 +1008,7 @@ function disegnaLato(){
     ? ['spento','guasto','in-arrivo'].includes(statoDi(m)) : classeDi(m)===k).length;
   const p = S.modelli.find(m=>m.pronto);
   let h = '<div class="k gruppo">'+esc(T().readyNow)+'</div>';
-  h += p ? '<button id="pronto-card" onclick="scegli('+JSON.stringify(p.id)+')">'
+  h += p ? '<button id="pronto-card" onclick="scegli('+arg(p.id)+')">'
       +'<span style="display:flex;align-items:center;gap:7px;min-width:0"><span class="dot vivo" style="background:var(--ok)"></span>'
       +'<span class="t">'+esc(titoloDi(p))+'</span></span>'
       +'<span class="i">'+esc(cortoDi(p))+'</span>'
@@ -1123,7 +1134,7 @@ function vistaMemoria(){
       +'<span class="mono" style="font-size:11px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
       +gb(g)+' GB'+(dentro?' · '+esc(dentro):'')+'</span><div class="sp"></div>'
       +(cap.scaricaSingoloModello?'':'<span style="font-size:11.5px;color:var(--warn-ink);text-align:right;max-width:32ch">'+esc(cap.nota||T().capAll)+'</span>')
-      +'<button class="b2 sm" onclick="esegui(\'libera\',{daFermare:['+JSON.stringify(p.chiave)+']})">'
+      +'<button class="b2 sm" onclick="esegui(\'libera\',{daFermare:['+arg(p.chiave)+']})">'
       +esc(cap.scaricaSingoloModello?T().freeRAM:(IT()?'Ferma ':'Stop ')+p.nome)+'</button></div>';
   });
   h += '</div>';
@@ -1213,7 +1224,7 @@ function vistaModelli(){
         const sotto = S.modo==='esperto'
           ? m.id+' · '+(m.runtime||'')+' · '+Math.round((m.context||0)/1024)+'k'
           : (dl ? gb(dl.gb)+' GB' : (m.runtime||''));
-        return '<div class="mriga'+(m.id===S.sel?' on':'')+'" onclick="scegli('+JSON.stringify(m.id)+')">'
+        return '<div class="mriga'+(m.id===S.sel?' on':'')+'" onclick="scegli('+arg(m.id)+')">'
           +'<button class="pill '+pillStato(st)+' chiedi" onclick="event.stopPropagation();spiega(\''+st+'\')">'+esc(T().st[st])+'</button>'
           +'<span style="min-width:0"><span class="t" style="font-weight:500;color:var(--strong);display:block">'+esc(titoloDi(m))+'</span>'
           +'<span class="i">'+esc(sotto)+'</span></span>'
@@ -1442,7 +1453,7 @@ function inspModello(){
      il riquadro c'è sempre, e se è vuoto dice come riempirlo. */
   if(!remoto) h += '<div class="desc"><div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'
     +'<span class="k" style="flex:1">'+esc(T().describedBy)+'</span>'
-    +'<button class="b3 sm" style="min-height:24px;padding:0 8px;font-size:11px" onclick="ridescrivi('+JSON.stringify(m.id)+')"'
+    +'<button class="b3 sm" style="min-height:24px;padding:0 8px;font-size:11px" onclick="ridescrivi('+arg(m.id)+')"'
     +(S.descrivendo?' disabled':'')+'>'+(S.descrivendo===m.id?'<span class="carica"></span>':'↻')+'</button></div>'
     +'<p>'+(m.note?esc(m.note):'<span style="color:var(--muted)">'+esc(IT()?'Ancora nessuna: premi ↻ e la scrive il modellino.'
        :'None yet: press ↻ and the small model writes it.')+'</span>')+'</p></div>';
@@ -1460,13 +1471,13 @@ function inspModello(){
     +'<button class="b2 sm" onclick="salvaChiave(\''+esc(m.runtime)+'\')">'+esc(T().keySave)+'</button></div>'
     +'<div style="font-size:11.5px;color:var(--muted);line-height:1.45">'+esc(T().keyNote)+'</div></div>';
   h += '<div class="azioni">'
-    +'<button class="b1" onclick="esegui(\'pronto\',{id:'+JSON.stringify(m.id)+'})"'+(st==='pronto'?' disabled':'')+'>'
+    +'<button class="b1" onclick="esegui(\'pronto\',{id:'+arg(m.id)+'})"'+(st==='pronto'?' disabled':'')+'>'
       +esc(st==='pronto'?T().isReady:T().makeReady)+'</button>'
-    +'<div class="due"><button class="b2 sm" onclick="prova('+JSON.stringify(m.id)+')"'+(S.provando?' disabled':'')+'>'
+    +'<div class="due"><button class="b2 sm" onclick="prova('+arg(m.id)+')"'+(S.provando?' disabled':'')+'>'
       +(S.provando===m.id?'<span class="carica"></span> ':'')+esc(T().testTime)+'</button>'
-    +'<button class="b2 sm" onclick="esegui(\'libera\',{daFermare:'+JSON.stringify(daFermare(m))+'})">'+esc(T().freeRAM)+'</button></div>'
+    +'<button class="b2 sm" onclick="esegui(\'libera\',{daFermare:['+daFermare(m).map(arg).join(',')+']})">'+esc(T().freeRAM)+'</button></div>'
     +'<div class="due"><button class="b3 sm" onclick="apriNomi()">'+esc(T().namesClients)+'</button>'
-    +'<button class="'+(S.armato==='arch:'+m.id?'bx':'b3 bxq')+' sm" onclick="archivia('+JSON.stringify(m.id)+')">'
+    +'<button class="'+(S.armato==='arch:'+m.id?'bx':'b3 bxq')+' sm" onclick="archivia('+arg(m.id)+')">'
     +esc(S.armato==='arch:'+m.id?T().pressAgain:T().archiveBtn)+'</button></div></div>';
   if(S.nomiAperti===m.id) h += formNomi(m);
   return h;
@@ -1478,7 +1489,7 @@ function formNomi(m){
     +campo(T().serverId, 'idm', m.id, T().idWarn)
     +'<label style="display:flex;gap:8px;align-items:center;font-size:12.5px"><input type="checkbox" id="cpi" '+(m.inPi?'checked':'')+' style="width:auto;min-height:0"> '+esc(T().inPi)+'</label>'
     +'<label style="display:flex;gap:8px;align-items:center;font-size:12.5px"><input type="checkbox" id="coc" '+(m.inOC?'checked':'')+' style="width:auto;min-height:0"> '+esc(T().inOC)+'</label>'
-    +'<button class="b1 sm" onclick="applicaNomi('+JSON.stringify(m.id)+')">'+esc(T().saveChanges)+'</button></div>';
+    +'<button class="b1 sm" onclick="applicaNomi('+arg(m.id)+')">'+esc(T().saveChanges)+'</button></div>';
 }
 const campo = (etichetta,id,valore,aiuto) => '<label style="display:flex;flex-direction:column;gap:4px">'
   +'<span class="k">'+esc(etichetta)+'</span><input id="'+id+'" type="text" value="'+esc(valore)+'">'
@@ -1544,7 +1555,7 @@ function inspAiuto(){
     : '<div class="msg md">'+esc(IT()?'Vedo cosa sta facendo il Mac adesso. Chiedi cosa c\'è in memoria, perché un modello non parte, o cosa fa un comando.'
         :'I can see what the Mac is doing right now. Ask what is in memory, why a model will not start, or what a command does.')+'</div>';
   h += '<div class="sp"></div><div style="display:flex;gap:6px;flex-wrap:wrap">'
-    +sugg.map(q=>'<button class="b3 sm" style="border:1px solid var(--line);font-size:10.5px" onclick="chiedi('+JSON.stringify(q)+')">'
+    +sugg.map(q=>'<button class="b3 sm" style="border:1px solid var(--line);font-size:10.5px" onclick="chiedi('+arg(q)+')">'
       +esc(q.length>34?q.slice(0,32)+'…':q)+'</button>').join('')+'</div>'
     +'<div style="display:flex;gap:8px"><input id="domanda" type="text" placeholder="'+esc(T().askPh)+'" '
     +'onkeydown="if(event.key===\'Enter\'){chiedi(this.value);this.value=\'\'}">'
