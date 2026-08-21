@@ -17,6 +17,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 QUI="$(pwd)"
 PORTA=7070
+BUNDLE_ID="${THELAAP_BUNDLE_ID:-app.thelaap.panel}"
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:$PATH
 
 echo "> building the panel (Go)"
@@ -38,7 +39,10 @@ fi
 DEST="$QUI"
 case "${1:-}" in
   --install) DEST="/Applications" ;;
-  --desktop) DEST="$HOME/Desktop" ;;
+  --desktop)
+    DEST="$(osascript -e 'POSIX path of (path to desktop folder)' 2>/dev/null)"
+    DEST="${DEST%/}"
+    ;;
 esac
 APP="$DEST/theLAAP.app"
 
@@ -59,7 +63,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 	     the middle of a menu written in italian. -->
 	<key>CFBundleDevelopmentRegion</key><string>it</string>
 	<key>CFBundleLocalizations</key><array><string>it</string><string>en</string></array>
-	<key>CFBundleIdentifier</key><string>com.lloreti.thelaap</string>
+	<key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
 	<key>CFBundleVersion</key><string>1.0</string>
 	<key>CFBundleShortVersionString</key><string>1.0</string>
 	<key>CFBundlePackageType</key><string>APPL</string>

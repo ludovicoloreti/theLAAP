@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ludovicoloreti/theLAAP/internal/budget"
+	"thelaap/internal/budget"
 )
 
 // La classe non è un'opinione: viene dalla soglia, e la soglia dalla macchina.

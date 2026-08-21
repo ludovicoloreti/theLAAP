@@ -270,8 +270,9 @@ final class Barra: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         // Se è già in esecuzione, un secondo avvio non deve sembrare "non è successo
         // niente": apre il pannello e si chiude, lasciando il primo al suo posto.
-        let mie = NSRunningApplication.runningApplications(
-            withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.lloreti.thelaap")
+        let mie = Bundle.main.bundleIdentifier.map {
+            NSRunningApplication.runningApplications(withBundleIdentifier: $0)
+        } ?? []
         if mie.count > 1 {
             apriPannello()
             NSApp.terminate(nil)
@@ -385,12 +386,6 @@ final class Barra: NSObject, NSApplicationDelegate {
             if URLSession.pingaSincrono(BASE + "/api/runtime") { serverVivo = true; return }
             Thread.sleep(forTimeInterval: 0.25)
         }
-    }
-
-    /// Alla chiusura porta via anche il server: non ha senso lasciarlo acceso
-    /// se la voce nella barra non c'è più.
-    func applicationWillTerminate(_ n: Notification) {
-        esegui("launchctl remove com.lloreti.thelaap.server 2>/dev/null")
     }
 
     @objc func apriPannello() {

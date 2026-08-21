@@ -389,16 +389,6 @@ func apiSetup(w http.ResponseWriter, r *http.Request) {
 // e restano solo le voci che il pannello sa fare da sé.
 func detectedTools() []ToolCfg {
 	var out []ToolCfg
-	base := ""
-	for _, d := range []string{"~/Desktop/AI/localstack", "~/AI/localstack", "~/localstack"} {
-		if st, err := os.Stat(espandi(d)); err == nil && st.IsDir() {
-			base = espandi(d)
-			break
-		}
-	}
-	if base == "" {
-		return out
-	}
 	py := "python3"
 	if p, err := exec_LookPath("python3"); err == nil {
 		py = p
@@ -419,8 +409,8 @@ func detectedTools() []ToolCfg {
 			"Aggiorna i programmi e li riavvia. I modelli non li tocca.", true},
 	}
 	for _, n := range noti {
-		f := filepath.Join(base, n.file)
-		if _, err := os.Stat(f); err != nil {
+		f := detectedToolPath(n.file)
+		if f == "" {
 			continue
 		}
 		cmd := py + " " + f
@@ -436,19 +426,35 @@ func detectedTools() []ToolCfg {
 	// Script liberi accanto agli altri. Dal 16/08/2026 il modello grande è
 	// DeepSeek V4 Flash su ds4.sh; laguna.sh resta come ripiego finché esiste,
 	// così un'installazione non ancora migrata continua a funzionare.
-	grande := filepath.Join(base, "ds4.sh")
-	if !binaryExists(grande) {
-		grande = filepath.Join(base, "laguna.sh")
+	grande := detectedToolPath("ds4.sh")
+	if grande == "" {
+		grande = detectedToolPath("laguna.sh")
 	}
-	if f := grande; binaryExists(f) {
+	if grande != "" {
 		out = append(out,
 			ToolCfg{ID: "modello-grande-on", Nome: "Attiva il modello grande", Durata: "un minuto",
 				Cosa:    "Spegne gli altri programmi e carica il modello che vuole la macchina libera.",
-				Command: f + " on"},
+				Command: grande + " on"},
 			ToolCfg{ID: "modello-grande-off", Nome: "Disattiva il modello grande", Durata: "pochi secondi",
-				Cosa: "Rimette in piedi i programmi normali.", Command: f + " off"})
+				Cosa: "Rimette in piedi i programmi normali.", Command: grande + " off"})
 	}
 	return out
+}
+
+// detectedToolPath non presume dove sia la cartella di sviluppo di chi usa il
+// pannello. Gli script si trovano nel PATH oppure in una directory indicata
+// esplicitamente; nessun percorso personale finisce nel sorgente pubblico.
+func detectedToolPath(nome string) string {
+	if dir := strings.TrimSpace(os.Getenv("THELAAP_TOOLS_DIR")); dir != "" {
+		f := filepath.Join(espandi(dir), nome)
+		if st, err := os.Stat(f); err == nil && !st.IsDir() {
+			return f
+		}
+	}
+	if p, err := exec_LookPath(nome); err == nil {
+		return p
+	}
+	return ""
 }
 
 // modernizeLaunchdCommands sostituisce load/unload con bootout/bootstrap

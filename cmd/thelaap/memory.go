@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ludovicoloreti/theLAAP/internal/budget"
+	"thelaap/internal/budget"
 )
 
 // MemState — fotografia della memoria unificata e di chi la sta occupando.

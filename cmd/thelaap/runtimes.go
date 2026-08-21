@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ludovicoloreti/theLAAP/internal/budget"
+	"thelaap/internal/budget"
 )
 
 // Cosa sa fare davvero ogni programma, verificato uno per uno:

@@ -1,4 +1,4 @@
-module github.com/ludovicoloreti/theLAAP
+module thelaap
 
 go 1.26.1
 
