@@ -30,7 +30,7 @@ Si apre all'indirizzo 127.0.0.1:7070 e parte da solo all'accensione del Mac. Fun
 		Chiavi: []string{"barra", "memoria", "ram", "vram", "gb", "occupata", "libera", "alto", "colori"},
 		Testo: `La barra colorata in cima rappresenta tutta la memoria del Mac (circa 128 GB, condivisa fra processore e scheda grafica: su questi Mac la RAM e la VRAM sono la stessa cosa).
 Ogni blocco colorato è un modello che in questo momento è caricato in memoria; passandoci sopra col mouse compare il nome e quanti GB occupa. Lo spazio grigio a destra è quello ancora libero.
-I modelli si caricano da soli alla prima domanda e restano in memoria per 10 minuti; poi si liberano. Non c'è niente da fare a mano.`,
+I modelli si caricano alla prima domanda e possono restare in memoria. Per toglierne uno senza cancellarlo: apri "Modelli", clicca la sua riga e premi "Disattiva modello".`,
 	},
 	{
 		Titolo: "Cosa vuol dire che un modello ragiona",
@@ -58,19 +58,19 @@ Alla fine dice quante parole al secondo produce e se ragiona prima di rispondere
 		Chiavi: []string{"aggiungere", "nuovo", "scaricare", "huggingface", "hf", "cercare", "installare", "download"},
 		Testo: `Nella sezione "Aggiungi un modello" si cerca su HuggingFace scrivendo cosa serve, per esempio "qwen coder" oppure "gemma".
 Vengono mostrati solo i modelli in formato MLX, l'unico che i programmi di questo Mac sanno eseguire, e vengono messi per primi quelli a 8 bit, che sono la qualità scelta per questa macchina.
-Premendo Scarica il download parte in sottofondo e si può continuare a usare il Mac. Quando finisce bisogna riavviare oMLX dalla sezione Sistema, perché è al riavvio che rilegge la cartella dei modelli; dopo di che il modello compare nella lista in alto.`,
+Premendo Scarica il download parte in sottofondo e si può continuare a usare il Mac. Quando finisce, se serve, riavvia oMLX da "Altro" > "Programmi", perché è al riavvio che rilegge la cartella dei modelli; dopo di che il modello compare in "Modelli".`,
 	},
 	{
-		Titolo: "Cosa sono i programmi nella sezione Sistema",
+		Titolo: "Cosa sono i programmi",
 		Chiavi: []string{"sistema", "programmi", "servizi", "runtime", "mtplx", "omlx", "lm studio", "ollama", "spento", "acceso"},
 		Testo: `I modelli non girano da soli: ognuno viene eseguito da un programma di servizio.
 MTPLX esegue il modello per il codice ed è il più veloce perché indovina più parole insieme. oMLX esegue i modelli grandi e quelli senza filtri, e tiene in memoria i pezzi delle conversazioni lunghe così non deve rileggerle ogni volta. LM Studio esegue i modelli di chat. Ollama ormai serve solo alla ricerca dentro i documenti.
-Partono tutti da soli quando accendi il Mac. Se un modello non risponde, quasi sempre è perché il suo programma è spento: si riaccende da qui.`,
+Lo stato e i comandi di questi programmi sono in "Altro" > "Programmi". Se un modello non risponde, controlla lì se il suo programma è spento e usa il pulsante mostrato sulla stessa riga.`,
 	},
 	{
 		Titolo: "Se qualcosa non funziona",
 		Chiavi: []string{"non funziona", "problema", "errore", "rotto", "lento", "aiuto", "comando", "risolvere", "507"},
-		Testo: `Prima cosa: "Controlla tutto" nella sezione Sistema. Fa una verifica completa e dice cosa non va.
+		Testo: `Prima cosa: apri "Controlla" e premi "Avvia controllo". Fa una verifica completa e dice cosa non va.
 Se un modello non risponde, guarda se il suo programma è acceso e riavvialo.
 Se compare l'errore 507 vuol dire che il modello è troppo grande per lo spazio rimasto: succede quando ci sono altri modelli in memoria, e si risolve con "Attiva il modello grande", che libera il Mac prima di caricarlo.
 Se tutto è diventato lento, guarda la barra in alto: se è quasi piena, spegni un programma o aspetta che i modelli si liberino da soli.`,
@@ -94,7 +94,7 @@ Prima di ogni salvataggio viene fatta una copia di sicurezza, e se qualcosa non 
 		Titolo: "L'etichetta «non disponibile»",
 		Chiavi: []string{"non disponibile", "disponibile", "grigio", "rosso", "manca", "sparito", "fantasma"},
 		Testo: `Vuol dire che quel modello è scritto nella tua lista, ma in questo momento nessun programma lo sta offrendo.
-Le cause sono due. O il programma che dovrebbe eseguirlo è spento: guarda nella sezione Sistema se è acceso, e riavvialo.
+Le cause sono due. O il programma che dovrebbe eseguirlo è spento: apri "Altro" > "Programmi" e controlla la sua riga.
 Oppure il file del modello non c'è più sul disco — succede se è stato cancellato, o se è stato scaricato ma il programma non è stato riavviato dopo: è al riavvio che rilegge la cartella.
 Finché è così, sceglierlo in Pi o OpenCode dà errore. Puoi toglierlo dalla lista senza cancellare niente dal disco.`,
 	},
@@ -103,7 +103,7 @@ Finché è così, sceglierlo in Pi o OpenCode dà errore. Puoi toglierlo dalla l
 		Chiavi: []string{"sempre in memoria", "residente", "sempre attivo", "non si scarica", "occupa sempre"},
 		Testo: `Il programma MTPLX funziona diversamente dagli altri: carica il suo modello all'accensione e lo tiene lì, sempre.
 Non è un difetto ed è voluto: quel programma indovina più parole insieme per andare più veloce, e per farlo deve tenere pronte delle parti in più del modello. Se lo scaricasse a ogni pausa perderebbe il suo vantaggio.
-Conseguenza pratica: finché MTPLX è acceso, quei GB restano occupati anche se non lo stai usando. Per liberarli devi spegnere il programma, dalla sezione Sistema o con «Ferma tutto».`,
+Conseguenza pratica: finché MTPLX è acceso, quei GB restano occupati anche se non lo stai usando. Per liberarli apri "Altro" > "Programmi" e spegni MTPLX, oppure usa "Ferma tutto" in "Memoria unificata".`,
 	},
 	{
 		Titolo: "L'etichetta «velocità sconosciuta»",
@@ -124,7 +124,7 @@ Passando il mouse sopra ognuna c'è scritto anche da quale parte del nome è sta
 		Chiavi: []string{"ferma tutto", "panic", "emergenza", "blocca", "libera memoria", "riaccendi"},
 		Testo: `Il pulsante rosso in alto spegne di colpo tutti i programmi che tengono i modelli in memoria: LM Studio, oMLX, MTPLX, e scarica quelli di Ollama.
 Serve quando il Mac è impantanato e serve memoria subito, senza aspettare che i modelli si liberino da soli.
-I modelli smettono di rispondere finché non premi «Riaccendi tutto», nella sezione Sistema. Non viene cancellato niente: si ricaricano alla prima domanda.`,
+I modelli smettono di rispondere finché non riavvii i programmi da "Altro" > "Programmi". Non viene cancellato niente: i modelli si ricaricano alla prima domanda.`,
 	},
 	{
 		Titolo: "I modelli che non vedi nel pannello",
@@ -218,6 +218,17 @@ func liveState() string {
 			}
 		}
 	}
+	b.WriteString(`
+
+AZIONI REALI DEL PANNELLO:
+- Per togliere dalla RAM un modello caricato senza cancellarlo: "Modelli" > clic sulla sua riga > "Disattiva modello".
+- Per caricare un modello spento: "Modelli" > clic sulla sua riga > "Attiva".
+- Per accendere, spegnere o riavviare un programma: "Altro" > "Programmi" > pulsante sulla riga del programma.
+- Per vedere e liberare tutta la memoria dei modelli: "Altro" > "Memoria unificata".
+- Per eseguire la verifica generale: "Controlla" > "Avvia controllo".
+- "Disattiva modello" non cancella file e non cambia Pi o OpenCode. "Archivia" sposta invece i file fuori dalle cartelle attive.
+- Non esiste una sezione chiamata "Sistema".
+`)
 	return b.String()
 }
 

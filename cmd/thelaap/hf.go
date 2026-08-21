@@ -21,7 +21,10 @@ type Found struct {
 	ID          string  `json:"id"`
 	GB          float64 `json:"gb"`
 	Downloads   int     `json:"downloads"`
+	Likes       int     `json:"likes"`
+	Tendenza    float64 `json:"tendenza"`
 	Aggiornato  string  `json:"aggiornato"`
+	Creato      string  `json:"creato"`
 	Formato     string  `json:"formato"` // MLX 8-bit, MLX 6-bit, GGUF…
 	GiaPresente bool    `json:"giaPresente"`
 	Consigliato bool    `json:"consigliato"`
@@ -54,23 +57,55 @@ func cached(id string) bool {
 	return err == nil
 }
 
+func hfSearchTerms(q string) string {
+	q = strings.TrimSpace(q)
+	if !strings.Contains(strings.ToLower(q), "mlx") {
+		q += " MLX"
+	}
+	return q
+}
+
+// hfSortField accetta soltanto i quattro ordinamenti mostrati dalla pagina.
+// Il valore finisce nella query verso HuggingFace: lasciarlo libero renderebbe
+// il pulsante Cerca dipendente da parametri arbitrari e da errori poco chiari.
+func hfSortField(v string) string {
+	switch v {
+	case "downloads", "likes", "lastModified", "trendingScore":
+		return v
+	default:
+		return "trendingScore"
+	}
+}
+
 func apiHFSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q == "" {
 		errJSON(w, "scrivi cosa cerchi")
 		return
 	}
-	u := "https://huggingface.co/api/models?search=" + url.QueryEscape(q) +
-		"&limit=60&sort=downloads&direction=-1"
+	// La pagina propone solo modelli MLX, quindi va chiesto MLX già a
+	// HuggingFace. Cercare soltanto "qwen" restituiva in testa sessanta GGUF;
+	// li scartavamo tutti e la pagina rimaneva vuota, facendo sembrare rotto il
+	// pulsante Cerca. "gemma" funzionava solo per caso perché alcuni MLX erano
+	// abbastanza popolari da entrare nei primi risultati generici.
+	qHF := hfSearchTerms(q)
+	ordine := hfSortField(r.URL.Query().Get("sort"))
+	u := "https://huggingface.co/api/models?search=" + url.QueryEscape(qHF) +
+		"&limit=60&sort=" + url.QueryEscape(ordine) + "&direction=-1" +
+		"&expand%5B%5D=downloads&expand%5B%5D=likes" +
+		"&expand%5B%5D=trendingScore&expand%5B%5D=lastModified&expand%5B%5D=createdAt"
 	b := httpGet(u, 25*time.Second)
 	if b == nil {
 		errJSON(w, "HuggingFace non raggiungibile")
 		return
 	}
 	var grezzi []struct {
-		ID           string `json:"id"`
-		Downloads    int    `json:"downloads"`
-		LastModified string `json:"lastModified"`
+		ID           string  `json:"id"`
+		Downloads    int     `json:"downloads"`
+		Likes        int     `json:"likes"`
+		Trending     float64 `json:"trendingScore"`
+		LastModified string  `json:"lastModified"`
+		CreatedAt    string  `json:"createdAt"`
 	}
 	if err := json.Unmarshal(b, &grezzi); err != nil {
 		errJSON(w, "risposta di HuggingFace non leggibile")
@@ -88,15 +123,14 @@ func apiHFSearch(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		wg.Add(1)
-		go func(id string, dl int, mod, f, nota string) {
+		go func(id string, dl, likes int, trend float64, mod, creato, f, nota string) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			t := Found{ID: id, Downloads: dl, Formato: f, Nota: nota,
+			t := Found{ID: id, Downloads: dl, Likes: likes, Tendenza: trend, Formato: f, Nota: nota,
 				GiaPresente: cached(id), Consigliato: f == "MLX 8-bit"}
-			if len(mod) >= 10 {
-				t.Aggiornato = mod[:10]
-			}
+			t.Aggiornato = mod
+			t.Creato = creato
 			// Il dettaglio serve per la dimensione, ma soprattutto dice se il
 			// repo è davvero raggiungibile: quelli chiusi o rimossi rispondono
 			// 401/404 e httpGet torna nil. Proporne uno significa far partire
@@ -125,22 +159,31 @@ func apiHFSearch(w http.ResponseWriter, r *http.Request) {
 			mu.Lock()
 			out = append(out, t)
 			mu.Unlock()
-		}(g.ID, g.Downloads, g.LastModified, fmt_, nota)
+		}(g.ID, g.Downloads, g.Likes, g.Trending, g.LastModified, g.CreatedAt, fmt_, nota)
 	}
 	wg.Wait()
 
-	// prima i consigliati, poi per download
+	// Le goroutine finiscono in ordine casuale. Rimettiamo lo stesso ordine
+	// richiesto a HuggingFace; la pagina potrà poi applicare filtri combinati
+	// senza far saltare le righe a ogni ridisegno.
 	for i := 0; i < len(out); i++ {
 		for j := i + 1; j < len(out); j++ {
 			a, b := out[i], out[j]
-			if (b.Consigliato && !a.Consigliato) ||
-				(b.Consigliato == a.Consigliato && b.Downloads > a.Downloads) {
+			var prima bool
+			switch ordine {
+			case "likes":
+				prima = b.Likes > a.Likes
+			case "lastModified":
+				prima = b.Aggiornato > a.Aggiornato
+			case "downloads":
+				prima = b.Downloads > a.Downloads
+			default:
+				prima = b.Tendenza > a.Tendenza
+			}
+			if prima {
 				out[i], out[j] = out[j], out[i]
 			}
 		}
-	}
-	if len(out) > 25 {
-		out = out[:25]
 	}
 	writeJSON(w, out)
 }

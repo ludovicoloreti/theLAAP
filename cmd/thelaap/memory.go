@@ -51,6 +51,38 @@ type ModelInRAM struct {
 	Stato   string  `json:"stato"`
 }
 
+// loadedModelsStatus legge l'endpoint strutturato dei runtime che lo
+// espongono (oMLX). /health dice soltanto "loaded_count: 1"; qui invece c'e'
+// l'id preciso, quindi il pannello puo' colorare il modello giusto come attivo
+// anche dopo un proprio riavvio.
+func loadedModelsStatus(b []byte, runtime string) ([]ModelInRAM, float64) {
+	var s struct {
+		FinalCeiling float64 `json:"final_ceiling"`
+		Models       []struct {
+			ID            string  `json:"id"`
+			Loaded        bool    `json:"loaded"`
+			ActualSize    float64 `json:"actual_size"`
+			EstimatedSize float64 `json:"estimated_size"`
+			EngineType    string  `json:"engine_type"`
+		} `json:"models"`
+	}
+	if json.Unmarshal(b, &s) != nil {
+		return nil, 0
+	}
+	out := []ModelInRAM{}
+	for _, x := range s.Models {
+		if !x.Loaded || x.ID == "" || x.EngineType == "markitdown" {
+			continue
+		}
+		peso := x.ActualSize
+		if peso <= 0 {
+			peso = x.EstimatedSize
+		}
+		out = append(out, ModelInRAM{Nome: x.ID, Runtime: runtime, GB: peso / 1e9, Stato: "caricato"})
+	}
+	return out, s.FinalCeiling / 1e9
+}
+
 // Ogni comando esterno ha un tetto di tempo. Senza, basta un programma che si
 // impianta (è successo con `lms`, che è Node e a volte non torna) per bloccare
 // tutto quello che sta dietro.
@@ -127,8 +159,9 @@ func readsMemory() MemState {
 		err error
 	}
 	var wg sync.WaitGroup
-	esiti := make([]esitoRT, len(cfg().Runtime))
-	for i, rc := range cfg().Runtime {
+	motori := knownRuntimes()
+	esiti := make([]esitoRT, len(motori))
+	for i, rc := range motori {
 		if rc.Caricati == "" {
 			continue
 		}
@@ -187,9 +220,10 @@ func readsMemory() MemState {
 
 	// I programmi che tengono il modello sempre residente lo dicono nel loro
 	// stato: se non c'è un comando apposta, si guarda /health.
-	corpi := make([][]byte, len(cfg().Runtime))
+	corpi := make([][]byte, len(motori))
+	statiModelli := make([][]byte, len(motori))
 	var wgH sync.WaitGroup
-	for i, rc := range cfg().Runtime {
+	for i, rc := range motori {
 		if rc.Caricati != "" {
 			continue
 		}
@@ -197,12 +231,20 @@ func readsMemory() MemState {
 		go func(i, porta int) {
 			defer wgH.Done()
 			corpi[i] = httpGet(fmt.Sprintf("http://127.0.0.1:%d/health", porta), 3*time.Second)
+			statiModelli[i] = httpGet(fmt.Sprintf("http://127.0.0.1:%d/v1/models/status", porta), 3*time.Second)
 		}(i, rc.Porta)
 	}
 	wgH.Wait()
 
-	for i, rc := range cfg().Runtime {
+	for i, rc := range motori {
 		if rc.Caricati != "" {
+			continue
+		}
+		if caricati, tetto := loadedModelsStatus(statiModelli[i], rc.Nome); len(caricati) > 0 {
+			m.Caricati = append(m.Caricati, caricati...)
+			if tetto > 0 {
+				m.CeilingGB = tetto
+			}
 			continue
 		}
 		b := corpi[i]
@@ -233,8 +275,12 @@ func readsMemory() MemState {
 			m.Caricati = append(m.Caricati, ModelInRAM{
 				Nome: h.Model, Runtime: rc.Nome, GB: gb, Stato: "residente"})
 		case h.EnginePool.LoadedCount > 0 && h.EnginePool.CurrentMemory > 0:
+			nome := recentlyActive(rc.Chiave)
+			if nome == "" {
+				nome = "modello attivo"
+			}
 			m.Caricati = append(m.Caricati, ModelInRAM{
-				Nome: "modello attivo", Runtime: rc.Nome,
+				Nome: nome, Runtime: rc.Nome,
 				GB: h.EnginePool.CurrentMemory / 1e9, Stato: "caricato"})
 		}
 	}

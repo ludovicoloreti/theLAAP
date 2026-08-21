@@ -166,11 +166,29 @@ func configState() ([]Model, []string) {
 		}
 	}
 
-	// incrocia con ciò che i server servono davvero
+	// Incrocia con ciò che i server dichiarano davvero e aggiunge anche i
+	// modelli che non sono ancora nei menu dei client.
+	//
+	// Prima l'elenco nasceva esclusivamente da Pi e OpenCode. Un modello poteva
+	// quindi essere installato e perfettamente visibile in LM Studio, ma sparire
+	// dal pannello finché non si modificavano a mano entrambi i JSON. Oltre a
+	// essere scomodo, questo rendeva impossibile capire il guasto del modellino
+	// locale: il file c'era, il runtime lo vedeva, theLAAP no.
 	serviti := map[string]bool{}
 	for _, rt := range discoverRuntimes() {
 		for _, id := range rt.Modelli {
-			serviti[rt.Chiave+"|"+id] = true
+			k := rt.Chiave + "|" + id
+			serviti[k] = true
+			if _, presente := indice[k]; !presente {
+				indice[k] = &Model{
+					Runtime:   rt.Chiave,
+					ID:        id,
+					Nome:      id,
+					Context:   131072,
+					MaxTokens: 32768,
+					Servito:   true,
+				}
+			}
 		}
 	}
 	out := []Model{}

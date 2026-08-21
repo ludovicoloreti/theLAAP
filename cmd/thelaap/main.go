@@ -74,6 +74,7 @@ func rotte(pagina string) *http.ServeMux {
 	mux.HandleFunc("/api/memoria", guardia(apiMemory))
 	mux.HandleFunc("/api/config", guardia(apiConfig))
 	mux.HandleFunc("/api/prova", guardia(postOnly(apiProbe)))
+	mux.HandleFunc("/api/attiva", guardia(postOnly(apiActivate)))
 	// Eseguono comandi o riscrivono le schede: da GET erano raggiungibili con
 	// un <img src=...> da qualunque pagina web.
 	mux.HandleFunc("/api/esegui", guardia(postOnly(apiRun)))

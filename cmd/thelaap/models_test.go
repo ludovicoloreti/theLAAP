@@ -96,6 +96,35 @@ func TestArchivioNuovoSiPuoRipristinare(t *testing.T) {
 	}
 }
 
+func TestAliasLMStudioUsaLaMappaUfficiale(t *testing.T) {
+	b := []byte(`[
+  {"modelKey":"gemma-4-31b-it-mlx","path":"lmstudio-community/gemma-4-31B-it-MLX-8bit","indexedModelIdentifier":"lmstudio-community/gemma-4-31B-it-MLX-8bit"},
+  {"modelKey":"un-altro","path":"editore/un-altro"}
+]`)
+	got := lmStudioAliasesJSON("GEMMA-4-31B-IT-MLX", b)
+	if len(got) != 1 || got[0] != "lmstudio-community/gemma-4-31B-it-MLX-8bit" {
+		t.Fatalf("alias inattesi: %#v", got)
+	}
+}
+
+func TestArchivioToglieERipristinoRimetteIClient(t *testing.T) {
+	a := Model{Runtime: "omlx", ID: "modello-a", Nome: "A", InPi: true, InOC: false}
+	b := Model{Runtime: "lmstudio", ID: "modello-b", Nome: "B", InPi: true, InOC: true}
+	restanti, associate := withoutConfiguredModel([]Model{a, b}, "omlx", "modello-a")
+	if len(restanti) != 1 || restanti[0].ID != b.ID || len(associate) != 1 || associate[0].ID != a.ID {
+		t.Fatalf("separazione errata: restanti=%+v associate=%+v", restanti, associate)
+	}
+	merged := mergeConfiguredModels(restanti, associate)
+	if len(merged) != 2 {
+		t.Fatalf("ripristino configurazione errato: %+v", merged)
+	}
+	for _, m := range merged {
+		if m.ID == a.ID && (!m.InPi || m.InOC) {
+			t.Fatalf("client non conservati: %+v", m)
+		}
+	}
+}
+
 func TestEliminazioneDefinitivaRestaDentroIlDeposito(t *testing.T) {
 	deposito := t.TempDir()
 	vecchio := ModelStore

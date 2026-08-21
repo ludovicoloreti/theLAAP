@@ -31,7 +31,11 @@ func TestClasseDipendeDallaSogliaNonDalModello(t *testing.T) {
 		{"sotto soglia convive", 32.4, 64, ClasseConvivente},
 		{"sopra soglia pretende la macchina", 89.4, 64, ClasseEsclusivo},
 		{"sulla soglia esatta è esclusivo", 64, 64, ClasseEsclusivo},
-		{"peso non misurato non è esclusivo", 0, 64, ClasseConvivente},
+		// Questo caso diceva «convivente», ed era il difetto: zero non supera
+		// la soglia, quindi un modello mai pesato passava per uno che sta in
+		// RAM insieme agli altri. Il 18/08/2026 era DeepSeek V4 Flash, 81 GB.
+		// Non sapere quanto pesa è una terza risposta, non la più comoda.
+		{"peso non misurato non è né esclusivo né convivente", 0, 64, ClasseIgnota},
 		// Stesso modello, macchina più grande: cambia la classe, non il codice.
 		{"su un Mac da 256 lo stesso modello convive", 89.4, 128, ClasseConvivente},
 	}
@@ -107,20 +111,20 @@ func TestPrioritaDelloStato(t *testing.T) {
 	m := MemState{Caricati: []ModelInRAM{{Nome: "publisher/Modello-8bit"}}}
 	arrivo := map[string]bool{"publisher/in-arrivo": true}
 
-	if s := stateOf(Card{Model: Model{ID: "publisher/Modello-8bit", Servito: true}}, m, arrivo); s != StatoInMemoria {
+	if s := stateOf(Card{Model: Model{ID: "publisher/Modello-8bit", Servito: true}}, m, arrivo, nil); s != StatoInMemoria {
 		t.Errorf("caricato → %s", s)
 	}
-	if s := stateOf(Card{Model: Model{ID: "publisher/Modello-8bit", Servito: false}}, m, arrivo); s != StatoGuasto {
+	if s := stateOf(Card{Model: Model{ID: "publisher/Modello-8bit", Servito: false}}, m, arrivo, nil); s != StatoGuasto {
 		t.Errorf("non servito ma caricato → %s, atteso guasto: l'id in configurazione è sbagliato", s)
 	}
-	if s := stateOf(Card{Model: Model{ID: "publisher/in-arrivo", Servito: false}}, m, arrivo); s != StatoInArrivo {
+	if s := stateOf(Card{Model: Model{ID: "publisher/in-arrivo", Servito: false}}, m, arrivo, nil); s != StatoInArrivo {
 		t.Errorf("in scaricamento → %s, atteso in-arrivo", s)
 	}
-	if s := stateOf(Card{Model: Model{ID: "publisher/altro", Servito: true}}, m, arrivo); s != StatoSpento {
+	if s := stateOf(Card{Model: Model{ID: "publisher/altro", Servito: true}}, m, arrivo, nil); s != StatoSpento {
 		t.Errorf("dichiarato e non caricato → %s", s)
 	}
 	// Maiuscole: i nomi arrivano da servizi di terzi e non combaciano mai.
-	if s := stateOf(Card{Model: Model{ID: "PUBLISHER/modello-8BIT", Servito: true}}, m, arrivo); s != StatoInMemoria {
+	if s := stateOf(Card{Model: Model{ID: "PUBLISHER/modello-8BIT", Servito: true}}, m, arrivo, nil); s != StatoInMemoria {
 		t.Error("il confronto con i caricati è sensibile alle maiuscole")
 	}
 }

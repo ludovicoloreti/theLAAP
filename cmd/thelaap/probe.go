@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -24,6 +26,40 @@ type Outcome struct {
 type destinazione struct {
 	baseURL string
 	apiKey  string
+}
+
+// Alcuni runtime (in particolare oMLX) dichiarano che c'e' un modello in
+// memoria, ma non ne restituiscono il nome. Quando theLAAP ne attiva uno con
+// successo conserva per poco l'identita': cosi' la lista puo' dire subito
+// "attivo" invece del fuorviante "disponibile". L'indizio scade insieme al
+// normale periodo di inattivita' dei runtime e non sopravvive al processo.
+type activeModelHint struct {
+	Model string
+	At    time.Time
+}
+
+var activeHints = struct {
+	sync.RWMutex
+	M map[string]activeModelHint
+}{M: map[string]activeModelHint{}}
+
+func rememberActive(runtime, model string) {
+	if runtime == "" || model == "" {
+		return
+	}
+	activeHints.Lock()
+	activeHints.M[strings.ToLower(runtime)] = activeModelHint{Model: model, At: time.Now()}
+	activeHints.Unlock()
+}
+
+func recentlyActive(runtime string) string {
+	activeHints.RLock()
+	h := activeHints.M[strings.ToLower(runtime)]
+	activeHints.RUnlock()
+	if h.Model == "" || time.Since(h.At) > 20*time.Minute {
+		return ""
+	}
+	return h.Model
 }
 
 func localDestination(porta int) destinazione {
@@ -105,6 +141,23 @@ func probeModelAt(d destinazione, modello string) Outcome {
 		Risposta: trunc(testo, 160), LoadSec: loadSec}
 }
 
+// activateModelAt fa soltanto il warmup. "Attiva" deve essere rapido e non
+// generare 300 token come "Cronometra": sono due azioni diverse.
+func activateModelAt(d destinazione, modello string) Outcome {
+	v, sec, err := callTo(d, modello, "Rispondi solo OK.", 2, 20*time.Minute)
+	if err != nil {
+		return Outcome{Errore: err.Error()}
+	}
+	if e, ok := v["error"]; ok {
+		return Outcome{Errore: trunc(sprint(e), 200), LoadSec: sec}
+	}
+	scelte, _ := v["choices"].([]any)
+	if len(scelte) == 0 {
+		return Outcome{Errore: "nessuna risposta", LoadSec: sec}
+	}
+	return Outcome{OK: true, LoadSec: sec}
+}
+
 func apiProbe(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Porta   int    `json:"porta"`
@@ -126,11 +179,43 @@ func apiProbe(w http.ResponseWriter, r *http.Request) {
 	// La misura è la fonte più affidabile che abbiamo: la conserviamo, così
 	// l'interfaccia non deve indovinare le velocità né tenerle scritte nel codice.
 	if e.OK && req.Runtime != "" {
+		rememberActive(req.Runtime, req.Model)
 		updateProfile(req.Runtime, req.Model, func(p *Profile) {
 			p.TokS = e.TokS
 			p.Reasoning = e.Reasoning
 			p.Provato = time.Now()
+			p.UltimoUso = time.Now()
 		})
 	}
 	writeJSON(w, e)
+}
+
+func apiActivate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Porta   int    `json:"porta"`
+		Model   string `json:"modello"`
+		Runtime string `json:"runtime"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errJSON(w, err.Error())
+		return
+	}
+	if req.Model == "" || req.Runtime == "" {
+		errJSON(w, "modello o programma mancante")
+		return
+	}
+	var e Outcome
+	if d, ok := destinationFor(req.Runtime); ok && d.baseURL != "" {
+		e = activateModelAt(d, req.Model)
+	} else {
+		e = activateModelAt(localDestination(req.Porta), req.Model)
+	}
+	if !e.OK {
+		errJSON(w, e.Errore)
+		return
+	}
+	rememberActive(req.Runtime, req.Model)
+	updateProfile(req.Runtime, req.Model, func(p *Profile) { p.UltimoUso = time.Now() })
+	refreshMemory()
+	writeJSON(w, map[string]any{"ok": true, "modello": req.Model, "loadSec": e.LoadSec})
 }

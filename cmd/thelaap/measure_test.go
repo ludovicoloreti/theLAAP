@@ -101,3 +101,18 @@ func TestMisuraGBNonVaInPanico(t *testing.T) {
 		}
 	}
 }
+
+func TestStatoRuntimeDiceQualeModelloEAttivo(t *testing.T) {
+	b := []byte(`{"final_ceiling":120000000000,"models":[
+  {"id":"qwen-attivo","loaded":true,"actual_size":30400000000,"estimated_size":31500000000,"engine_type":"vlm"},
+  {"id":"altro","loaded":false,"estimated_size":1000000000,"engine_type":"llm"},
+  {"id":"MarkItDown","loaded":true,"actual_size":0,"engine_type":"markitdown"}
+]}`)
+	got, tetto := loadedModelsStatus(b, "oMLX")
+	if len(got) != 1 || got[0].Nome != "qwen-attivo" || math.Abs(got[0].GB-30.4) > 0.01 {
+		t.Fatalf("modelli attivi inattesi: %+v", got)
+	}
+	if math.Abs(tetto-120) > 0.01 {
+		t.Fatalf("tetto = %.1f, atteso 120", tetto)
+	}
+}

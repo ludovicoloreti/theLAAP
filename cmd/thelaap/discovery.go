@@ -35,7 +35,7 @@ type Runtime struct {
 // descrive la macchina su cui il pannello sta girando.
 func configuredRuntimes() []Runtime {
 	out := []Runtime{}
-	for _, r := range cfg().Runtime {
+	for _, r := range knownRuntimes() {
 		chiaveOC := r.ChiaveOC
 		if chiaveOC == "" {
 			chiaveOC = r.Chiave

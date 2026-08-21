@@ -144,20 +144,22 @@ func helperModel() string {
 // Non è un assistente generico: è il libretto di istruzioni di QUESTO pannello.
 // Deve rispondere solo con quello che gli passiamo (manuale + stato di adesso),
 // e ammettere di non sapere invece di inventare.
-const RULES = `Sei l'aiuto del pannello di controllo dei modelli AI installati su questo Mac.
+const RULES = `Sei Gellow, l'assistente del pannello di controllo dei modelli AI installati su questo Mac.
 Chi ti scrive è la persona che usa il pannello, non un tecnico.
 
 REGOLE:
-- Rispondi SOLO con le informazioni che trovi qui sotto. Se la risposta non c'è, dillo e basta: "Questo non lo so, prova con Controlla tutto nella sezione Sistema".
-- Rispondi in italiano, breve: 2-4 frasi. Nessun elenco puntato se non serve davvero.
+- Rispondi SOLO con le informazioni che trovi qui sotto. Se manca davvero un passaggio, scrivi «Il rapporto non indica dove cambiare questa impostazione»; non inventare una sezione e non chiedere di ripetere il controllo che stai già spiegando.
+- Rispondi in italiano chiaro. A una domanda semplice bastano 3-6 frasi; quando devi spiegare un controllo usa anche 6-12 punti brevi se servono a non omettere problemi.
 - Parla di cose concrete che la persona vede sullo schermo (pulsanti, sezioni, la barra della memoria).
 - Non usare termini tecnici inglesi se puoi evitarli. Mai parlare di "token", "reasoning_content", "provider", "runtime", "quantizzazione": usa parole normali.
 - Se la domanda riguarda com'è messo il Mac adesso, usa i numeri della situazione qui sotto, non parlare in generale.
-- Non citare mai i titoli in maiuscolo di questo testo: sono appunti per te, non cose che la persona vede sullo schermo. Le sezioni che lei vede si chiamano "I tuoi modelli", "Aggiungi un modello" e "Sistema".
+- Non citare mai i titoli in maiuscolo di questo testo: sono appunti per te. Le sezioni visibili si chiamano "Panoramica", "Modelli", "Configurazioni", "Controlla" e, sotto "Altro", "Programmi" e "Memoria unificata".
+- Usa soltanto pulsanti e sezioni elencati nelle AZIONI REALI DEL PANNELLO. La sezione "Sistema" non esiste: non nominarla mai. Non dire mai di usare "Attiva" per spegnere qualcosa.
 - Non fare somme o calcoli sui numeri: riporta quelli che trovi, e basta.`
 
 type reqExplain struct {
-	Domanda string `json:"domanda"`
+	Domanda  string `json:"domanda"`
+	Contesto string `json:"contesto,omitempty"`
 }
 
 // apiQuestions: il repertorio dei suggerimenti, mescolato dal client.
@@ -189,11 +191,42 @@ func apiExplain(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, "domanda mancante")
 		return
 	}
+	// Le istruzioni operative più semplici non hanno bisogno di essere
+	// reinventate ogni volta da un modello da 4B. Sono un contratto della UI:
+	// così Gellow non può mandare la persona in una sezione che non esiste o
+	// confondere «Attiva» con «spegni».
+	if risposta := aiutoDiretto(req.Domanda); risposta != "" {
+		writeJSON(w, map[string]any{"ok": true, "risposta": risposta})
+		return
+	}
 	// Mini-RAG: prendo dal manuale solo i pezzi che c'entrano con la domanda,
 	// e ci aggiungo sempre la fotografia dello stato attuale della macchina.
 	var ctx strings.Builder
 	ctx.WriteString(RULES)
 	ctx.WriteString("\n\n" + liveState())
+	if c := strings.TrimSpace(req.Contesto); c != "" {
+		// Il risultato dei controlli arriva da comandi già in whitelist, non
+		// dall'utente e non viene mai eseguito. Lo passiamo al modellino come
+		// testo da spiegare: senza, «Chiedi all'aiutante» vedrebbe soltanto lo
+		// stato corrente e non le righe rosse che la persona sta guardando.
+		ctx.WriteString("\n\nRISULTATO DEL CONTROLLO DA SPIEGARE:\n")
+		ctx.WriteString(trunc(withoutAnsi(c), 8000))
+		ctx.WriteString(`
+
+ISTRUZIONI SPECIALI PER QUESTO CONTROLLO:
+- Non fermarti al primo errore. Copri ogni causa distinta indicata da una croce rossa o da un avviso importante; riunisci soltanto le righe che dipendono chiaramente dalla stessa causa.
+- In questo impianto CODE dipende da MTPLX, CODE-FREE dipende da oMLX e CHAT dipende da LM Studio. Se il programma corrispondente e' spento, il modello che non risponde e' una conseguenza della stessa causa, non un nuovo problema.
+- «solo in Pi: X» significa che X e' gia' in Pi ma manca da OpenCode. «solo in OpenCode» significa il contrario.
+- «NON risponde» significa spento o irraggiungibile: non dire mai che quel programma e' attivo.
+- Un limite di memoria sbagliato e un programma spento sono due cause distinte, anche se riguardano entrambi oMLX. In particolare: oMLX spento + CODE-FREE muto e' una causa; il tetto oMLX insufficiente e' un'altra causa di configurazione.
+- Le righe «COSA FARE» del rapporto hanno precedenza: usale e non contraddirle.
+- Apri con un riepilogo concreto: quante cause reali vedi e quali funzioni sono bloccate.
+- Per ogni causa scrivi: «Problema», «Conseguenza» e «Cosa fare adesso».
+- In «Cosa fare adesso» indica il percorso preciso nell'interfaccia. Se il rapporto contiene gia' un comando necessario, riportalo esattamente in un blocco di codice e spiega in una frase cosa fa.
+- Distingui cio' che e' davvero guasto da cio' che e' spento per scelta. Non dire di accendere tutto se basta un solo programma.
+- Chiudi dicendo quale controllo ripetere e quale risultato verde aspettarsi.
+- Non rimandare genericamente a un altro controllo: il rapporto da spiegare e' gia' qui e devi trasformarlo in una soluzione eseguibile.`)
+	}
 	docs := recupera(req.Domanda, 3)
 	if len(docs) == 0 {
 		docs = KNOWLEDGE[:2] // almeno "a cosa serve il pannello"
@@ -203,20 +236,24 @@ func apiExplain(w http.ResponseWriter, r *http.Request) {
 		ctx.WriteString("\n## " + d.Titolo + "\n" + d.Testo + "\n")
 	}
 
+	maxTokens := 500
+	if strings.TrimSpace(req.Contesto) != "" {
+		maxTokens = 1000
+	}
 	corpo, _ := json.Marshal(map[string]any{
 		"model": helperModel(),
 		"messages": []any{
 			map[string]any{"role": "system", "content": ctx.String()},
 			map[string]any{"role": "user", "content": trunc(req.Domanda, 500)},
 		},
-		"max_tokens":  400,
+		"max_tokens":  maxTokens,
 		"temperature": 0.2,
 	})
 	cl := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := cl.Post("http://127.0.0.1:"+itoa(helperPort())+"/v1/chat/completions",
 		"application/json", bytes.NewReader(corpo))
 	if err != nil {
-		errJSON(w, "il mini-modello non risponde: "+err.Error())
+		errJSON(w, "Gellow non risponde: "+err.Error())
 		return
 	}
 	defer resp.Body.Close()
@@ -238,6 +275,24 @@ func apiExplain(w http.ResponseWriter, r *http.Request) {
 	msg, _ := c0["message"].(map[string]any)
 	testo, _ := msg["content"].(string)
 	writeJSON(w, map[string]any{"ok": true, "risposta": testo})
+}
+
+func aiutoDiretto(domanda string) string {
+	q := strings.ToLower(strings.TrimSpace(domanda))
+	vuoleSpegnere := strings.Contains(q, "spegn") || strings.Contains(q, "disattiv") || strings.Contains(q, "togli") && strings.Contains(q, "ram")
+	parlaDiModello := strings.Contains(q, "modell")
+	if !vuoleSpegnere || !parlaDiModello {
+		return ""
+	}
+	risposta := "Vai in «Modelli» e clicca la riga del modello. Se è caricato, nella sua scheda trovi il pulsante «Disattiva modello»: lo toglie dalla RAM, ma non cancella i file e non lo rimuove da Pi o OpenCode. Il programma che lo esegue resta acceso; se quel programma non sa scaricare un singolo modello, il pulsante dice invece chiaramente quale programma verrà spento."
+	if caricati := readsMemory().Caricati; len(caricati) > 0 {
+		nomi := make([]string, 0, len(caricati))
+		for _, c := range caricati {
+			nomi = append(nomi, c.Nome)
+		}
+		risposta += " Adesso risultano in memoria: " + strings.Join(nomi, ", ") + ". Questa risposta non spegne nulla."
+	}
+	return risposta
 }
 
 // helperPort: su quale runtime vive il modello scelto per l'aiuto.

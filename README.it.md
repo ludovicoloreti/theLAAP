@@ -54,26 +54,25 @@ La scelta resta memorizzata.
 
 ## Come è fatta la pagina
 
-Tre colonne, e ognuna risponde a una domanda diversa: a sinistra **dove sono**, in
-mezzo **cosa succede**, a destra **cosa faccio con questo**. In cima, un campo
-`⌘K` che accetta un comando o una frase; in fondo, i numeri della macchina, il
-tema e la lingua.
+La pagina parte da una vera **Panoramica** e ha quattro sole destinazioni
+principali:
 
-**Una schermata, una cosa.** La memoria e l'elenco dei modelli sono due
-schermate separate, e non è un dettaglio di gusto: quando erano la stessa,
-cambiare filtro cambiava solo la tabella in fondo, e per vedere gli «esclusivi»
-bisognava scorrere oltre il titolo, la barra della RAM, le righe dei processi, la
-lettura della macchina e la scheda della regola. Misurati: 1036 px, ogni volta,
-per arrivare a una lista che a volte è vuota.
-
-| schermata | cosa contiene |
+| schermata | cosa risolve |
 |---|---|
-| **Memoria unificata** | barra, processi, lettura della macchina, regola col glossario |
-| **Modelli** (Tutti · Conviventi · Esclusivi · Spenti · Remoti) | titolo, filtri, tabella. Sopra, una riga sola coi due numeri che servono a capire i verdetti — ed è il collegamento alla memoria |
+| **Panoramica** | dice subito cosa funziona, cosa va sistemato e offre il controllo in un clic |
+| **Modelli** | mostra insieme tutti i modelli dichiarati dai client e quelli trovati davvero nei motori locali |
+| **Configurazioni** | una matrice unica permette di aggiungere o togliere ogni modello da Pi e OpenCode con due spunte |
+| **Controlla** | esegue il controllo rapido come azione primaria e mostra un risultato leggibile |
 
-Cambiando schermata si torna in cima, e **solo** cambiando: il disegno gira anche
-ogni cinque secondi col polling, e riportare su la pagina mentre qualcuno legge
-sarebbe peggio del problema che risolve.
+Programmi, memoria dettagliata, download, archivio e file completi sono raccolti
+sotto **Altro**. Restano disponibili senza trasformare la navigazione nella
+mappa delle parti interne del programma. La colonna dei dettagli compare solo
+quando si apre l'elenco dei modelli; le altre schermate usano tutto lo spazio.
+
+L'elenco non nasce più soltanto dai JSON dei client: viene unito a ciò che LM
+Studio, Ollama, oMLX e gli altri motori dichiarano davvero. Un modello installato
+ma non ancora presente in Pi o OpenCode compare quindi come **non configurato**
+e si può aggiungere dalla matrice, senza modificare file a mano.
 
 **Due assi, non uno.** Ogni modello ha uno *stato* — com'è adesso — e una
 *classe* — come può convivere con gli altri:
