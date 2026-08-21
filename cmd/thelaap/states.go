@@ -28,7 +28,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ludovicoloreti/theLAAP/internal/budget"
+	"thelaap/internal/budget"
 )
 
 // Stati e classi: le stringhe sono un contratto verso la pagina e verso Swift.

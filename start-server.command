@@ -2,7 +2,7 @@
 # Starts theLAAP: the server first, then the app.
 #
 # This is a fallback. Double clicking the app is enough now that the local data
-# no longer lives under ~/Desktop: before that the server start blocked inside
+# no longer lives in a TCC-protected user directory: before that the server blocked inside
 # open() because of TCC, and the ad-hoc signature took the blame. See note 3 in
 # the README.
 BIN="/Applications/theLAAP.app/Contents/MacOS/aipanel"

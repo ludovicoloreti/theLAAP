@@ -97,7 +97,7 @@ Conflating them means promising 103 GB when there are 42.
 ## 📦 Install
 
 ```bash
-git clone https://github.com/ludovicoloreti/theLAAP.git
+git clone <repository-url>
 cd theLAAP
 ./build.sh --install     # macOS: builds and installs theLAAP.app
 ```
@@ -218,7 +218,7 @@ go test ./...
 **A wrong diagnosis costs more than no diagnosis.** For weeks the app could not start
 its own server. The note in this repo said the binary was ad-hoc signed and macOS would
 only run it with a terminal among its ancestors. False. The sampler found the main
-thread parked inside `open()`, 100% of samples: a data file under `~/Desktop`, which is
+thread parked inside `open()`, 100% of samples: a data file inside a TCC-protected user directory, which is
 TCC protected, and a child of a `.app` waiting forever for a permission prompt that
 never appears. Moving the file fixed it in one second. The note is rewritten in place,
 not deleted, because the wrong explanation was plausible and that is why it cost so

@@ -38,14 +38,14 @@ var (
 	profiliMu sync.RWMutex
 	// Sta accanto alla configurazione, non nella cartella del progetto.
 	//
-	// Non è ordine: è l'unico posto da cui si può leggere all'avvio. Quando la
-	// cartella del progetto sta sul Desktop — e qui ci sta — aprire un file
-	// dentro di essa fa scattare TCC. Un figlio della .app che tenta quella
+	// Non è ordine: è l'unico posto da cui si può leggere all'avvio. Quando il
+	// progetto è in una directory utente protetta, aprire un file al suo interno
+	// fa scattare TCC. Un figlio della .app che tenta quella
 	// open() si ferma dentro la syscall e non ne esce: nessun log, porta mai
 	// aperta, e la voce nella barra che lo rilancia in continuazione. Provato
 	// col campionatore: 100% dei campioni in `open`, sia col binario di adesso
-	// sia con quello di prima. Dal Terminale non si vede, perché il Terminale
-	// il permesso sul Desktop ce l'ha già.
+	// sia con quello di prima. Dal Terminale non si vede se il terminale ha già
+	// il permesso necessario.
 	//
 	// Per la stessa ragione qui NON c'è un ripiego che guarda il percorso
 	// vecchio: basterebbe quello a rimettere il blocco.

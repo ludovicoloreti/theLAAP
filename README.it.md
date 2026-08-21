@@ -222,7 +222,7 @@ girare. Riaprendola, riparte da dov'era.
 ## 📦 Installazione
 
 ```bash
-git clone https://github.com/ludovicoloreti/theLAAP.git
+git clone <url-del-repository>
 cd theLAAP
 ./build.sh --install
 ```
@@ -361,7 +361,7 @@ La causa vera, trovata col campionatore: il thread principale fermo dentro `open
 +     2365 open  (in libsystem_kernel.dylib)
 ```
 
-`caricaProfili()` apriva `~/Desktop/AI/theLAAP/profili.json`. **Il Desktop è protetto da TCC**: un figlio di una `.app` che ci apre un file resta appeso ad aspettare un permesso che in quel contesto non compare mai. Da un terminale non si vede, perché il Terminale quel permesso ce l'ha già — ed è per questo che ogni prova col server avviato a mano sembrava perfetta.
+`caricaProfili()` apriva il file dei profili dalla cartella del progetto, che in quel caso si trovava in una directory protetta da TCC. Un figlio di una `.app` che ci apre un file resta appeso ad aspettare un permesso che in quel contesto non compare mai. Da un terminale non si vede, perché il Terminale quel permesso ce l'ha già — ed è per questo che ogni prova col server avviato a mano sembrava perfetta.
 
 Verificato invece di dedotto: `git archive HEAD` in una cartella a parte, compilato il binario di prima, messo quello nel bundle. Identico blocco, log vuoto, porta chiusa. Il difetto era vecchio, e restava coperto da un server acceso una volta e mai riavviato.
 
@@ -372,7 +372,7 @@ Spostati `profili.json` e `backup-config/` in `~/.config/thelaap/`, l'app avvia 
 **4. Mai far leggere alla app la cartella Scrivania — e vale anche per i dati.**
 Cercare lì il binario faceva comparire il dialogo dei permessi di macOS, e finché non si rispondeva **l'app restava congelata**: nessuna finestra, nessun errore, niente. Sembrava rotta. Ora legge solo dentro il proprio bundle.
 
-Questa nota c'era già, e la trappola è tornata comunque da un'altra porta: non l'eseguibile, ma un file di **dati** — `profili.json`, che sta nella cartella del progetto, che sta sul Desktop. Vedi la nota 3. La regola giusta è più larga di come era scritta: **niente di quello che l'app apre all'avvio può stare sotto `~/Desktop`, `~/Documents` o `~/Downloads`.** Per questo nel codice non c'è un ripiego che guardi i percorsi vecchi: basterebbe quello a rimettere il blocco.
+Questa nota c'era già, e la trappola è tornata comunque da un'altra porta: non l'eseguibile, ma un file di **dati** nella cartella protetta del progetto. Vedi la nota 3. La regola giusta è più larga di come era scritta: **niente di quello che l'app apre all'avvio può stare in una directory utente protetta da TCC.** Per questo nel codice non c'è un ripiego verso vecchi percorsi locali: basterebbe quello a rimettere il blocco.
 
 **5. Attenzione ai processi fantasma durante lo sviluppo.**
 Un `./aipanel` lanciato a mano e mai ucciso ha tenuto la porta 7070 per un'ora mentre le build nuove morivano in silenzio: ore a inseguire un favicon 404 e rotte "inesistenti" che erano solo codice vecchio in esecuzione. Prima di dare la colpa al codice: `lsof -nP -iTCP:7070 -sTCP:LISTEN` e guarda l'ora di avvio.
@@ -504,7 +504,7 @@ Lo stato locale della macchina non sta più nella cartella del progetto: vive in
 **Non è una questione di ordine, è l'unico posto da cui il server può leggere.**
 Quando la cartella del progetto sta sul Desktop — e su questa macchina ci sta —
 ogni file dentro di essa passa da TCC. Un `aipanel` avviato dalla voce nella
-barra dei menu, aprendo `~/Desktop/.../profili.json`, si fermava **dentro la
+barra dei menu, aprendo il file dei profili nella directory protetta, si fermava **dentro la
 syscall `open()`**: nessuna riga di log, porta mai aperta, e lo Swift che lo
 rilanciava all'infinito credendolo morto. Dal Terminale non si vedeva, perché il
 Terminale il permesso sul Desktop ce l'ha già. Il campionatore lo diceva chiaro:
