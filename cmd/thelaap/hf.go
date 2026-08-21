@@ -14,8 +14,8 @@ import (
 )
 
 // Cercare un modello su HuggingFace e scaricarlo senza uscire dal pannello.
-// Filtriamo su MLX 8-bit: è il formato che i runtime di questa macchina usano,
-// e 8-bit è la regola dello stack (mai 4-bit, salvo MoE molto grossi).
+// La ricerca non decide al posto dell'utente: mostra tutti i formati trovati e
+// segnala soltanto quali sono direttamente adatti ai runtime MLX configurati.
 
 type Found struct {
 	ID          string  `json:"id"`
@@ -37,15 +37,21 @@ func formato(id string) (string, bool, string) {
 	switch {
 	case strings.Contains(l, "gguf"):
 		return "GGUF", false, "per Ollama, non per i runtime MLX di questa macchina"
-	case strings.Contains(l, "8bit"), strings.Contains(l, "8-bit"), strings.Contains(l, "oq8"):
+	case strings.Contains(l, "mlx") && (strings.Contains(l, "8bit") || strings.Contains(l, "8-bit") || strings.Contains(l, "oq8")):
 		return "MLX 8-bit", true, ""
-	case strings.Contains(l, "6bit"), strings.Contains(l, "oq6"):
+	case strings.Contains(l, "mlx") && (strings.Contains(l, "6bit") || strings.Contains(l, "6-bit") || strings.Contains(l, "oq6")):
 		return "MLX 6-bit", true, "accettabile solo per MoE molto grossi"
-	case strings.Contains(l, "4bit"), strings.Contains(l, "5bit"), strings.Contains(l, "3bit"),
-		strings.Contains(l, "2bit"), strings.Contains(l, "nvfp4"), strings.Contains(l, "int4"):
-		return "sotto 8-bit", false, "sotto la soglia di qualità dello stack"
+	case strings.Contains(l, "mlx") && (strings.Contains(l, "4bit") || strings.Contains(l, "4-bit") || strings.Contains(l, "5bit") || strings.Contains(l, "3bit") ||
+		strings.Contains(l, "2bit") || strings.Contains(l, "nvfp4") || strings.Contains(l, "int4")):
+		return "MLX sotto 6-bit", false, "sotto la soglia di qualità consigliata"
+	case strings.Contains(l, "mlx") && (strings.Contains(l, "bf16") || strings.Contains(l, "fp16")):
+		return "MLX BF16/FP16", true, "qualità alta, ma richiede molta memoria"
 	case strings.Contains(l, "mlx"):
 		return "MLX", true, ""
+	case strings.Contains(l, "onnx"):
+		return "ONNX", false, "richiede un runtime ONNX"
+	case strings.Contains(l, "coreml"):
+		return "Core ML", false, "richiede un'app compatibile con Core ML"
 	}
 	return "?", false, "formato non riconosciuto"
 }
@@ -58,11 +64,7 @@ func cached(id string) bool {
 }
 
 func hfSearchTerms(q string) string {
-	q = strings.TrimSpace(q)
-	if !strings.Contains(strings.ToLower(q), "mlx") {
-		q += " MLX"
-	}
-	return q
+	return strings.TrimSpace(q)
 }
 
 // hfSortField accetta soltanto i quattro ordinamenti mostrati dalla pagina.
@@ -83,11 +85,9 @@ func apiHFSearch(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, "scrivi cosa cerchi")
 		return
 	}
-	// La pagina propone solo modelli MLX, quindi va chiesto MLX già a
-	// HuggingFace. Cercare soltanto "qwen" restituiva in testa sessanta GGUF;
-	// li scartavamo tutti e la pagina rimaneva vuota, facendo sembrare rotto il
-	// pulsante Cerca. "gemma" funzionava solo per caso perché alcuni MLX erano
-	// abbastanza popolari da entrare nei primi risultati generici.
+	// Nessun suffisso implicito: se l'utente cerca "qwen" deve poter vedere il
+	// risultato reale di HuggingFace, non soltanto i repository MLX scelti dal
+	// pannello. Il formato si filtra esplicitamente nella pagina.
 	qHF := hfSearchTerms(q)
 	ordine := hfSortField(r.URL.Query().Get("sort"))
 	u := "https://huggingface.co/api/models?search=" + url.QueryEscape(qHF) +
@@ -118,10 +118,7 @@ func apiHFSearch(w http.ResponseWriter, r *http.Request) {
 	out := []Found{} // mai nil: nil diventa "null" nel JSON
 	sem := make(chan struct{}, 8)
 	for _, g := range grezzi {
-		fmt_, ok, nota := formato(g.ID)
-		if !ok && fmt_ != "MLX 6-bit" { // scarto GGUF e sotto-8-bit
-			continue
-		}
+		fmt_, _, nota := formato(g.ID)
 		wg.Add(1)
 		go func(id string, dl, likes int, trend float64, mod, creato, f, nota string) {
 			defer wg.Done()
@@ -141,19 +138,49 @@ func apiHFSearch(w http.ResponseWriter, r *http.Request) {
 			}
 			{
 				var d struct {
-					Siblings []struct {
+					CreatedAt    string `json:"createdAt"`
+					LastModified string `json:"lastModified"`
+					Siblings     []struct {
 						Rfilename string  `json:"rfilename"`
 						Size      float64 `json:"size"`
 					} `json:"siblings"`
 				}
 				if json.Unmarshal(bb, &d) == nil {
+					if d.CreatedAt != "" {
+						t.Creato = d.CreatedAt
+					}
+					if d.LastModified != "" {
+						t.Aggiornato = d.LastModified
+					}
 					var tot float64
+					haSafe, haGGUF, haONNX := false, false, false
 					for _, s := range d.Siblings {
-						if strings.HasSuffix(s.Rfilename, ".safetensors") {
+						nomeFile := strings.ToLower(s.Rfilename)
+						if strings.HasSuffix(nomeFile, ".safetensors") {
 							tot += s.Size
+							haSafe = true
+						}
+						if strings.HasSuffix(nomeFile, ".gguf") {
+							haGGUF = true
+							tot += s.Size
+						}
+						if strings.HasSuffix(nomeFile, ".onnx") {
+							haONNX = true
 						}
 					}
 					t.GB = tot / 1e9
+					if t.Formato == "?" {
+						switch {
+						case haGGUF:
+							t.Formato, t.Nota = "GGUF", "per Ollama o un runtime GGUF"
+						case haONNX:
+							t.Formato, t.Nota = "ONNX", "richiede un runtime ONNX"
+						case haSafe:
+							t.Formato, t.Nota = "Safetensors", "il runtime dipende dall'architettura del modello"
+						default:
+							t.Formato, t.Nota = "Altro/non indicato", "controlla i file del repository prima di usarlo"
+						}
+					}
 				}
 			}
 			mu.Lock()
