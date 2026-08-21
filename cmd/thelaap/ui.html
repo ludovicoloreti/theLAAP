@@ -190,9 +190,12 @@ pre.out{margin:0;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .mod-row .secondaria{display:block;font-size:11px;color:var(--muted);line-height:1.3;margin-top:4px;white-space:normal;overflow-wrap:anywhere}
 .mod-row>.pill{white-space:normal;text-align:center;line-height:1.15;max-width:100%;overflow-wrap:anywhere;box-sizing:border-box}
-.stato-modello{display:flex;flex-direction:column;gap:4px;align-items:stretch;min-width:0}.stato-modello small{font-size:9.5px;line-height:1.2;text-align:center;color:var(--muted)}
+.stato-modello{display:flex;flex-direction:column;gap:4px;align-items:stretch;min-width:0}
+.stato-modello .pill{display:flex;align-items:center;justify-content:center;box-sizing:border-box;max-width:100%;
+  min-height:24px;height:auto;padding:4px 8px;white-space:normal;overflow-wrap:break-word;text-align:center;line-height:1.15}
+.stato-modello small{font-size:9.5px;line-height:1.2;text-align:center;color:var(--muted)}
 .sezione-modelli{font-size:13px;font-weight:650;color:var(--strong);margin:18px 0 8px}
-@media(max-width:1000px){.mod-head,.mod-row{grid-template-columns:104px minmax(190px,1.4fr) minmax(90px,.58fr) minmax(100px,.65fr)}
+@media(max-width:1000px){.mod-head,.mod-row{grid-template-columns:124px minmax(170px,1.4fr) minmax(90px,.58fr) minmax(100px,.65fr)}
   .mod-head>*:nth-child(3),.mod-row>*:nth-child(3){display:none}}
 @media(max-width:700px){.mod-head{display:none}.mod-row{grid-template-columns:100px minmax(0,1fr);gap:7px 11px;padding:12px}
   .mod-row>*:nth-child(4),.mod-row>*:nth-child(5){grid-column:2}.mod-row>*:nth-child(3){display:none}}
@@ -1536,6 +1539,8 @@ function ordinaModelli(lista){
    anche quando la lista è lunga. */
 function vistaModelli(){
   const inRAM=S.modelli.filter(m=>['pronto','in-memoria'].includes(statoDi(m))&&!remotoDi(m));
+  const processiRAM=((S.mem&&S.mem.processi)||[]).filter(p=>(p.correnteByte||0)/1e9>0.2)
+    .sort((a,b)=>(b.correnteByte||0)-(a.correnteByte||0));
   const automatico=m=>{
     if(S.aiuto&&String(S.aiuto.modello)===String(m.id))return true;
     const testo=(m.id+' '+(m.nome||'')).toLowerCase();
@@ -1584,7 +1589,7 @@ function vistaModelli(){
   const intestazione='<div class="mod-head">'+[IT()?'Situazione':'Status',IT()?'Modello':'Model',IT()?'A cosa serve':'What it does',IT()?'Programma':'Program',IT()?'Dove compare':'Where it appears']
     .map(x=>'<span class="k">'+esc(x)+'</span>').join('')+'</div>';
   const tabella=lista=>'<div class="card">'+intestazione+ordinaModelli(lista).map(m=>{
-    const st=statoLista(m),meta=[m.gb?gb(m.gb)+' GB':null,m.misurato?gb(m.tokS)+' tok/s':null].filter(Boolean).join(' · ');
+    const st=statoLista(m),meta=[m.gb?(IT()?'peso modello ':'model size ')+gb(m.gb)+' GB':null,m.misurato?gb(m.tokS)+' tok/s':null].filter(Boolean).join(' · ');
     return '<div class="mod-row'+(m.id===S.sel?' on':'')+'" onclick="scegli('+arg(m.id)+')">'
       +'<span class="stato-modello"><span class="pill '+st[1]+'">'+esc(st[0])+'</span>'+(st[2]?'<small>'+esc(st[2])+'</small>':'')+'</span>'
       +'<span style="min-width:0"><span class="principale" title="'+esc(m.id)+'">'+esc(nomeReale(m))+'</span><span class="secondaria">'+esc(meta)+'</span></span>'
@@ -1613,7 +1618,10 @@ function vistaModelli(){
     +'border-radius:8px;background:var(--surface);min-height:0;flex-wrap:wrap">'
     +metrica(T().used, gb(occupatiGB())+' / '+gb(totaleGB())+' GB')
     +metrica(T().available, gb(disponibiliGB())+' GB')
-    +'<span class="sp"></span><span class="k" style="color:var(--accent-ink)">'+esc(T().memory)+' →</span></button>';
+    +'<span class="sp"></span><span class="k" style="color:var(--accent-ink)">'+esc(T().memory)+' →</span>'
+    +(processiRAM.length?'<span style="flex-basis:100%;font-size:11.5px;color:var(--muted);text-align:left">'
+      +esc((IT()?'RAM reale: ':'Live RAM: ')+processiRAM.map(p=>(p.nome||p.chiave)+' '+gb((p.correnteByte||0)/1e9)+' GB').join(' · '))+'</span>':'')
+    +'</button>';
 
   if(S.armato==='libera-tutta')h+=nota('n-warn',IT()?'Scaricare tutti i modelli dalla RAM?':'Unload every model from RAM?',
     IT()?'I programmi restano accesi quando sanno scaricare il singolo modello. Gellow e i client lo ricaricheranno soltanto al prossimo utilizzo. Premi di nuovo per confermare.'
@@ -1629,7 +1637,10 @@ function vistaModelli(){
     h += '<div class="card"><div class="vuoto"><b>'+esc(T().noneHere)+'</b>'+esc(T().noneHereWhy)+'</div></div>';
   } else {
     if(S.filtro==='tutti'){
-      const principali=visibili.filter(m=>!automatico(m)),auto=visibili.filter(automatico);
+      const attivi=visibili.filter(m=>['pronto','in-memoria'].includes(statoDi(m)));
+      const rimanenti=visibili.filter(m=>!attivi.includes(m));
+      const principali=rimanenti.filter(m=>!automatico(m)),auto=rimanenti.filter(automatico);
+      if(attivi.length)h+='<div class="sezione-modelli">'+esc(IT()?'Attivi ora':'Active now')+'</div>'+tabella(attivi);
       if(principali.length)h+='<div class="sezione-modelli">'+esc(IT()?'Chat e codice':'Chat and code')+'</div>'+tabella(principali);
       if(auto.length)h+='<div class="sezione-modelli">'+esc(IT()?'Strumenti interni':'Internal tools')+'</div>'+tabella(auto);
     }else h+=tabella(visibili);
@@ -1761,9 +1772,8 @@ function risultatiHF(){
   const adesso=Date.now(), giorni={sette:7,trenta:30,anno:365}[S.hfEta]||0;
   const autore=String(S.hfAutore||'').trim().toLowerCase();
   const vis=(S.hf||[]).filter(t=>{
-    const peso=Number(t.gb)||0, formato=String(t.formato||'').toLowerCase();
-    if(S.hfFormato==='8'&&!formato.includes('8-bit'))return false;
-    if(S.hfFormato==='6'&&!formato.includes('6-bit'))return false;
+    const peso=Number(t.gb)||0, formato=String(t.formato||'Altro/non indicato');
+    if(S.hfFormato!=='tutti'&&formato!==S.hfFormato)return false;
     if(S.hfMemoria==='entra'&&(!peso||peso>disponibiliGB()))return false;
     if(S.hfMemoria==='liberare'&&(!peso||peso<=disponibiliGB()))return false;
     if(S.hfMemoria==='presenti'&&!t.giaPresente)return false;
@@ -1781,10 +1791,13 @@ function risultatiHF(){
 
 function vistaHF(){
   const visibili=risultatiHF();
+  const formati=[...new Set((S.hf||[]).map(t=>String(t.formato||'Altro/non indicato')))]
+    .sort((a,b)=>a.localeCompare(b,LINGUA,{numeric:true,sensitivity:'base'}));
+  const scelteFormato=[['tutti',IT()?'Tutti i formati':'All formats'],...formati.map(f=>[f,f])];
   const avanzati=[S.hfEta!=='tutte',S.hfAutore,S.hfMinLikes,S.hfMinDownloads,S.hfMinGB,S.hfMaxGB].filter(Boolean).length;
   let h = '<h1>'+esc(IT()?'Scarica un modello':'Download a model')+'</h1><p class="sub">'
-    +esc(IT()?'Cerca per nome o per uso. Mostro soltanto versioni MLX compatibili con questo Mac; preferisco 8 bit e accetto 6 bit per i modelli molto grandi.'
-      :'Search by name or purpose. Only MLX versions compatible with this Mac are shown; 8-bit is preferred and 6-bit is accepted for very large models.')+'</p>'
+    +esc(IT()?'Cerca per nome o per uso. Mostro tutti i formati trovati da HuggingFace; MLX è quello eseguibile direttamente dai runtime MLX di questo Mac.'
+      :'Search by name or purpose. All formats found on HuggingFace are shown; MLX is the one directly usable by this Mac’s MLX runtimes.')+'</p>'
     +'<div style="display:flex;gap:9px;margin-bottom:13px">'
     +'<input id="hfq" type="search" value="'+esc(S.hfQuery)+'" placeholder="'+esc(T().searchPh)+'" onkeydown="if(event.key===\'Enter\')cerca()">'
     +'<button class="b1" onclick="cerca()">'+(S.hfCercando?'<span class="carica"></span>':esc(T().search))+'</button></div>'
@@ -1794,7 +1807,7 @@ function vistaHF(){
   h+='<div class="filtri-hf"><div class="base"><div class="scelte-hf">'
     +scelteBottoni(IT()?'Ordine':'Sort',S.hfSort,[['trendingScore',IT()?'Tendenza':'Trending'],['downloads',IT()?'Download':'Downloads'],
       ['likes','Like'],['lastModified',IT()?'Più recenti':'Recent']],'cambiaOrdineHF')
-    +scelteBottoni(IT()?'Formato':'Format',S.hfFormato,[['tutti',IT()?'8 e 6 bit':'8 and 6 bit'],['8','Solo 8-bit'],['6','Solo 6-bit']],'setFormatoHF')
+    +scelteBottoni(IT()?'Formato':'Format',S.hfFormato,scelteFormato,'setFormatoHF')
     +scelteBottoni(IT()?'Memoria':'Memory',S.hfMemoria,[['tutti',IT()?'Qualsiasi':'Any'],['entra',IT()?'Entra ora':'Fits now'],
       ['liberare',IT()?'Serve RAM':'Needs RAM'],['presenti',IT()?'Già scaricato':'Downloaded']],'setMemoriaHF')
     +'</div><span class="sp"></span><b style="font-size:12px">'+visibili.length+' / '+S.hf.length+' '+esc(IT()?'risultati':'results')
@@ -1814,7 +1827,7 @@ function vistaHF(){
     x.repo, x.stato==='in corso' ? gb(x.gb)+' GB' : (x.errore||'ok')); });
   if(S.hfErrore)h+=nota('n-bad',IT()?'Ricerca non riuscita':'Search failed',S.hfErrore);
   if(S.hfCercato&&!S.hfCercando&&!S.hfErrore&&!S.hf.length)h+='<div class="card"><div class="vuoto"><b>'
-    +esc(IT()?'Nessun modello MLX trovato':'No MLX model found')+'</b>'
+    +esc(IT()?'Nessun modello trovato':'No model found')+'</b>'
     +esc(IT()?'Prova un nome più generale, per esempio «qwen», «gemma» o «coder».':'Try a broader name, such as “qwen”, “gemma”, or “coder”.')+'</div></div>';
   if(S.hf.length&&!visibili.length)h+='<div class="card"><div class="vuoto"><b>'+esc(IT()?'Nessun risultato con questi filtri':'No results with these filters')+'</b>'
     +esc(IT()?'Azzera uno o più filtri: la ricerca originale ha trovato '+S.hf.length+' modelli.':'Clear one or more filters: the original search found '+S.hf.length+' models.')+'</div></div>';
@@ -1824,7 +1837,10 @@ function vistaHF(){
         +'<span class="mono" style="font-size:11.5px;color:var(--strong);word-break:break-all">'+esc(t.id)+'</span>'
         +'<span class="m">'+[t.gb?gb(t.gb)+' GB':'',t.formato].filter(Boolean).map(esc).join(' · ')+'</span>'
         +'<span class="hf-meta"><span>↓ '+numeroHF(t.downloads)+' download</span><span>♥ '+numeroHF(t.likes)+' like</span>'
-        +'<span class="trend">↗ '+numeroHF(t.tendenza)+' '+esc(IT()?'tendenza':'trend')+'</span><span>'+esc(IT()?'agg. ':'updated ')+esc(dataHF(t.aggiornato||t.creato))+'</span></span></span>'
+        +'<span class="trend">↗ '+numeroHF(t.tendenza)+' '+esc(IT()?'tendenza':'trend')+'</span>'
+        +(t.creato?'<span>'+esc(IT()?'pubblicato ':'published ')+esc(dataHF(t.creato))+'</span>':'')
+        +(t.aggiornato?'<span>'+esc(IT()?'aggiornato ':'updated ')+esc(dataHF(t.aggiornato))+'</span>':'')
+        +'<a href="https://huggingface.co/'+esc(t.id)+'" onclick="event.stopPropagation()">'+esc(IT()?'Apri su HuggingFace ↗':'Open on HuggingFace ↗')+'</a></span></span>'
         +'<span class="pill '+(entra?'p-ok':'p-warn')+'">'+esc(entra?(IT()?'entra ora':'fits now'):(IT()?'serve RAM':'needs RAM'))+'</span>'
         +(t.giaPresente?'<span class="pill p-ok">'+esc(T().onDisk)+'</span>'
           :'<button class="b2 sm" onclick="scarica('+i+')">'+esc(T().download)+'</button>')
@@ -1837,7 +1853,7 @@ async function cerca(){
   if(!q.trim()) return;
   const nuova=q.trim(), cambiata=nuova!==S.hfQuery, richiesta=++S.hfRichiesta;
   S.hfQuery=nuova; S.hfCercato=true; S.hfCercando=true; S.hfErrore='';
-  if(cambiata)S.hf=[];
+  if(cambiata){S.hf=[];S.hfFormato='tutti';}
   disegnaCentro();
   try{
     const dati=await api('/api/hf/cerca?q='+encodeURIComponent(nuova)+'&sort='+encodeURIComponent(S.hfSort)) || [];

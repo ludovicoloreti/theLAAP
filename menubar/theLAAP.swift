@@ -138,6 +138,28 @@ final class Finestra: NSWindowController, WKNavigationDelegate, WKScriptMessageH
         web.load(URLRequest(url: URL(string: BASE)!))
     }
 
+    /// I link ai repository non devono sostituire il pannello dentro la sua
+    /// WKWebView. Li apre il browser predefinito e la finestra resta dov'era.
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = navigationAction.request.url else {
+            decisionHandler(.cancel)
+            return
+        }
+        let host = (url.host ?? "").lowercased()
+        if url.scheme == "http" && (host == "127.0.0.1" || host == "localhost") {
+            decisionHandler(.allow)
+            return
+        }
+        if navigationAction.navigationType == .linkActivated,
+           url.scheme == "https", host == "huggingface.co" {
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
+        decisionHandler(.cancel)
+    }
+
     // Se il server non risponde, invece della pagina bianca del browser
     // spieghiamo cosa fare, in italiano.
     func webView(_ w: WKWebView, didFailProvisionalNavigation n: WKNavigation!, withError e: Error) {

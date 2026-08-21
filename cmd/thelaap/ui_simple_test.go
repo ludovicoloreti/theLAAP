@@ -122,6 +122,17 @@ func TestListaModelliHaOrdinamentoComprensibile(t *testing.T) {
 	}
 }
 
+func TestListaModelliSpiegaRAMEPesoEMetteGliAttiviInCima(t *testing.T) {
+	for _, atteso := range []string{
+		"processiRAM", "RAM reale:", "Live RAM:", "peso modello ", "model size ",
+		"Attivi ora", "Active now", "const attivi=visibili.filter",
+	} {
+		if !strings.Contains(UI, atteso) {
+			t.Errorf("lista modelli ancora ambigua: manca %q", atteso)
+		}
+	}
+}
+
 func TestConfigurazioniPartonoDaiModelliConLeSpunte(t *testing.T) {
 	for _, atteso := range []string{
 		"ordineConfigurazioni", "Con spunte prima", "['pi','Pi']", "['opencode','OpenCode']",
@@ -137,10 +148,22 @@ func TestRicercaHuggingFaceHaFiltriCombinabili(t *testing.T) {
 	for _, atteso := range []string{
 		"function risultatiHF()", "hfSort:'trendingScore'", "hfFormato", "hfMemoria",
 		"hfEta", "hfAutore", "hfMinLikes", "hfMinDownloads", "hfMinGB", "hfMaxGB",
-		"Tendenza", "Download", "Like", "Più recenti",
+		"Tendenza", "Download", "Like", "Più recenti", "Tutti i formati", "scelteFormato",
+		"S.hfFormato!=='tutti'&&formato!==S.hfFormato",
 	} {
 		if !strings.Contains(UI, atteso) {
 			t.Errorf("ricerca HuggingFace senza %q", atteso)
+		}
+	}
+}
+
+func TestRisultatiHuggingFaceHannoLinkEDateDistinte(t *testing.T) {
+	for _, atteso := range []string{
+		"https://huggingface.co/", "Apri su HuggingFace", "Open on HuggingFace",
+		"pubblicato ", "published ", "aggiornato ", "updated ",
+	} {
+		if !strings.Contains(UI, atteso) {
+			t.Errorf("risultato HuggingFace senza %q", atteso)
 		}
 	}
 }
@@ -187,6 +210,17 @@ func TestAzioniModelloSonoSempliciEVisibili(t *testing.T) {
 	} {
 		if !strings.Contains(UI, atteso) {
 			t.Errorf("azione o stato modello senza %q", atteso)
+		}
+	}
+}
+
+func TestStatoModelloRestaDentroIlChip(t *testing.T) {
+	for _, atteso := range []string{
+		".stato-modello .pill", "height:auto", "white-space:normal",
+		"overflow-wrap:break-word", "grid-template-columns:124px",
+	} {
+		if !strings.Contains(UI, atteso) {
+			t.Errorf("chip di stato non adattivo: manca %q", atteso)
 		}
 	}
 }

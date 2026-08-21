@@ -2,12 +2,23 @@ package main
 
 import "testing"
 
-func TestRicercaHuggingFaceChiedeDirettamenteMLX(t *testing.T) {
-	if got := hfSearchTerms("qwen"); got != "qwen MLX" {
-		t.Fatalf("ricerca generica = %q, atteso qwen MLX", got)
+func TestRicercaHuggingFaceNonForzaUnFormato(t *testing.T) {
+	if got := hfSearchTerms("  qwen  "); got != "qwen" {
+		t.Fatalf("ricerca generica trasformata in %q", got)
 	}
-	if got := hfSearchTerms("gemma mlx"); got != "gemma mlx" {
-		t.Fatalf("MLX duplicato: %q", got)
+}
+
+func TestFormatoHuggingFaceDistingueLeFamiglie(t *testing.T) {
+	for id, atteso := range map[string]string{
+		"org/model-MLX-8bit": "MLX 8-bit",
+		"org/model-MLX-bf16": "MLX BF16/FP16",
+		"org/model-GGUF":     "GGUF",
+		"org/model-ONNX":     "ONNX",
+		"org/model-CoreML":   "Core ML",
+	} {
+		if got, _, _ := formato(id); got != atteso {
+			t.Errorf("formato(%q) = %q, atteso %q", id, got, atteso)
+		}
 	}
 }
 
