@@ -72,3 +72,38 @@ func TestArgSfuggeEntrambiIContesti(t *testing.T) {
 		}
 	}
 }
+
+// Un pulsante spento deve sempre dire perché.
+//
+// Il 18/08/2026 l'utente ha riferito che «non vanno un sacco di tasti e/o non
+// si capisce cosa facciano». Le due metà erano la stessa cosa: un pulsante
+// grigio senza spiegazione è indistinguibile da uno rotto, e un pulsante che
+// esce senza fare niente è peggio di uno spento. bottone() tiene insieme le
+// due cose — disabilitato E col motivo — perché separarle è come si torna qui.
+func TestOgniPulsanteSpentoDiceIlPerche(t *testing.T) {
+	// L'attributo `disabled` come lo scrive la pagina: sempre preceduto da uno
+	// spazio o da un apice, mai da `:` (che sarebbe il CSS `:disabled`).
+	muto := regexp.MustCompile(`['" ]disabled['" ][^>]{0,120}`)
+	for _, a := range muto.FindAllString(UI, -1) {
+		if strings.Contains(a, "title=") {
+			continue
+		}
+		t.Errorf("un elemento è disabilitato senza dire perché: %s", a)
+	}
+}
+
+// I pulsanti che governano un programma non decidono da sé se il programma si
+// possa governare: lo chiedono al server, che è lo stesso che poi esegue.
+// Ricavarlo nella pagina — dal nome, dalla porta, da un elenco scritto qui —
+// è come si offre un pulsante che il server rifiuta.
+func TestLaPaginaNonDecideDaSeCosaSiPuoFermare(t *testing.T) {
+	for _, sospetto := range []string{
+		"chiave==='ollama'", "chiave==='mtplx'", "chiave==='omlx'",
+		"chiave==='lmstudio'", "porta===11434",
+	} {
+		if strings.Contains(UI, sospetto) {
+			t.Errorf("la pagina giudica un programma dal nome o dalla porta (%s): "+
+				"quel giudizio è del server, e due copie prima o poi divergono", sospetto)
+		}
+	}
+}

@@ -54,7 +54,7 @@ func capacita(rc RuntimeCfg) RuntimeCapability {
 
 func apiCapability(w http.ResponseWriter, r *http.Request) {
 	out := []RuntimeCapability{}
-	for _, rc := range cfg().Runtime {
+	for _, rc := range knownRuntimes() {
 		out = append(out, capacita(rc))
 	}
 	writeJSON(w, out)
@@ -67,7 +67,7 @@ func unloadModel(chiave, modello string) (string, error) {
 		return "", fmt.Errorf("non mi hai detto quale modello")
 	}
 	var rc *RuntimeCfg
-	for _, x := range cfg().Runtime {
+	for _, x := range knownRuntimes() {
 		if x.Chiave == chiave {
 			c := x
 			rc = &c
@@ -148,7 +148,7 @@ func currentBudget() budget.Budget {
 // KV cache e buffer, che non stanno su disco e non compaiono in `ps`.
 func runtimeFootprints(caricati []ModelInRAM) []budget.RuntimeUsage {
 	var out []budget.RuntimeUsage
-	for _, rc := range cfg().Runtime {
+	for _, rc := range knownRuntimes() {
 		pid, err := pidListeningOnPort(rc.Porta)
 		if err != nil {
 			continue // spento: non occupa niente

@@ -169,14 +169,7 @@ func apiService(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, err.Error())
 		return
 	}
-	var rc *RuntimeCfg
-	for _, x := range cfg().Runtime {
-		if x.Chiave == req.Servizio {
-			c := x
-			rc = &c
-			break
-		}
-	}
+	rc := runtimeByKey(req.Servizio)
 	if rc == nil {
 		errJSON(w, "non conosco il programma: "+req.Servizio)
 		return
@@ -187,10 +180,27 @@ func apiService(w http.ResponseWriter, r *http.Request) {
 	}
 	linea := serviceCommand(*rc, req.Azione)
 	if linea == "" {
+		// Il perché cambia il rimedio, quindi si dice quale dei due è. Un
+		// motore adottato non è dichiarato da nessuna parte: dirgli «manca il
+		// comando nella configurazione» manda a cercare una voce che non c'è.
+		if adopted(rc.Chiave) {
+			errJSON(w, rc.Nome+" lo usano i tuoi client ma non è in configurazione: "+
+				"il pannello lo vede e lo misura, ma per accenderlo e spegnerlo "+
+				"servono i suoi comandi. Aggiungili in «configurazione».")
+			return
+		}
 		errJSON(w, rc.Nome+" non si può governare da qui: manca il comando nella configurazione")
 		return
 	}
-	out := sh(linea + " 2>&1")
+	out, err := shErr(45*time.Second, linea+" 2>&1")
+	if err != nil {
+		messaggio := withoutAnsi(out)
+		if messaggio == "" {
+			messaggio = err.Error()
+		}
+		errJSON(w, rc.Nome+" non ha eseguito "+req.Azione+": "+trunc(messaggio, 400))
+		return
+	}
 
 	if strings.TrimSpace(out) == "" {
 		out = "eseguito"

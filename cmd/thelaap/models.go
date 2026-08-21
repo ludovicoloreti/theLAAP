@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -81,6 +82,60 @@ func safeName(id string) bool {
 	return true
 }
 
+// lmStudioAliases traduce l'identificativo breve servito dall'API nel
+// percorso reale indicizzato da LM Studio. Per esempio l'API dice
+// "gemma-4-31b-it-mlx", mentre sul disco c'e'
+// "lmstudio-community/gemma-4-31B-it-MLX-8bit". Indovinare il publisher o la
+// quantizzazione con confronti sfocati rischierebbe di archiviare il modello
+// sbagliato; `lms ls --json` e' invece la fonte che usa LM Studio stesso.
+func lmStudioAliases(id string) []string {
+	h, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	bin := filepath.Join(h, ".lmstudio", "bin", "lms")
+	if _, err := os.Stat(bin); err != nil {
+		return nil
+	}
+	b, err := exec.Command(bin, "ls", "--json").Output()
+	if err != nil {
+		return nil
+	}
+	return lmStudioAliasesJSON(id, b)
+}
+
+func lmStudioAliasesJSON(id string, b []byte) []string {
+	var voci []struct {
+		ModelKey   string `json:"modelKey"`
+		Path       string `json:"path"`
+		Identifier string `json:"indexedModelIdentifier"`
+	}
+	if json.Unmarshal(b, &voci) != nil {
+		return nil
+	}
+	var out []string
+	for _, v := range voci {
+		if !strings.EqualFold(v.ModelKey, id) {
+			continue
+		}
+		for _, p := range []string{v.Path, v.Identifier} {
+			if p != "" && !containsFold(out, p) {
+				out = append(out, p)
+			}
+		}
+	}
+	return out
+}
+
+func containsFold(ss []string, s string) bool {
+	for _, x := range ss {
+		if strings.EqualFold(x, s) {
+			return true
+		}
+	}
+	return false
+}
+
 // DiskSpace: una copia fisica del modello.
 type DiskSpace struct {
 	Percorso     string  `json:"percorso"`
@@ -151,7 +206,13 @@ func findOnDisk(id string) []DiskSpace {
 		}
 		return strings.Trim(s, "-")
 	}
-	bersaglio := norm(id)
+	bersagli := []string{norm(id)}
+	for _, a := range lmStudioAliases(id) {
+		if n := norm(a); n != "" && !containsFold(bersagli, n) {
+			bersagli = append(bersagli, n)
+		}
+	}
+	corrisponde := func(s string) bool { return containsFold(bersagli, norm(s)) }
 	var out []DiskSpace
 	// Percorsi reali già trovati: servono a riconoscere le cartelle che
 	// puntano QUI con altri nomi (vedi sotto).
@@ -168,22 +229,27 @@ func findOnDisk(id string) []DiskSpace {
 		for _, v := range voci {
 			// .locks e simili sono contabilità della cache, non modelli:
 			// includerli faceva comparire "2 posti" per un modello solo.
-			if !v.IsDir() || strings.HasPrefix(v.Name(), ".") {
+			if strings.HasPrefix(v.Name(), ".") {
 				continue
 			}
 			p1 := filepath.Join(r, v.Name())
-			if norm(v.Name()) == bersaglio {
+			st1, err := os.Stat(p1) // segue anche i collegamenti a cartelle
+			if err != nil || !st1.IsDir() {
+				continue
+			}
+			if corrisponde(v.Name()) {
 				out = append(out, examineFolder(p1))
 				visti[p1] = true
 				continue
 			}
 			sotto, _ := os.ReadDir(p1)
 			for _, s := range sotto {
-				if !s.IsDir() {
+				q := filepath.Join(p1, s.Name())
+				st2, err := os.Stat(q) // LM Studio usa collegamenti a snapshot HF
+				if err != nil || !st2.IsDir() {
 					continue
 				}
-				if norm(v.Name()+"/"+s.Name()) == bersaglio || norm(s.Name()) == bersaglio {
-					q := filepath.Join(p1, s.Name())
+				if corrisponde(v.Name()+"/"+s.Name()) || corrisponde(s.Name()) {
 					out = append(out, examineFolder(q))
 					visti[q] = true
 				}
@@ -308,6 +374,9 @@ func pointsInside(dir string, posti []DiskSpace) bool {
 // examineFolder misura una cartella e capisce se contiene file veri o solo
 // collegamenti verso un'altra copia.
 func examineFolder(p string) DiskSpace {
+	if st, err := os.Lstat(p); err == nil && st.Mode()&os.ModeSymlink != 0 {
+		return DiskSpace{Percorso: p, Collegamenti: true}
+	}
 	var byte0 int64
 	var file, link int
 	filepath.WalkDir(p, func(q string, d os.DirEntry, err error) error {
@@ -707,6 +776,49 @@ func rollbackRestore(spostati []archiveFiles, voce string) {
 	}
 }
 
+func sameConfiguredModel(m Model, runtime, id string) bool {
+	if !strings.EqualFold(m.ID, id) {
+		return false
+	}
+	return runtime == "" || strings.EqualFold(m.Runtime, runtime)
+}
+
+func withoutConfiguredModel(in []Model, runtime, id string) (restanti, associate []Model) {
+	for _, m := range in {
+		if sameConfiguredModel(m, runtime, id) {
+			if m.InPi || m.InOC {
+				associate = append(associate, m)
+			}
+			continue
+		}
+		restanti = append(restanti, m)
+	}
+	return restanti, associate
+}
+
+func mergeConfiguredModels(in, daRipristinare []Model) []Model {
+	out := append([]Model{}, in...)
+	for _, torna := range daRipristinare {
+		trovato := false
+		for i := range out {
+			if sameConfiguredModel(out[i], torna.Runtime, torna.ID) {
+				// Il manifesto conserva esattamente in quali client compariva.
+				out[i].InPi = out[i].InPi || torna.InPi
+				out[i].InOC = out[i].InOC || torna.InOC
+				if out[i].Nome == "" {
+					out[i].Nome = torna.Nome
+				}
+				trovato = true
+				break
+			}
+		}
+		if !trovato {
+			out = append(out, torna)
+		}
+	}
+	return out
+}
+
 // apiRemoveModel archivia il modello. La cancellazione definitiva e'
 // deliberatamente separata e puo' agire soltanto su una voce gia' nel deposito.
 func apiRemoveModel(w http.ResponseWriter, r *http.Request) {
@@ -734,16 +846,25 @@ func apiRemoveModel(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, "non lo archivio: "+strings.Join(motivi, "; "))
 		return
 	}
-	configurate, _ := configState()
-	associate := []Model{}
-	for _, m := range configurate {
-		if strings.EqualFold(m.ID, req.ID) {
-			associate = append(associate, m)
-		}
+	configurate, erroriConfig := configState()
+	if len(erroriConfig) > 0 {
+		errJSON(w, "prima sistema le configurazioni: "+strings.Join(erroriConfig, "; "))
+		return
 	}
+	restanti, associate := withoutConfiguredModel(configurate, req.Runtime, req.ID)
 	voce, err := archivia(e, req.Runtime, associate)
 	if err != nil {
 		errJSON(w, err.Error())
+		return
+	}
+	// Archivio e menu dei client sono una sola operazione: niente voci fantasma
+	// in Pi/OpenCode. Se la scrittura fallisce, rimettiamo subito i file dov'erano.
+	if err := writeConfig(restanti); err != nil {
+		if _, rollbackErr := restoreArchived(voce.ID); rollbackErr != nil {
+			errJSON(w, "configurazione non aggiornata: "+err.Error()+"; anche il ripristino dei file e' incompleto: "+rollbackErr.Error())
+			return
+		}
+		errJSON(w, "non ho archiviato nulla: non riesco ad aggiornare Pi e OpenCode: "+err.Error())
 		return
 	}
 	refreshMemory()
@@ -773,6 +894,15 @@ func apiRestoreModel(w http.ResponseWriter, r *http.Request) {
 	m, err := restoreArchived(req.ID)
 	if err != nil {
 		errJSON(w, err.Error())
+		return
+	}
+	configurate, erroriConfig := configState()
+	if len(erroriConfig) > 0 {
+		errJSON(w, "file ripristinati, ma le configurazioni non sono leggibili: "+strings.Join(erroriConfig, "; "))
+		return
+	}
+	if err := writeConfig(mergeConfiguredModels(configurate, m.Configurazioni)); err != nil {
+		errJSON(w, "file ripristinati, ma non riesco a rimettere il modello in Pi e OpenCode: "+err.Error())
 		return
 	}
 	refreshMemory()

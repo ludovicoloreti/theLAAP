@@ -15,7 +15,7 @@ package main
 // Due assi, tenuti separati perché rispondono a due domande diverse:
 //
 //	STATO   com'è adesso        pronto · in-memoria · spento · in-arrivo · guasto · remoto
-//	CLASSE  come può convivere  convivente · esclusivo · residente · remoto
+//	CLASSE  come può convivere  convivente · esclusivo · residente · remoto · ignota
 //
 // La classe NON è una soglia nuova: è la stessa SogliaGrandeByte che budget.go
 // usa per la regola «un modello grande alla volta». Se cambia quella, cambiano
@@ -45,6 +45,11 @@ const (
 	ClasseEsclusivo  = "esclusivo"
 	ClasseResidente  = "residente"
 	ClasseRemoto     = "remoto"
+	// ClasseIgnota: non l'abbiamo mai pesato, quindi non sappiamo come possa
+	// convivere. Prima questi finivano in «convivente», perché zero non supera
+	// la soglia — e un modello da 81 GB mai misurato veniva presentato come
+	// uno che sta in RAM insieme agli altri. Non sapere va detto.
+	ClasseIgnota = "ignota"
 )
 
 // CardState: una scheda più il giudizio. Il client non calcola niente.
@@ -84,12 +89,15 @@ func classOf(s Card, sogliaGB float64) string {
 	if provRemote(s.Runtime) {
 		return ClasseRemoto
 	}
-	for _, rc := range cfg().Runtime {
+	for _, rc := range knownRuntimes() {
 		if rc.Chiave == s.Runtime && rc.ModelloResidente {
 			return ClasseResidente
 		}
 	}
-	if s.GB > 0 && s.GB >= sogliaGB {
+	if s.GB <= 0 {
+		return ClasseIgnota
+	}
+	if s.GB >= sogliaGB {
 		return ClasseEsclusivo
 	}
 	return ClasseConvivente
@@ -98,7 +106,7 @@ func classOf(s Card, sogliaGB float64) string {
 // stateOf: com'è adesso. L'ordine dei controlli è la priorità con cui vanno
 // mostrati: un modello in scaricamento non è "spento", e uno che non risponde
 // non è "in memoria" solo perché il programma è acceso.
-func stateOf(s Card, m MemState, inArrivo map[string]bool) string {
+func stateOf(s Card, m MemState, inArrivo map[string]bool, spenti map[string]bool) string {
 	if provRemote(s.Runtime) {
 		return StatoRemoto
 	}
@@ -106,6 +114,13 @@ func stateOf(s Card, m MemState, inArrivo map[string]bool) string {
 		return StatoInArrivo
 	}
 	if !s.Servito {
+		// Spento e guasto sono due cose diverse, e la differenza è tutta nel
+		// rimedio: uno si accende, l'altro si va a cercare in configurazione.
+		// Tenerli insieme faceva apparire «guasto» ogni modello di un
+		// programma semplicemente spento — quattro su sei, questa mattina.
+		if spenti[strings.ToLower(s.Runtime)] {
+			return StatoSpento
+		}
 		return StatoGuasto
 	}
 	if caricato(s, m) {
@@ -164,6 +179,7 @@ func modelsWithState() ModelsResponse {
 	for _, d := range downloadsInProgress() {
 		inArrivo[strings.ToLower(d)] = true
 	}
+	spenti := stoppedRuntimes()
 
 	// La barra disegna l'occupazione misurata sui processi, non i pesi dei
 	// file: mtplx dichiara 29,3 GB e ne occupa 84,8 (vedi memory.go).
@@ -191,7 +207,7 @@ func modelsWithState() ModelsResponse {
 		x := CardState{
 			Card:   s,
 			Classe: classOf(s, sogliaGB),
-			Stato:  stateOf(s, m, inArrivo),
+			Stato:  stateOf(s, m, inArrivo, spenti),
 		}
 		// «Se lo carico adesso, ci sta?» — la stessa risposta del preflight,
 		// così la pagina non deve chiederla modello per modello, e non può

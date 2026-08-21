@@ -28,6 +28,7 @@ type Profile struct {
 	GB        float64   `json:"gb"`        // dal disco
 	Context   int       `json:"context"`
 	Provato   time.Time `json:"provato"`
+	UltimoUso time.Time `json:"ultimoUso,omitempty"`
 	Etichetta string    `json:"etichetta"` // scritta dall'utente, vince su tutto
 	Note      string    `json:"note"`
 }
@@ -162,6 +163,7 @@ type Card struct {
 	TokS      float64 `json:"tokS"`
 	GB        float64 `json:"gb"`
 	Provato   string  `json:"provato"`
+	UltimoUso string  `json:"ultimoUso,omitempty"`
 	Indizi    []Hint  `json:"indizi"`
 	Etichetta string  `json:"etichetta"`
 	// Note: le due frasi scritte dal modellino, salvate una volta in
@@ -181,6 +183,9 @@ func schede() []Card {
 			s.Misurato = !p.Provato.IsZero()
 			if s.Misurato {
 				s.Provato = p.Provato.Format("2/1/2006")
+			}
+			if !p.UltimoUso.IsZero() {
+				s.UltimoUso = p.UltimoUso.Format(time.RFC3339)
 			}
 		}
 		out = append(out, s)

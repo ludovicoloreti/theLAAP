@@ -24,7 +24,7 @@ func TestTagliaDalNomeContaITotaliNonGliAttivi(t *testing.T) {
 		{"gemma-4-26b-a4b-it-mlx", 26, "a4b sono gli attivi, il peso è 26"},
 		{"lmstudio-community--gemma-4-E2B-it-MLX-8bit", 2, "E2B è la taglia, 8bit la quantizzazione"},
 		{"ailexleon--gemma-4-26B-A4B-it-qat-uncensored-heretic-mlx-lm-4Bit", 26, "4Bit non sono 4 miliardi"},
-		{"Basher17--Qwen3.6-27B-heretic-v2-oQ8e-mtp", 27, "27B, e il 3.6 della versione non è una taglia"},
+		{"pyros-vault--Qwen3.8-27B-Uncensored-oQ8e-mtp", 27, "27B, e il 3.8 della versione non è una taglia"},
 		{"qwen3.8-27b-mtp", 27, "idem"},
 		{"gemma-4-31b-it-mlx", 31, ""},
 		{"mlx-community/Qwen2.5-0.5B-Instruct-4bit", 0.5, "le taglie con la virgola si leggono"},
@@ -57,7 +57,7 @@ func TestChiNonPuoFareLAiuto(t *testing.T) {
 	}
 	dentro := []string{
 		"lmstudio-community--gemma-4-E2B-it-MLX-8bit", "gemma-4-26b-a4b-it-mlx",
-		"qwen3.8-27b-mtp", "Basher17--Qwen3.6-27B-heretic-v2-oQ8e-mtp",
+		"qwen3.8-27b-mtp", "pyros-vault--Qwen3.8-27B-Uncensored-oQ8e-mtp",
 	}
 	for _, id := range dentro {
 		if cannotHelp(id) {
@@ -84,7 +84,7 @@ func TestSceglieIlPiuPiccoloCheConversa(t *testing.T) {
 		"text-embedding-nomic-embed-text-v1.5",
 	}
 	omlx := []string{
-		"Basher17--Qwen3.6-27B-heretic-v2-oQ8e-mtp", "GLM-OCR-8bit", "PaddleOCR-VL-8bit",
+		"pyros-vault--Qwen3.8-27B-Uncensored-oQ8e-mtp", "GLM-OCR-8bit", "PaddleOCR-VL-8bit",
 		"lmstudio-community--gemma-4-E2B-it-MLX-8bit", "dots.mocr-8bit",
 	}
 

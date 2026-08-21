@@ -74,7 +74,7 @@ func activeRegime(r RegimeCfg) bool {
 // toStop: i programmi accesi che il regime spegnerebbe.
 func toStop(r RegimeCfg) []string {
 	var out []string
-	for _, rc := range cfg().Runtime {
+	for _, rc := range knownRuntimes() {
 		if rc.Chiave == r.RuntimeAttivo || rc.Ferma == "" {
 			continue
 		}
@@ -148,7 +148,7 @@ func composeRegime(rg RegimeCfg, azione string) string {
 
 	altri := func() []string {
 		var c []string
-		for _, rc := range cfg().Runtime {
+		for _, rc := range knownRuntimes() {
 			if rc.Chiave == rg.RuntimeAttivo || rc.Ferma == "" {
 				continue
 			}

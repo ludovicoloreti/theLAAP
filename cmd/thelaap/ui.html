@@ -106,6 +106,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .seg button{min-height:26px;padding:0 12px;border-radius:6px;color:var(--muted)}
 .seg button.on{background:var(--surface);color:var(--accent-ink);box-shadow:0 1px 2px oklch(0.2 0.02 245/.14)}
 .seg.mini button{min-height:20px;padding:0 8px;font-size:10px}
+.scelta-riga{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.scelta-riga>.et{font-size:11px;color:var(--muted);min-width:62px}
+.scelte{display:flex;gap:4px;flex-wrap:wrap}.scelte button{min-height:28px;padding:0 10px;border-color:var(--line);background:var(--surface);font-size:11.5px}
+.scelte button.on{border-color:var(--accent);background:var(--soft);color:var(--accent-ink);font-weight:650}
 
 /* pezzi comuni */
 h1{margin:0 0 4px;font-size:25px;font-weight:600;color:var(--strong);letter-spacing:-.02em}
@@ -120,7 +123,8 @@ h2{margin:0;font-size:16px;font-weight:600;color:var(--strong)}
 .riga .t{display:block;font-size:13px;font-weight:500;color:var(--strong)}
 .riga .m{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
 .tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);
-  border:1px solid var(--line2);background:none;padding:4px 8px;border-radius:4px;white-space:nowrap;min-height:0}
+  border:1px solid var(--line2);background:none;padding:4px 8px;border-radius:4px;white-space:nowrap;min-height:0;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .tag.grigio{color:var(--muted);border-color:var(--line)}
 .pill{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:999px;border:0;min-height:0;white-space:nowrap}
 .p-ok{background:var(--ok-bg);color:var(--ok-ink)} .p-acc{background:var(--soft);color:var(--accent-ink)}
@@ -157,6 +161,14 @@ pre.out{margin:0;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:
 .tetto{position:absolute;top:-6px;bottom:-6px;width:0;border-left:1px dashed var(--warn);pointer-events:none}
 .righello{display:flex;justify-content:space-between;margin-top:9px;padding-top:7px;border-top:1px solid var(--line)}
 .righello span{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.stato-adesso{border:1px solid var(--line2);border-left:4px solid var(--ok);border-radius:10px;background:var(--surface);
+  padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.stato-adesso.spento{border-left-color:var(--line2)}
+.stato-adesso .titolo-adesso{flex:1;min-width:220px}.stato-adesso .titolo-adesso b{display:block;color:var(--strong);
+  font-size:16px;line-height:1.3;overflow-wrap:anywhere}.stato-adesso .titolo-adesso span{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.stato-adesso .numeri-adesso{display:flex;gap:8px;flex-wrap:wrap}.stato-adesso .numero-adesso{min-width:132px;padding:9px 11px;
+  border:1px solid var(--line);border-radius:8px;background:var(--inset)}
+.stato-adesso .numero-adesso b{display:block;font:600 16px var(--mono);color:var(--strong);margin-top:3px}
 
 /* tabella dei modelli */
 .intesta,.mriga{display:grid;grid-template-columns:110px minmax(0,1fr) 100px 86px 90px;gap:12px;align-items:center}
@@ -169,11 +181,27 @@ pre.out{margin:0;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:
   text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
 .num{font-family:var(--mono);font-size:11.5px;text-align:right}
 .chiedi{cursor:help}
+.filtri-modelli{flex-wrap:wrap;justify-content:flex-end}
+.mod-head,.mod-row{display:grid;grid-template-columns:110px minmax(200px,1.5fr) minmax(120px,.75fr) minmax(95px,.58fr) minmax(105px,.65fr);gap:12px;align-items:center}
+.mod-head{padding:10px 16px;background:var(--inset);border-bottom:1px solid var(--line)}.mod-row{padding:13px 16px;border-top:1px solid var(--line);cursor:pointer;position:relative}
+.mod-row:first-child{border-top:0}.mod-row:hover{background:var(--inset)}
+.mod-row.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.mod-row .principale{font-weight:600;color:var(--strong);line-height:1.28;white-space:normal;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.mod-row .secondaria{display:block;font-size:11px;color:var(--muted);line-height:1.3;margin-top:4px;white-space:normal;overflow-wrap:anywhere}
+.mod-row>.pill{white-space:normal;text-align:center;line-height:1.15;max-width:100%;overflow-wrap:anywhere;box-sizing:border-box}
+.stato-modello{display:flex;flex-direction:column;gap:4px;align-items:stretch;min-width:0}.stato-modello small{font-size:9.5px;line-height:1.2;text-align:center;color:var(--muted)}
+.sezione-modelli{font-size:13px;font-weight:650;color:var(--strong);margin:18px 0 8px}
+@media(max-width:1000px){.mod-head,.mod-row{grid-template-columns:104px minmax(190px,1.4fr) minmax(90px,.58fr) minmax(100px,.65fr)}
+  .mod-head>*:nth-child(3),.mod-row>*:nth-child(3){display:none}}
+@media(max-width:700px){.mod-head{display:none}.mod-row{grid-template-columns:100px minmax(0,1fr);gap:7px 11px;padding:12px}
+  .mod-row>*:nth-child(4),.mod-row>*:nth-child(5){grid-column:2}.mod-row>*:nth-child(3){display:none}}
 
 /* inspector */
 #insp .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 10px;flex:none}
 #insp .tabs button{border-bottom:2px solid transparent;border-radius:0;min-height:40px;color:var(--muted)}
 #insp .tabs button.on{color:var(--accent-ink);border-bottom-color:var(--accent);margin-bottom:-1px}
+.chiudi-insp{display:none;margin-left:auto;color:var(--muted)}
 #insp .cont{flex:1;overflow-y:auto;padding:16px 16px 22px;display:flex;flex-direction:column;gap:14px;min-height:0}
 .specs{display:grid;grid-template-columns:max-content 1fr;border:1px solid var(--line);border-radius:8px;
   overflow:hidden;flex:none}
@@ -190,6 +218,12 @@ pre.out{margin:0;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:
   background:var(--inset);color:var(--body);text-wrap:pretty}
 .msg.io{align-self:flex-end;max-width:88%;border-color:var(--accent);border-radius:10px 10px 2px 10px;
   background:var(--soft);color:var(--accent-ink)}
+.msg.gellow-attesa{display:flex;align-items:center;gap:11px;border-color:var(--accent);background:var(--soft);color:var(--accent-ink)}
+.gellow-gira{width:18px;height:18px;flex:none;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:gira .8s linear infinite}
+.gellow-attesa b{display:block;font-size:12.5px}.gellow-attesa small{display:block;color:var(--muted);font-size:10.5px;margin-top:3px}
+.gellow-punti{display:inline-flex;gap:3px;margin-left:4px;vertical-align:2px}.gellow-punti i{width:4px;height:4px;border-radius:50%;background:currentColor;
+  animation:gellow-lampeggia 1.05s infinite ease-in-out}.gellow-punti i:nth-child(2){animation-delay:.15s}.gellow-punti i:nth-child(3){animation-delay:.3s}
+@keyframes gellow-lampeggia{0%,70%,100%{opacity:.2;transform:translateY(0)}35%{opacity:1;transform:translateY(-2px)}}
 .md p{margin:0 0 7px} .md p:last-child{margin:0}
 .md code{font-family:var(--mono);font-size:11.5px;background:var(--surface);border:1px solid var(--line);
   border-radius:4px;padding:1px 5px}
@@ -243,9 +277,64 @@ svg.ico{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-wi
 
 /* finestre piccole: prima cade l'inspector, poi la colonna di sinistra.
    Le media query stanno in fondo perché vincano sulle regole base. */
-@media(max-width:1180px){main{grid-template-columns:224px minmax(0,1fr)} #insp{display:none}}
+@media(max-width:1180px){
+  main{grid-template-columns:224px minmax(0,1fr)} #insp{display:none}
+  main.insp-aperto #insp{display:flex;position:fixed;z-index:80;right:10px;top:58px;bottom:38px;
+    width:min(390px,calc(100vw - 20px));border:1px solid var(--line2);border-radius:12px;
+    box-shadow:0 24px 70px oklch(0.14 0.01 245/.28);background:var(--surface)}
+  main.insp-aperto::after{content:"";position:fixed;z-index:70;inset:50px 0 30px;background:oklch(0.18 0.01 245/.18)}
+  .chiudi-insp{display:block!important}
+}
 @media(max-width:820px){main{grid-template-columns:minmax(0,1fr)} #lato{display:none}
   header .titolo span{display:none} #apri-cmdk{width:auto;min-width:120px}}
+
+/* La vista semplice parte da quattro destinazioni, non dalla tassonomia
+   interna del programma. Le funzioni avanzate restano disponibili, raccolte
+   in un solo posto e senza occupare la navigazione principale. */
+.nav-principale{display:flex;flex-direction:column;gap:3px}
+.nav-extra{margin-top:12px;border-top:1px solid var(--line);padding-top:9px}
+.nav-extra summary{cursor:pointer;list-style:none;padding:7px 11px;color:var(--muted);font-size:12px;font-weight:600}
+.nav-extra summary::-webkit-details-marker{display:none}
+.nav-extra summary::after{content:"+";float:right;font-family:var(--mono);font-weight:400}
+.nav-extra[open] summary::after{content:"−"}
+.hero-semplice{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:22px;margin-bottom:16px}
+.hero-semplice h1{font-size:25px;margin:0 0 7px}.hero-semplice p{margin:0;color:var(--body);line-height:1.55;max-width:72ch}
+.griglia-home{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.riquadro-home{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:16px;min-width:0}
+.riquadro-home .numero{font-family:var(--mono);font-size:24px;color:var(--strong);display:block;margin:4px 0}
+.mem-home{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:16px;margin-bottom:16px}
+.mem-home-testa{display:flex;justify-content:space-between;gap:16px;align-items:baseline;flex-wrap:wrap;margin-bottom:11px}
+.mem-home-testa b{color:var(--strong)}.mem-home-testa span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.mem-home-barra{height:30px;display:flex;overflow:hidden;border:1px solid var(--line);border-radius:7px;background:var(--inset)}
+.mem-home-fetta{min-width:2px;height:100%;background:var(--accent);border-right:1px solid var(--surface)}
+.mem-home-libera{flex:1;min-width:0;background:var(--inset)}
+.mem-home-legenda{display:flex;gap:8px 16px;flex-wrap:wrap;margin-top:11px;font-size:11.5px;color:var(--body)}
+.mem-home-legenda span{display:inline-flex;align-items:center;gap:6px}.mem-home-legenda i{width:9px;height:9px;border-radius:3px;background:var(--accent);flex:none}
+.azioni-home{display:flex;gap:9px;flex-wrap:wrap;margin-top:17px}
+.barra-risultato{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:16px 0 9px;
+  padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.barra-risultato .titolo-risultato{display:flex;flex-direction:column;gap:2px;min-width:180px;margin-right:auto}
+.barra-risultato .titolo-risultato b{font-size:13px;color:var(--strong)}
+.barra-risultato .titolo-risultato span{font-size:11.5px;color:var(--muted)}
+.barra-risultato button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.filtri-hf{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px;margin:0 0 14px}
+.filtri-hf .base{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.filtri-hf .scelte-hf{display:flex;flex-direction:column;gap:9px;width:100%}
+.filtri-hf label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted)}
+.filtri-hf select,.filtri-hf input{min-height:32px;font-size:12px;background:var(--surface)}
+.filtri-hf select{width:auto;min-width:135px}
+.filtri-hf input[type=number]{width:112px}
+.filtri-hf .apri-filtri{width:100%;border-top:1px solid var(--line);border-radius:0;text-align:left;margin-top:2px;padding:9px 0 0;color:var(--accent-ink);min-height:30px}
+.filtri-hf .avanzati{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:10px}
+.hf-meta{display:flex;gap:11px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--muted)}
+.hf-meta span{white-space:nowrap}.hf-meta .trend{color:var(--accent-ink)}
+.config-riga{display:grid;grid-template-columns:minmax(220px,1fr) 120px 90px 110px 105px;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.config-riga:first-child{border-top:0}.config-riga .check{text-align:center}.config-riga input{width:18px;min-height:18px}
+.config-head{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--inset)}
+.esito-semplice{background:var(--code-bg);color:var(--code-fg);border-radius:9px;padding:14px;white-space:pre-wrap;line-height:1.5;max-height:420px;overflow:auto;font-family:var(--mono);font-size:11.5px}
+main.senza-insp{grid-template-columns:224px minmax(0,1fr)}
+main.senza-insp #insp{display:none}
+@media(max-width:900px){.griglia-home{grid-template-columns:1fr}.config-riga{grid-template-columns:minmax(160px,1fr) 80px 65px 85px}.config-riga>*:nth-child(2){display:none}}
+@media(max-width:820px){main.senza-insp{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
 <body>
@@ -261,8 +350,10 @@ svg.ico{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-wi
     <span id="cmdk-invito">Ask or command</span><kbd>⌘K</kbd>
   </button>
   <div class="seg" id="seg-modo"></div>
-  <button class="b3" style="min-width:32px;padding:0 8px" onclick="vaiTab('aiuto')" id="btn-aiuto" title="Help">
-    <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3v1.7"/><line x1="12" y1="17" x2="12" y2="17"/></svg>
+  <button class="b2" style="padding:0 10px" onclick="vaiTab('aiuto')" id="btn-aiuto"
+          title="Open Gellow" aria-label="Open Gellow" aria-controls="insp" aria-expanded="false">
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/><circle cx="8" cy="10.5" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="10.5" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="10.5" r=".8" fill="currentColor" stroke="none"/></svg>
+    <span id="testo-aiuto">Gellow</span>
   </button>
 </header>
 
@@ -272,7 +363,8 @@ svg.ico{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-wi
   <aside id="insp">
     <div class="tabs">
       <button id="tab-modello" class="on" onclick="vaiTab('modello')">Model</button>
-      <button id="tab-aiuto" onclick="vaiTab('aiuto')">Help</button>
+      <button id="tab-aiuto" onclick="vaiTab('aiuto')">Gellow</button>
+      <button class="chiudi-insp" onclick="chiudiInsp()" aria-label="Chiudi Gellow" title="Chiudi Gellow">×</button>
     </div>
     <div class="cont" id="insp-corpo"></div>
   </aside>
@@ -305,17 +397,17 @@ en:{whatItIs:"The local AI admin panel",ask:"Ask or command",guided:"Guided",exp
   readyNow:"Ready now",models:"Models",machine:"Machine",catalog:"Catalog and files",
   memory:"Unified memory",memorySub:"On Apple Silicon, RAM and VRAM are one pool.",
   programs:"Programs",maintenance:"Maintenance",config:"Config files",archive:"Archive",
-  smallModel:"Local small model",smallModelWhat:"Describes models, explains errors, turns what you type into a command.",
+  smallModel:"Gellow",smallModelWhat:"Your local assistant: describes models, explains errors, and turns requests into commands.",
   ramUnified:"Unified RAM",used:"used",free:"free",readNow:"read now",stale:"numbers frozen for",
   ceiling:"ceiling for one model",ceilingShort:"single ceiling",threshold:"coexistence threshold",
   measured:"measured on processes, not files",
   reading:"Machine reading",readingNote:"written by the code, no model",
   rule:"Rule",ruleClick:"Every label below is clickable.",states:"States",classes:"Classes",
   colState:"State",colModel:"Model",colClass:"Class",colWeight:"Weight",colSpeed:"Speed",
-  allModels:"All models",fAll:"All",fCo:"Coexisting",fEx:"Exclusive",fOff:"Off",fRem:"Remote",
+  allModels:"All models",fAll:"All",fCo:"Coexisting",fEx:"Exclusive",fOff:"Off",fRem:"Remote",fUnk:"Unknown size",
   modelsSub:"What each one does, whether it fits, and what to do with it.",seeModels:"See the models",
   noneHere:"Nothing in this group",noneHereWhy:"Try another filter, or All to see every model.",
-  addHF:"Add from HuggingFace",describeAll:"Describe all with the small model",
+  addHF:"Add from HuggingFace",describeAll:"Ask Gellow to describe all",
   stopAll:"Stop everything",startAll:"Start everything",pressAgain:"Press again to confirm",
   stopAllTitle:"Stop everything frees the memory now",
   stopAllBody:"Every program goes down and the models stop answering until you start them again. The panel stays open.",
@@ -330,10 +422,10 @@ en:{whatItIs:"The local AI admin panel",ask:"Ask or command",guided:"Guided",exp
   configSub:"theLAAP and the client files. Checked and backed up on save.",
   save:"Save",format:"Format",check:"Check",reload:"Reload",validJSON:"valid JSON",invalidJSON:"not valid JSON",
   archiveSub:"Removed models keep path and config. Restore puts them back.",restore:"Restore",del:"Delete",
-  tabModel:"Model",tabHelp:"Help",describedBy:"Described by the small model",
-  ifLoaded:"If you load it now",makeReady:"Make it the ready model",isReady:"Already the ready model",
+  tabModel:"Model",tabHelp:"Gellow",describedBy:"Described by Gellow",
+  ifLoaded:"If you activate it now",makeReady:"Activate",isReady:"Active",
   testTime:"Test and time it",freeRAM:"Free RAM",namesClients:"Names and clients",archiveBtn:"Archive",
-  askPh:"Ask the small model",send:"Send",
+  askPh:"Ask Gellow",send:"Send",
   cmdkPh:"A command, or what you want: free 40 gb",
   understood:"Understood",fromWhatISee:"From what I see",commands:"Commands",alsoThese:"Also these",
   confirm:"Confirm",footChoose:"up down to pick",footRun:"enter to run",footClose:"esc to close",footLocal:"read here, no network",
@@ -351,25 +443,25 @@ en:{whatItIs:"The local AI admin panel",ask:"Ask or command",guided:"Guided",exp
   offline:"The panel cannot reach the server",offlineWhy:"Start it with avvia-server.command, then reload this page.",
   noCommands:"No command declared",noCommandsWhy:"Tools, regimes and programs all come from the config file.",
   available:"free for a new model",reserved:"kept for the system",ceilingUnknown:"the program does not declare one",
-  alreadyIn:"Already in memory",alreadyInWhy:"It answers without loading time. Free RAM takes it out.",
-  unknownWeight:"Weight never measured",describing:"asking the small model",
-  st:{pronto:"ready","in-memoria":"in memory",spento:"off","in-arrivo":"incoming",guasto:"faulty",remoto:"remote"},
-  cl:{convivente:"coexisting",esclusivo:"exclusive",residente:"resident",remoto:"remote"}},
+  alreadyIn:"Already in memory",alreadyInWhy:"To turn it off, press Deactivate model. It leaves RAM; its files and client settings stay in place.",
+  unknownWeight:"Weight never measured",describing:"asking Gellow",
+  st:{pronto:"active","in-memoria":"in memory",spento:"off","in-arrivo":"incoming",guasto:"faulty",remoto:"remote"},
+  cl:{convivente:"coexisting",esclusivo:"exclusive",residente:"resident",remoto:"remote",ignota:"weight unknown"}},
 it:{whatItIs:"Il pannello di amministrazione dell'AI locale",ask:"Chiedi o comanda",guided:"Guidato",expert:"Esperto",
   readyNow:"Pronto adesso",models:"Modelli",machine:"Macchina",catalog:"Catalogo e file",
   memory:"Memoria unificata",memorySub:"Su Apple Silicon RAM e VRAM sono un unico spazio.",
   programs:"Programmi",maintenance:"Manutenzione",config:"Configurazioni",archive:"Archivio",
-  smallModel:"Modellino locale",smallModelWhat:"Descrive i modelli, spiega gli errori, traduce quello che scrivi in un comando.",
+  smallModel:"Gellow",smallModelWhat:"Il tuo assistente locale: descrive i modelli, spiega gli errori e trasforma le richieste in comandi.",
   ramUnified:"RAM unificata",used:"occupati",free:"liberi",readNow:"letta ora",stale:"numeri fermi da",
   ceiling:"tetto per un solo modello",ceilingShort:"tetto singolo",threshold:"soglia convivenza",
   measured:"misurata sui processi, non sui file",
   reading:"Lettura della macchina",readingNote:"scritta dal codice, senza modello",
   rule:"Regola",ruleClick:"Ogni etichetta qui sotto è cliccabile.",states:"Stati",classes:"Classi",
   colState:"Stato",colModel:"Modello",colClass:"Classe",colWeight:"Peso",colSpeed:"Velocità",
-  allModels:"Tutti i modelli",fAll:"Tutti",fCo:"Conviventi",fEx:"Esclusivi",fOff:"Spenti",fRem:"Remoti",
+  allModels:"Tutti i modelli",fAll:"Tutti",fCo:"Conviventi",fEx:"Esclusivi",fOff:"Spenti",fRem:"Remoti",fUnk:"Peso ignoto",
   modelsSub:"Cosa fa ognuno, se ci sta, e cosa farci.",seeModels:"Vedi i modelli",
   noneHere:"In questo gruppo non c'è niente",noneHereWhy:"Prova un altro filtro, o Tutti per vederli tutti.",
-  addHF:"Aggiungi da HuggingFace",describeAll:"Fai descrivere tutto al modellino",
+  addHF:"Aggiungi da HuggingFace",describeAll:"Fai descrivere tutto a Gellow",
   stopAll:"Ferma tutto",startAll:"Riaccendi tutto",pressAgain:"Premi di nuovo per confermare",
   stopAllTitle:"Ferma tutto libera la memoria adesso",
   stopAllBody:"Tutti i programmi vanno giù e i modelli non rispondono più finché non li riaccendi. Il pannello resta aperto.",
@@ -384,10 +476,10 @@ it:{whatItIs:"Il pannello di amministrazione dell'AI locale",ask:"Chiedi o coman
   configSub:"theLAAP e i file dei client. Controllati e salvati con copia.",
   save:"Salva",format:"Formatta",check:"Controlla",reload:"Ricarica",validJSON:"JSON valido",invalidJSON:"JSON non valido",
   archiveSub:"I modelli rimossi conservano percorso e configurazione. Ripristina li rimette.",restore:"Ripristina",del:"Elimina",
-  tabModel:"Modello",tabHelp:"Aiuto",describedBy:"Descritto dal modellino",
-  ifLoaded:"Se lo carichi adesso",makeReady:"Rendilo il modello pronto",isReady:"È già il modello pronto",
+  tabModel:"Modello",tabHelp:"Gellow",describedBy:"Descritto da Gellow",
+  ifLoaded:"Se lo attivi adesso",makeReady:"Attiva",isReady:"Attivo",
   testTime:"Cronometra",freeRAM:"Libera RAM",namesClients:"Nomi e client",archiveBtn:"Archivia",
-  askPh:"Chiedi al modellino",send:"Invia",
+  askPh:"Chiedi a Gellow",send:"Invia",
   cmdkPh:"Un comando, o cosa vuoi: libera 40 giga",
   understood:"Capito",fromWhatISee:"Da quello che vedo",commands:"Comandi",alsoThese:"Anche questi",
   confirm:"Conferma",footChoose:"su giù per scegliere",footRun:"invio per eseguire",footClose:"esc per chiudere",footLocal:"letto qui, senza rete",
@@ -405,10 +497,10 @@ it:{whatItIs:"Il pannello di amministrazione dell'AI locale",ask:"Chiedi o coman
   offline:"Il pannello non raggiunge il server",offlineWhy:"Avvialo con avvia-server.command, poi ricarica questa pagina.",
   noCommands:"Nessun comando dichiarato",noCommandsWhy:"Strumenti, regimi e programmi vengono tutti dal file di configurazione.",
   available:"liberi per un modello nuovo",reserved:"tenuti per il sistema",ceilingUnknown:"il programma non lo dichiara",
-  alreadyIn:"Già in memoria",alreadyInWhy:"Risponde senza tempo di caricamento. Libera RAM lo tira fuori.",
-  unknownWeight:"Peso mai misurato",describing:"lo chiedo al modellino",
-  st:{pronto:"pronto","in-memoria":"in memoria",spento:"spento","in-arrivo":"in arrivo",guasto:"guasto",remoto:"remoto"},
-  cl:{convivente:"convivente",esclusivo:"esclusivo",residente:"residente",remoto:"remoto"}}
+  alreadyIn:"Già in memoria",alreadyInWhy:"Per spegnerlo premi Disattiva modello. Esce dalla RAM; file e configurazioni dei client restano al loro posto.",
+  unknownWeight:"Peso mai misurato",describing:"lo chiedo a Gellow",
+  st:{pronto:"attivo","in-memoria":"in memoria",spento:"spento","in-arrivo":"in arrivo",guasto:"guasto",remoto:"remoto"},
+  cl:{convivente:"convivente",esclusivo:"esclusivo",residente:"residente",remoto:"remoto",ignota:"peso ignoto"}}
 };
 /* La lingua: quella scelta, altrimenti quella del browser, altrimenti inglese.
    Non è pignoleria: `cosa`, `nota` e gli avvisi arrivano dal server e dalla
@@ -431,7 +523,8 @@ guasto:{tipo:'st',en:"The program is on but does not know this id. Usually a wro
 convivente:{tipo:'cl',en:"Under the threshold, so it can stay in RAM together with others.",it:"Sotto la soglia, quindi può stare in RAM insieme ad altri."},
 esclusivo:{tipo:'cl',en:"Fits alone, not next to another. The panel stops the other programs first, then widens the memory margins.",it:"Da solo ci sta, accanto a un altro no. Il pannello ferma prima gli altri programmi, poi allarga i margini."},
 residente:{tipo:'cl',en:"Its program keeps it loaded on purpose: it costs little and serves a constant job.",it:"Il suo programma lo tiene caricato per scelta: costa poco e serve a un lavoro continuo."},
-remoto:{tipo:'cl',en:"Runs on a provider server. No unified memory used, and no stopping it from here.",it:"Gira sul server di un provider. Non usa memoria unificata e da qui non si ferma."}
+remoto:{tipo:'cl',en:"Runs on a provider server. No unified memory used, and no stopping it from here.",it:"Gira sul server di un provider. Non usa memoria unificata e da qui non si ferma."},
+ignota:{tipo:'cl',en:"Never measured, so we cannot say. Not a synonym for light: an unmeasured model can be the biggest one you have. Press «Test it» once and it gets a weight.",it:"Mai misurato, quindi non lo sappiamo. Non vuol dire leggero: un modello non misurato può essere il più grosso che hai. Premi «Provalo» una volta e il peso c'è."}
 };
 
 /* ════════════════════════════════════════════════════════════════
@@ -473,15 +566,22 @@ async function api(p,o){
    3. stato del pannello. Tutto quello che arriva dal server sta qui.
    ════════════════════════════════════════════════════════════════ */
 const S = {
-  schermo:'memoria', filtro:'tutti', sel:null, tab:'modello',
+  schermo:'home', filtro:'tutti', sel:null, tab:'modello', inspAperto:false,
   modo: localStorage.getItem('modo')||'guidato',
+  ordineModelli:localStorage.getItem('ordine-modelli')||'attivi',
+  ordineConfigurazioni:localStorage.getItem('ordine-configurazioni')||'configurati',
   tema: localStorage.getItem('tema')||'auto',
-  armato:'', cambiato:false, offline:false,
+  armato:'', cambiato:false, offline:false, archiviando:'', erroreArchivio:'', esameArchivio:null,
   mem:null, mod:null, modelli:[], runtime:[], capacita:{}, provider:{}, cred:{},
-  regimi:[], strumenti:[], comandi:[], aiuto:null, descrivendo:'', provando:'',
+  regimi:[], strumenti:[], comandi:[], aiuto:null, descrivendo:'', provando:'', attivando:'', spegnendo:'',
+  gellowOccupato:false, gellowDal:0, gellowScroll:'',
   esitoProva:'', avvisoProva:'', nomiAperti:null,
-  archivio:[], documenti:[], doc:null, docRev:'', hf:[], scarichi:[],
-  chat:[], domande:[], console:['ready.']
+  archivio:[], documenti:[], doc:null, docRev:'', hf:[], scarichi:[], configErrori:[],
+  hfCercato:false, hfCercando:false, hfQuery:'', hfErrore:'', copiato:false,
+  hfSort:'trendingScore', hfFormato:'tutti', hfMemoria:'tutti', hfEta:'tutte',
+  hfAutore:'', hfMinLikes:0, hfMinDownloads:0, hfMinGB:0, hfMaxGB:0,
+  hfFiltriAperti:false, hfRichiesta:0,
+  chat:[], domande:[], console:[]
 };
 
 /* ────────────────────────────────────────────────────────────────
@@ -515,7 +615,20 @@ const mancanoGB = m => m.verdetto ? (m.verdetto.mancanoByte||0)/1e9 : 0;
 const daFermare = m => (m.verdetto && m.verdetto.daLiberare) || [];
 const nomeRuntime = k => { const r = S.runtime.find(x=>x.chiave===k); return (r&&r.nome)||k; };
 
-const titoloDi = m => m.etichetta || m.nome || (String(m.id).split('/').pop()||m.id);
+/* Il nome principale deve identificare il modello, non ripetere una frase
+   inventata dal modellino. Le vecchie etichette automatiche (per esempio
+   «Analisi delle regole» su DeepSeek) restano modificabili, ma non possono più
+   nascondere ciò che c'è davvero sotto. */
+function nomeReale(m){
+  let n=String(m.nome||'').trim(), id=String(m.id||'');
+  if(n && n!==id){
+    if(n.includes('—')) n=n.split('—').slice(1).join('—').trim();
+    n=n.split('·')[0].trim();
+    if(n) return breve(n,58);
+  }
+  return cortoDi({id:id}) || id;
+}
+const titoloDi = m => nomeReale(m);
 /* Per i pulsanti. I nomi nei file dei client sono frasi intere — «CHAT-FAST —
    Gemma 4 26B-A4B MLX 8-bit (MoE, 4B attivi) · 86,5 tok/s misurati · per la
    chat quotidiana» — e dentro un pulsante diventano un paragrafo. Nelle righe
@@ -544,8 +657,8 @@ const VERBI = [
 {id:'libera',gruppo:'memory',en:"Free memory",it:"Libera memoria",
   cen:"Unloads as much as needed, starting from the biggest.",cit:"Scarica quanto serve, partendo dal più grande.",
   p:['libera','liberare','svuota','spazio','servono','giga','gb','free','space','room','need']},
-{id:'pronto',gruppo:'models',en:"Make a model ready",it:"Rendi pronto un modello",
-  cen:"Loads it and pins it as the ready model.",cit:"Lo carica e lo mette come modello pronto.",
+{id:'pronto',gruppo:'models',en:"Activate a model",it:"Attiva un modello",
+  cen:"Loads it so it can answer now.",cit:"Lo carica e lo rende subito utilizzabile.",
   p:['pronto','carica','usa','attiva','voglio','passa a','ready','load','use','want','switch']},
 {id:'prova',gruppo:'models',en:"Test a model",it:"Prova un modello",
   cen:"Sends a real question and times the answer.",cit:"Manda una domanda vera e cronometra la risposta.",
@@ -556,8 +669,8 @@ const VERBI = [
 {id:'config',gruppo:'files',en:"Open the config files",it:"Apri le configurazioni",
   cen:"theLAAP and the client files, JSON or YAML, with a backup on save.",cit:"theLAAP e i file dei client, JSON o YAML, con copia al salvataggio.",
   p:['config','configurazione','json','yaml','file','modifica','edit']},
-{id:'chiedi',gruppo:'help',en:"Ask the small model",it:"Chiedi al modellino",
-  cen:"The small model here answers, with the live state in front of it.",cit:"Risponde il modellino che gira qui, con lo stato reale davanti.",
+{id:'chiedi',gruppo:'help',en:"Ask Gellow",it:"Chiedi a Gellow",
+  cen:"Gellow answers locally, with the live state in front of it.",cit:"Gellow risponde in locale, con lo stato reale davanti.",
   p:['perche','spiega','come faccio','aiuto','why','explain','what does','how do i','help']}
 ];
 const nomeCmd = c => (IT() ? c.it : c.en) || c.en || c.it;
@@ -788,7 +901,7 @@ async function esegui(id, extra){
       const g = S.regimi.find(x => x.runtimeAttivo===m.runtime) || S.regimi[0];
       if(g && !g.attivo) return cambiaRegime(g.chiave);
     }
-    return prova(m.id);
+    return attiva(m.id);
   }
   if(id==='prova') return prova(extra.id || (modelloSel()||{}).id);
   /* tutto il resto è un comando del registro, e si esegue sulla rotta che il
@@ -858,7 +971,7 @@ async function cambiaRegime(chiave){
   const g = S.regimi.find(x=>x.chiave===chiave); if(!g) return;
   /* Entrare ferma altri programmi: si dice PRIMA quali, e si conferma. */
   if(!g.attivo && S.armato!=='regime:'+chiave){
-    S.armato = 'regime:'+chiave; vai('memoria'); return;
+    S.schermo='memoria'; S.inspAperto=false; S.armato='regime:'+chiave; disegnaTutto(); return;
   }
   S.armato = '';
   vai('manutenzione');
@@ -884,14 +997,57 @@ async function prova(id){
   S.provando=''; disegnaInsp(); aggiorna();
 }
 
-async function chiedi(testo){
-  if(!testo) return;
-  S.tab='aiuto'; S.chat.push({io:1,testo}); disegnaInsp();
-  const attesa = {io:0,testo:'…'}; S.chat.push(attesa); disegnaInsp();
+async function attiva(id){
+  const m=S.modelli.find(x=>x.id===id); if(!m||S.attivando)return;
+  const rt=S.runtime.find(r=>r.chiave===m.runtime);
+  if(m.gb>0){
+    try{
+      const v=await api('/api/preflight',{method:'POST',body:JSON.stringify({modello:m.id,pesoGB:m.gb})});
+      if(v&&v.verdetto&&!v.verdetto.ammesso){S.avvisoProva=motivoDi(v.verdetto,m.gb);disegnaInsp();return;}
+    }catch(e){}
+  }
+  S.avvisoProva='';S.esitoProva='';S.attivando=id;disegnaInsp();
   try{
-    const r = await api('/api/spiega',{method:'POST',body:JSON.stringify({domanda:testo})});
-    attesa.testo = (r&&r.ok) ? r.risposta : (IT()?'il modellino non risponde':'the small model is not answering');
+    const r=await api('/api/attiva',{method:'POST',body:JSON.stringify({porta:rt?rt.porta:0,modello:m.id,runtime:m.runtime})});
+    S.esitoProva=(r&&r.ok)?(IT()?'Attivo: può rispondere adesso.':'Active: it can answer now.'):
+      (IT()?'Non attivato: ':'Not activated: ')+((r&&r.errore)||'');
+  }catch(e){S.esitoProva=(IT()?'Non attivato: ':'Not activated: ')+e.message;}
+  S.attivando='';await aggiorna();disegnaInsp();
+}
+
+async function disattiva(id){
+  const m=S.modelli.find(x=>x.id===id);if(!m||S.spegnendo)return;
+  const cap=S.capacita[m.runtime]||{};
+  if(!cap.scaricaSingoloModello){
+    if(puoFermare(m.runtime))return servizio(m.runtime,'stop');
+    S.esitoProva=IT()?'Non posso disattivarlo: manca il comando per scaricare il modello o fermare il programma.'
+      :'I cannot deactivate it: the command to unload the model or stop the program is missing.';
+    return disegnaInsp();
+  }
+  S.spegnendo=id;S.esitoProva='';disegnaInsp();
+  try{
+    await api('/api/modello/libera-memoria',{method:'POST',body:JSON.stringify({runtime:m.runtime,modello:m.id})});
+    S.esitoProva=IT()?'Modello disattivato: è fuori dalla RAM. Il programma '+nomeRuntime(m.runtime)+' resta acceso.'
+      :'Model deactivated: it is out of RAM. '+nomeRuntime(m.runtime)+' stays running.';
+  }catch(e){S.esitoProva=(IT()?'Non disattivato: ':'Not deactivated: ')+e.message;}
+  S.spegnendo='';await aggiorna();disegnaInsp();
+}
+
+async function chiedi(testo, contesto){
+  if(!testo||S.gellowOccupato) return;
+  S.tab='aiuto'; S.inspAperto=true; S.gellowScroll='fondo';S.chat.push({io:1,testo}); disegnaTutto();
+  S.gellowOccupato=true;S.gellowDal=Date.now();
+  const attesa = {io:0,testo:'',caricando:true,controllo:!!contesto}; S.chat.push(attesa); disegnaInsp();
+  const tic=setInterval(()=>{
+    const e=$('gellow-tempo');if(!e)return;
+    const secondi=Math.max(1,Math.floor((Date.now()-S.gellowDal)/1000));
+    e.textContent=secondi+(IT()?(secondi===1?' secondo':' secondi'):(secondi===1?' second':' seconds'));
+  },1000);
+  try{
+    const r = await api('/api/spiega',{method:'POST',body:JSON.stringify({domanda:testo,contesto:contesto||''})});
+    attesa.testo = (r&&r.ok) ? r.risposta : (IT()?'Gellow non risponde':'Gellow is not answering');
   }catch(e){ attesa.testo = String(e.message); }
+  clearInterval(tic);attesa.caricando=false;attesa.nuova=true;S.gellowOccupato=false;S.gellowDal=0;S.gellowScroll='risposta';
   disegnaInsp();
 }
 
@@ -903,10 +1059,10 @@ function spiega(k){
   const testa = v.tipo==='st' ? (IT()?'Stato. ':'State. ') : (IT()?'Classe di convivenza. ':'Coexistence class. ');
   const coda = quali.length ? (IT()?' Adesso: ':' Right now: ')+quali.map(titoloDi).join(', ')+'.'
                             : (IT()?' Adesso nessun modello.':' No model right now.');
-  S.tab='aiuto';
+  S.tab='aiuto'; S.inspAperto=true;
   S.chat.push({io:1,testo:IT()?'Cosa vuol dire «'+eti+'»?':'What does "'+eti+'" mean?'});
   S.chat.push({io:0,testo:testa+(IT()?v.it:v.en)+coda});
-  disegnaInsp();
+  disegnaTutto();
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -928,6 +1084,10 @@ async function applicaTema(){
    non deve tenere sveglia la macchina.
    ════════════════════════════════════════════════════════════════ */
 let TIMER=null;
+function staModificando(){
+  const a=document.activeElement;
+  return !!a && ['INPUT','SELECT','TEXTAREA','SUMMARY'].includes(a.tagName);
+}
 async function aggiorna(){
   try{
     /* /api/modelli porta in una richiesta i numeri della macchina, lo stato,
@@ -943,7 +1103,10 @@ async function aggiorna(){
     S.runtime = Array.isArray(runtime)?runtime:[];
     if(!S.sel && S.modelli.length) S.sel = prontoId() || S.modelli[0].id;
   }catch(e){ S.offline=true; }
-  disegnaTutto();
+  /* Il polling non deve sostituire un menu mentre è aperto né un campo mentre
+     qualcuno scrive. I dati vengono aggiornati comunque; il prossimo giro,
+     appena il controllo perde il fuoco, ridisegna anche la pagina. */
+  if(!staModificando())disegnaTutto();
 }
 /* le liste che cambiano solo quando si cambia configurazione: una volta sola.
    Alcune rotte rispondono `null` quando non c'è niente, non `[]`: il `|| def`
@@ -951,6 +1114,7 @@ async function aggiorna(){
 async function caricaLento(){
   const uno = async (p, dove, def) => { try{ const v = await api(p); S[dove] = v || def; }catch(e){ S[dove] = def; } };
   const mappa = async (p, dove) => { try{ (await api(p) || []).forEach(x => S[dove][x.chiave||x.provider] = x); }catch(e){} };
+  const configurazioni = async () => { try{ const v=await api('/api/config'); S.configErrori=(v&&v.errori)||[]; }catch(e){ S.configErrori=[e.message]; } };
   await Promise.all([
     uno('/api/regimi','regimi',[]),
     uno('/api/strumenti','strumenti',[]),
@@ -960,11 +1124,12 @@ async function caricaLento(){
     uno('/api/hf/stato','scarichi',[]),
     uno('/api/domande','domande',[]),
     uno('/api/aiuto','aiuto',null),
+    configurazioni(),
     mappa('/api/capacita','capacita'),
     mappa('/api/provider','provider'),
     mappa('/api/credenziali','cred')
   ]);
-  disegnaTutto();
+  if(!staModificando())disegnaTutto();
 }
 function avviaPolling(){
   clearInterval(TIMER);
@@ -979,6 +1144,7 @@ const pillStato = s => ({pronto:'p-ok','in-memoria':'p-acc',spento:'p-neutro','i
 const STATI = ['pronto','in-memoria','spento','in-arrivo','guasto'];
 const CLASSI = ['convivente','esclusivo','residente','remoto'];
 const ICO = {
+  home:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9h13v-9"/><path d="M9.5 19v-5h5v5"/>',
   modelli:'<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>',
   memoria:'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1.5" x2="9" y2="4"/><line x1="15" y1="1.5" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="22.5"/><line x1="15" y1="20" x2="15" y2="22.5"/>',
   programmi:'<rect x="3" y="4" width="18" height="16" rx="2"/><polyline points="7,9 10,12 7,15"/><line x1="12.5" y1="15" x2="17" y2="15"/>',
@@ -988,20 +1154,34 @@ const ICO = {
 };
 const ico = k => '<svg class="ico" viewBox="0 0 24 24">'+ICO[k]+'</svg>';
 
-function vai(s, filtro){ S.schermo=s; if(filtro) S.filtro=filtro; S.armato=''; disegnaTutto(); }
-function vaiTab(t){ S.tab=t; disegnaInsp(); }
+function vai(s, filtro){ S.schermo=s; if(filtro) S.filtro=filtro; S.armato=''; S.inspAperto=false; disegnaTutto(); }
+function vaiTab(t){ if(t==='aiuto'&&S.tab!=='aiuto')S.gellowScroll='fondo';S.tab=t; S.inspAperto=true; disegnaTutto(); }
+function chiudiInsp(){ S.inspAperto=false; disegnaTutto(); }
 /* disegnaCentro serve: la riga evidenziata sta nella tabella, non
    nell'ispettore. Senza, il segno della selezione arrivava col giro di
    aggiornamento dopo, e il clic sembrava non aver fatto niente. */
-function scegli(id){ S.sel=id; S.tab='modello'; S.esitoProva=''; S.avvisoProva=''; disegnaCentro(); disegnaInsp(); }
+function scegli(id){
+  S.sel=id; S.tab='modello'; S.inspAperto=true; S.esitoProva=''; S.avvisoProva='';
+  S.armato=''; S.erroreArchivio=''; S.esameArchivio=null; disegnaTutto();
+}
 
-function disegnaTutto(){ disegnaTestata(); disegnaLato(); disegnaCentro(); disegnaInsp(); disegnaPiede(); }
+function disegnaTutto(){
+  /* Se Gellow è aperto l'ispettore deve esistere anche fuori da Modelli.
+     Prima `senza-insp` vinceva nel CSS e il clic su Aiuto aggiornava lo stato
+     senza mostrare nulla: il pulsante sembrava rotto. */
+  document.querySelector('main').classList.toggle('senza-insp',S.schermo!=='modelli'&&!S.inspAperto);
+  document.querySelector('main').classList.toggle('insp-aperto',!!S.inspAperto);
+  disegnaTestata(); disegnaLato(); disegnaCentro(); disegnaInsp(); disegnaPiede();
+}
 
 function disegnaTestata(){
   $('che-cos-e').textContent = T().whatItIs;
   $('cmdk-invito').textContent = T().ask;
   $('q').placeholder = T().cmdkPh;
-  $('btn-aiuto').title = T().tabHelp;
+  $('btn-aiuto').title = IT()?'Apri Gellow':'Open Gellow';
+  $('btn-aiuto').setAttribute('aria-label',IT()?'Apri Gellow':'Open Gellow');
+  $('btn-aiuto').setAttribute('aria-expanded',String(!!S.inspAperto&&S.tab==='aiuto'));
+  $('testo-aiuto').textContent = T().tabHelp;
   $('seg-modo').innerHTML =
     ['guidato','esperto'].map(m => '<button class="'+(S.modo===m?'on':'')+'" onclick="setModo(\''+m+'\')">'
       +esc(m==='guidato'?T().guided:T().expert)+'</button>').join('');
@@ -1009,58 +1189,18 @@ function disegnaTestata(){
 function setModo(m){ S.modo=m; localStorage.setItem('modo',m); disegnaTutto(); }
 
 function disegnaLato(){
-  const conta = (k) => S.modelli.filter(m => k==='spento'
-    ? ['spento','guasto','in-arrivo'].includes(statoDi(m)) : classeDi(m)===k).length;
-  const p = S.modelli.find(m=>m.pronto);
-  let h = '<div class="k gruppo">'+esc(T().readyNow)+'</div>';
-  h += p ? '<button id="pronto-card" onclick="scegli('+arg(p.id)+')">'
-      +'<span style="display:flex;align-items:center;gap:7px;min-width:0"><span class="dot vivo" style="background:var(--ok)"></span>'
-      +'<span class="t">'+esc(titoloDi(p))+'</span></span>'
-      +'<span class="i">'+esc(cortoDi(p))+'</span>'
-      +'<span class="mono" style="font-size:11px;color:var(--strong);display:flex;gap:12px">'
-      +(p.misurato?'<span>'+gb(p.tokS)+' <span class="k">tok/s</span></span>':'')
-      +(p.gb?'<span>'+gb(p.gb)+' <span class="k">GB</span></span>':'')+'</span></button>'
-    : '<div style="padding:0 11px 10px;font-size:12px;color:var(--muted)">'
-      +esc(IT()?'nessun modello caricato':'no model loaded')+'</div>';
-
-  /* MODELLI porta all'elenco, non alla memoria: sono due schermate diverse.
-     Prima erano la stessa, e cambiare filtro cambiava solo la tabella in
-     fondo — per vedere gli esclusivi bisognava scorrere oltre la barra, i
-     processi, la lettura e la regola. Ogni volta. */
-  h += '<div class="k gruppo">'+esc(T().models)+'</div>';
-  h += voce(S.schermo==='modelli'&&S.filtro==='tutti','modelli',T().fAll,S.modelli.length,"vai('modelli','tutti')");
-  [['convivente',T().fCo],['esclusivo',T().fEx],['spento',T().fOff],['remoto',T().fRem]].forEach(([k,n])=>{
-    h += voce(k===S.filtro && S.schermo==='modelli', 'modelli', n, conta(k), "vai('modelli','"+k+"')");
-  });
-  h += voce(S.schermo==='archivio','modelli',T().archive,S.archivio.length,"vai('archivio')");
-  h += '<div class="k gruppo">'+esc(T().machine)+'</div>';
-  h += voce(S.schermo==='memoria','memoria',T().memory,'',"vai('memoria')");
+  let h='<div class="nav-principale">';
+  h += voce(S.schermo==='home','home',IT()?'Panoramica':'Overview','',"vai('home')");
+  h += voce(S.schermo==='modelli','modelli',T().models,S.modelli.length,"vai('modelli','tutti')");
+  h += voce(S.schermo==='configurazioni','config',T().config,'',"vai('configurazioni')");
+  h += voce(S.schermo==='manutenzione','manutenzione',IT()?'Controlla':'Check','',"vai('manutenzione')");
+  h += '</div><details class="nav-extra" '+(S.modo==='esperto'?'open':'')+'><summary>'
+    +esc(IT()?'Altro':'More')+'</summary>';
   h += voce(S.schermo==='programmi','programmi',T().programs,S.runtime.filter(r=>r.attivo).length,"vai('programmi')");
-  h += voce(S.schermo==='manutenzione','manutenzione',T().maintenance,'',"vai('manutenzione')");
-  h += '<div class="k gruppo">'+esc(T().catalog)+'</div>';
-  h += voce(S.schermo==='hf','hf','HuggingFace','',"vai('hf')");
-  h += voce(S.schermo==='config','config',T().config,'',"vai('config')");
-  /* il modellino: chi è lo dice il server (/api/aiuto), il peso e lo stato si
-     leggono dalla sua scheda. Niente nome cablato, o cambiando Mac mentirebbe. */
-  const a = S.aiuto && S.aiuto.modello ? S.modelli.find(m => String(m.id)===String(S.aiuto.modello)) : null;
-  h += '<div class="sp"></div><div style="border-top:1px solid var(--line);padding:11px 11px 2px;display:flex;flex-direction:column;gap:6px">'
-    +'<span class="k">'+esc(T().smallModel)+'</span>'
-    +(S.aiuto && S.aiuto.modello
-      ? '<span style="display:flex;align-items:center;gap:7px;min-width:0">'
-        +'<span class="dot" style="background:'+(a && ['pronto','in-memoria'].includes(statoDi(a))?'var(--ok)':'var(--line2)')+'"></span>'
-        +'<span class="mono" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
-        +esc(cortoDi({id:S.aiuto.modello}))
-        +(S.aiuto.parametriB?' · '+gb(S.aiuto.parametriB)+'B':'')
-        +(a&&a.gb?' · '+gb(a.gb)+' GB':'')+'</span></span>'
-      : '')
-    /* Se non c'era niente di piccolo si è preso quello che c'era: va detto, non
-       nascosto. Un 26B che scrive etichette occupa memoria che serve altrove. */
-    +(S.aiuto && S.aiuto.ripiego
-      ? '<span style="font-size:11.5px;color:var(--warn-ink);line-height:1.45">'
-        +esc(IT()?'Nessun modello piccolo fra quelli serviti: uso questo, ma pesa. Dichiarane uno con «modelloAiuto» in configurazione.'
-                 :'No small model among those served: using this one, but it is heavy. Name one with «modelloAiuto» in the config.')+'</span>'
-      : '')
-    +'<span style="font-size:11.5px;color:var(--muted);line-height:1.45">'+esc(T().smallModelWhat)+'</span></div>';
+  h += voce(S.schermo==='memoria','memoria',T().memory,'',"vai('memoria')");
+  h += voce(S.schermo==='hf','hf',IT()?'Scarica modelli':'Download models','',"vai('hf')");
+  h += voce(S.schermo==='archivio','modelli',T().archive,S.archivio.length,"vai('archivio')");
+  h += voce(S.schermo==='config','config',IT()?'File avanzati':'Advanced files','',"vai('config')")+'</details>';
   $('lato').innerHTML = h;
 }
 function voce(on, icona, nome, n, onclick){
@@ -1068,12 +1208,53 @@ function voce(on, icona, nome, n, onclick){
     +'<span class="nome">'+esc(nome)+'</span>'+(n||n===0?'<span class="n">'+n+'</span>':'')+'</button>';
 }
 
+/* bottone: un pulsante che sa anche di non poter fare niente.
+
+   Il motivo per cui è spento non è un dettaglio estetico: un pulsante grigio
+   senza spiegazione è indistinguibile da uno rotto, ed è esattamente il
+   sospetto che il 18/08/2026 si è rivelato fondato su metà pannello. Se
+   `perche` è pieno il pulsante è disabilitato E dice perché, sempre insieme:
+   separare le due cose è come si torna al punto di partenza.
+
+   `grezzo` per le etichette che contengono già markup (la rotellina). */
+function bottone(classe, azione, etichetta, perche, grezzo){
+  const off = !!perche;
+  return '<button class="'+classe+'" onclick="'+azione+'"'
+    + (off ? ' disabled title="'+esc(perche)+'"' : '')
+    + '>' + (grezzo ? etichetta : esc(etichetta)) + '</button>';
+}
+function scelteBottoni(titolo,valore,voci,azione){
+  return '<div class="scelta-riga"><span class="et">'+esc(titolo)+'</span><span class="scelte">'
+    +voci.map(([v,n])=>'<button class="'+(v===valore?'on':'')+'" onclick="'+azione+'('+arg(v)+')">'+esc(n)+'</button>').join('')
+    +'</span></div>';
+}
+
+/* liberabiliPer: i programmi che tengono memoria e che si possono alleggerire
+   per far posto a questo modello. Se è vuoto, «Libera RAM» non ha niente da
+   fare — ed è meglio dirlo prima di premere che non succedere niente dopo. */
+/* puoFermare: il server dichiara per ogni programma cosa sa fargli, e la
+   pagina si limita a leggerlo. Ricavarlo qui — dal nome, dalla porta — è come
+   si finisce a offrire pulsanti che il server rifiuta. */
+function puoFermare(chiave){
+  const r = S.runtime.find(x=>x.chiave===chiave);
+  return !!(r && r.puoFermare);
+}
+
+function liberabiliPer(m){
+  const nominati = daFermare(m);
+  const proc = ((S.mem&&S.mem.processi)||[]).filter(p => (p.correnteByte||0)/1e9 > 0.2);
+  if(nominati.length) return proc.filter(p => nominati.includes(p.chiave));
+  /* nessun nome dal verdetto: vale chiunque tenga memoria, come fa esegui() */
+  return proc;
+}
+
 function disegnaCentro(){
   if(S.offline){
     $('centro').innerHTML = '<div class="vuoto"><b>'+esc(T().offline)+'</b>'+esc(T().offlineWhy)+'</div>';
     return;
   }
-  const f = {memoria:vistaMemoria, modelli:vistaModelli, programmi:vistaProgrammi,
+  const f = {home:vistaHome, memoria:vistaMemoria, modelli:vistaModelli,
+             configurazioni:vistaConfigurazioni, programmi:vistaProgrammi,
              manutenzione:vistaManutenzione, hf:vistaHF, config:vistaConfig,
              archivio:vistaArchivio}[S.schermo] || vistaMemoria;
   $('centro').innerHTML = f();
@@ -1088,9 +1269,138 @@ function disegnaCentro(){
 }
 let ultimoDisegno = '';
 
+/* Panoramica: risponde subito a «cosa va e cosa devo fare?». I dettagli
+   tecnici restano nelle viste dedicate; qui ogni problema ha una sola uscita. */
+function vistaHome(){
+  const guasti=S.modelli.filter(m=>statoDi(m)==='guasto');
+  const nonConfigurati=S.modelli.filter(m=>!m.inPi&&!m.inOC);
+  const attivi=S.runtime.filter(r=>r.attivo).length;
+  const aiutoId=(S.aiuto&&S.aiuto.modello)||'';
+  const aiuto=S.modelli.find(m=>String(m.id)===String(aiutoId));
+  const aiutoOK=!!aiutoId && !!aiuto && statoDi(aiuto)!=='guasto' && !(S.aiuto&&S.aiuto.ripiego);
+  const processi=((S.mem&&S.mem.processi)||[]).filter(p=>(p.correnteByte||0)>0);
+  const problemi=guasti.length+(S.configErrori||[]).length+(aiutoOK?0:1);
+  const titolo=problemi ? (IT()?problemi+' cose da sistemare':problemi+' things to fix')
+                         : (IT()?'Tutto l’essenziale è a posto':'Everything essential is ready');
+  const sottotitolo=problemi
+    ? (IT()?'Vedi subito cosa non va; il controllo automatico conferma il resto.':'See what is wrong now; the automatic check confirms the rest.')
+    : (IT()?'Modelli, programmi e configurazioni sono leggibili da un solo posto.':'Models, programs and configurations are visible in one place.');
+  let h='<div class="hero-semplice"><span class="pill '+(problemi?'p-warn':'p-ok')+'">'
+    +esc(problemi?(IT()?'ATTENZIONE':'ATTENTION'):'OK')+'</span><h1>'+esc(titolo)+'</h1><p>'+esc(sottotitolo)+'</p>'
+    +'<div class="azioni-home"><button class="b1" onclick="controllaOra()">'+esc(IT()?'Controlla ora':'Check now')+'</button>'
+    +'<button class="b2" onclick="vai(\'modelli\',\'tutti\')">'+esc(IT()?'Vedi tutti i modelli':'See all models')+'</button>'
+    +'<button class="b3" onclick="vai(\'configurazioni\')">'+esc(IT()?'Apri Pi e OpenCode':'Open Pi and OpenCode')+'</button></div></div>';
+  h+='<div class="griglia-home">'
+    +'<div class="riquadro-home"><span class="k">'+esc(IT()?'Modelli trovati':'Models found')+'</span><span class="numero">'+S.modelli.length+'</span>'
+      +'<span class="sub">'+esc(S.modelli.filter(m=>m.inPi).length+' Pi · '+S.modelli.filter(m=>m.inOC).length+' OpenCode'
+        +(nonConfigurati.length?' · '+nonConfigurati.length+(IT()?' da aggiungere':' to add'):''))+'</span></div>'
+    +'<div class="riquadro-home"><span class="k">'+esc(IT()?'Programmi accesi':'Programs running')+'</span><span class="numero">'+attivi+' / '+S.runtime.length+'</span>'
+      +'<span class="sub">'+esc(S.runtime.filter(r=>r.attivo).map(r=>r.nome||r.chiave).join(' · ')||(IT()?'nessuno':'none'))+'</span></div>'
+    +'<div class="riquadro-home"><span class="k">Gellow</span><span class="numero" style="font-size:16px;word-break:break-word">'
+      +esc(aiutoId?cortoDi({id:aiutoId}):(IT()?'Non disponibile':'Unavailable'))+'</span><span class="sub">'
+      +esc(aiutoOK?(IT()?'pronto per spiegazioni e descrizioni':'ready for help and descriptions')
+        :(S.aiuto&&S.aiuto.ripiego?(IT()?'troppo grande: va scelto un modello sotto 8B':'too large: choose a model below 8B')
+        :(IT()?'non è visibile al programma':'not visible to the program')))+'</span></div>'
+    +'<div class="riquadro-home"><span class="k">'+esc(IT()?'RAM disponibile per un modello':'RAM available for a model')+'</span><span class="numero">'
+      +gb(disponibiliGB())+' GB</span><span class="sub">'+esc(IT()?'dopo la riserva di sicurezza':'after the safety reserve')+'</span></div></div>';
+  const colori=['var(--accent)','var(--ok)','var(--warn)','var(--accent-ink)','var(--bad)'];
+  h+='<div class="mem-home"><div class="mem-home-testa"><b>'+esc(IT()?'Memoria usata dai modelli':'Memory used by models')+'</b><span>'
+    +gb(occupatiGB())+' / '+gb(totaleGB())+' GB</span></div><div class="mem-home-barra" title="'+esc(gb(occupatiGB())+' GB')+'">'
+    +processi.map((p,i)=>'<span class="mem-home-fetta" style="width:'+Math.max(0,(p.correnteByte/1e9)/Math.max(totaleGB(),1)*100).toFixed(2)+'%;background:'+colori[i%colori.length]+'" title="'
+      +esc((p.nome||p.chiave)+' · '+gb(p.correnteByte/1e9)+' GB')+'"></span>').join('')
+    +'<span class="mem-home-libera"></span></div><div class="mem-home-legenda">'
+    +(processi.length?processi.map((p,i)=>'<span><i style="background:'+colori[i%colori.length]+'"></i><b>'+esc(p.nome||p.chiave)+'</b> '
+      +gb(p.correnteByte/1e9)+' GB'+((p.modelli||[]).length?' · '+esc(p.modelli.map(x=>cortoDi({id:x})).join(', ')):'')+'</span>').join('')
+      :'<span>'+esc(IT()?'Nessun modello sta usando RAM.':'No model is using RAM.')+'</span>')
+    +'</div></div>';
+  if(guasti.length) h+=nota('n-bad',IT()?'Modelli che non rispondono':'Models not responding',
+    guasti.map(titoloDi).join(', ')+(IT()?'. Apri Modelli per vedere il motivo.':'. Open Models to see why.'));
+  if(!aiutoOK) h+=nota('n-warn',IT()?'Gellow non è pronto':'Gellow is not ready',
+    aiutoId?(IT()?'Il pannello sta ripiegando su '+aiutoId+'.':'The panel is falling back to '+aiutoId+'.')
+            :(IT()?'Nessun piccolo modello conversazionale è disponibile.':'No small conversational model is available.'));
+  (S.configErrori||[]).forEach(e=>h+=nota('n-bad',IT()?'Configurazione non leggibile':'Configuration cannot be read',e));
+  if(nonConfigurati.length) h+=nota('n-info',IT()?'Modelli trovati ma non nei client':'Models found but missing from clients',
+    nonConfigurati.length+(IT()?' modelli sono installati ma non compaiono ancora in Pi o OpenCode. Sistemali dalla vista Configurazioni.'
+      :' models are installed but not yet present in Pi or OpenCode. Fix them in Configurations.'));
+  return h;
+}
+
+function cambiaClient(runtime,id,quale,valore){
+  const m=S.modelli.find(x=>x.runtime===runtime&&x.id===id); if(!m)return;
+  if(quale==='pi')m.inPi=valore; else m.inOC=valore;
+  S.cambiato=true; disegnaCentro();
+}
+function ordinaConfigurazioni(lista){
+  return lista.slice().sort((a,b)=>{
+    let d=0;
+    if(S.ordineConfigurazioni==='configurati')d=(Number(!!b.inPi)+Number(!!b.inOC))-(Number(!!a.inPi)+Number(!!a.inOC));
+    else if(S.ordineConfigurazioni==='pi')d=Number(!!b.inPi)-Number(!!a.inPi);
+    else if(S.ordineConfigurazioni==='opencode')d=Number(!!b.inOC)-Number(!!a.inOC);
+    else if(S.ordineConfigurazioni==='programma')d=nomeRuntime(a.runtime).localeCompare(nomeRuntime(b.runtime),LINGUA,{sensitivity:'base'});
+    if(!d)d=nomeReale(a).localeCompare(nomeReale(b),LINGUA,{numeric:true,sensitivity:'base'});
+    return d;
+  });
+}
+
+/* Una matrice sola sostituisce il giro file -> provider -> modello. Qui si
+   vede l'intera configurazione e si cambia un client con una spunta. */
+function vistaConfigurazioni(){
+  const pi=S.modelli.filter(m=>m.inPi).length, oc=S.modelli.filter(m=>m.inOC).length;
+  const ordinati=ordinaConfigurazioni(S.modelli);
+  let h='<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px"><div class="cresci">'
+    +'<h1>'+esc(T().config)+'</h1><p class="sub">'+esc(IT()?'Tutti i modelli di Pi e OpenCode, insieme. Spunta, salva, fine.'
+      :'Every Pi and OpenCode model together. Check, save, done.')+'</p></div>'
+    +(S.cambiato?'<button class="b1" onclick="salva()">'+esc(T().saveChanges)+'</button>':'')+'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="pill p-neutro">'+S.modelli.length+' '+esc(T().models.toLowerCase())+'</span>'
+    +'<span class="pill p-acc">Pi '+pi+'</span><span class="pill p-acc">OpenCode '+oc+'</span>'
+    +(S.cambiato?'<span class="pill p-warn">'+esc(T().unsaved)+'</span>':'')+'</div>';
+  if((S.configErrori||[]).length) S.configErrori.forEach(e=>h+=nota('n-bad','',e));
+  h+=scelteBottoni(IT()?'Ordina':'Sort',S.ordineConfigurazioni,
+    [['configurati',IT()?'Con spunte prima':'Checked first'],['pi','Pi'],['opencode','OpenCode'],
+     ['nome',IT()?'Nome A–Z':'Name A–Z'],['programma',IT()?'Programma':'Program']],
+    'impostaOrdineConfigurazioni')+'<div style="height:12px"></div>';
+  h+='<div class="card"><div class="config-riga config-head"><span>'+esc(T().colModel)+'</span><span>'+(IT()?'Programma':'Program')+'</span><span class="check">Pi</span><span class="check">OpenCode</span><span>'+(IT()?'Disponibilità':'Availability')+'</span></div>'
+    +ordinati.map(m=>'<div class="config-riga"><span style="min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis">'+esc(titoloDi(m))+'</b>'
+      +'<span class="mono" style="display:block;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis">'+esc(m.id)+'</span></span>'
+      +'<span>'+esc(nomeRuntime(m.runtime))+'</span>'
+      +'<label class="check" title="Pi"><input type="checkbox" '+(m.inPi?'checked':'')+' onchange="cambiaClient('+arg(m.runtime)+','+arg(m.id)+',\'pi\',this.checked)"></label>'
+      +'<label class="check" title="OpenCode"><input type="checkbox" '+(m.inOC?'checked':'')+' onchange="cambiaClient('+arg(m.runtime)+','+arg(m.id)+',\'oc\',this.checked)"></label>'
+      +'<span class="pill '+pillStato(statoDi(m))+'">'+esc(T().st[statoDi(m)])+'</span></div>').join('')+'</div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap"><span class="sub">'
+    +esc(IT()?'Ogni salvataggio crea prima una copia di sicurezza.':'Every save creates a backup first.')+'</span>'
+    +'<button class="b3" onclick="vai(\'config\')">'+esc(IT()?'Apri i file completi':'Open full files')+'</button></div>';
+  return h;
+}
+function impostaOrdineConfigurazioni(v){S.ordineConfigurazioni=v;localStorage.setItem('ordine-configurazioni',v);disegnaCentro();}
+
+function controllaOra(){
+  const preferito=S.strumenti.find(x=>x.id==='controllo')||S.strumenti.find(x=>!x.rischio);
+  if(preferito) return esegui(preferito.id);
+  vai('manutenzione'); log('! '+(IT()?'Nessun controllo automatico configurato.':'No automatic check configured.'));
+}
+
+function testoRisultato(){ return (S.console||[]).join('\n').trim(); }
+async function copiaRisultato(){
+  const testo=testoRisultato(); if(!testo)return;
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(testo);
+    else throw new Error('clipboard');
+  }catch(e){
+    const t=document.createElement('textarea'); t.value=testo; t.style.position='fixed'; t.style.opacity='0';
+    document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
+  }
+  S.copiato=true; disegnaCentro(); setTimeout(()=>{S.copiato=false;if(S.schermo==='manutenzione')disegnaCentro();},1800);
+}
+function chiediRisultato(){
+  const testo=testoRisultato(); if(!testo)return;
+  chiedi(IT()?'Analizza tutto questo controllo. Raggruppa gli errori per causa, non saltarne nessuna, spiegami cosa bloccano e dammi in ordine i pulsanti o i comandi precisi per risolverli.'
+              :'Analyze this entire check. Group errors by cause, omit none, explain what each blocks, and give me the exact buttons or commands to fix them in order.',testo);
+}
+
 function vistaMemoria(){
   const tot=totaleGB(), occ=occupatiGB(), lib=liberiGB(), tet=tettoGB(), sog=sogliaGB();
   const proc = ((S.mem&&S.mem.processi)||[]).filter(p=>(p.correnteByte||0)/1e9>0.2);
+  const inRAM=S.modelli.filter(m=>['pronto','in-memoria'].includes(statoDi(m))&&!remotoDi(m));
   const COL=['var(--s1)','var(--s2)','var(--s3)','var(--s4)'];
   const reg = S.regimi[0];
   let h = '<div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:16px">'
@@ -1098,9 +1408,14 @@ function vistaMemoria(){
     +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
     +(reg?'<button class="b2" onclick="cambiaRegime(\''+esc(reg.chiave)+'\')">'
       +esc(S.armato==='regime:'+reg.chiave?T().pressAgain:(reg.attivo?(IT()?'Esci da ':'Leave ')+reg.nome:reg.nome))+'</button>':'')
+    +bottone(S.armato==='libera-tutta'?'bx':'b2','liberaTuttaRAM()',S.armato==='libera-tutta'?(IT()?'Conferma: libera RAM':'Confirm: free RAM'):(IT()?'Libera RAM modelli':'Free model RAM'),
+      inRAM.length?'':(IT()?'La RAM dei modelli è già libera.':'Model RAM is already free.'))
     +'<button class="'+(S.armato==='ferma'?'bx':'bx')+'" onclick="fermaTutto()">'
       +esc(S.armato==='ferma'?T().pressAgain:T().stopAll)+'</button></div></div>';
 
+  if(S.armato==='libera-tutta')h+=nota('n-warn',IT()?'Scaricare tutti i modelli dalla RAM?':'Unload every model from RAM?',
+    IT()?'Quando possibile i programmi restano accesi e ricaricano il modello soltanto al prossimo uso. Premi di nuovo per confermare.'
+        :'When possible, programs stay on and reload a model only when next used. Press again to confirm.');
   if(S.armato==='ferma') h += nota('n-bad', T().stopAllTitle, T().stopAllBody+' '+T().pressAgain+'.');
   if(S.armato.startsWith('regime:') && reg) h += nota('n-warn',
     reg.nome, (IT()?'Fermerà ':'It will stop ')+((reg.fermera||[]).join(', ')||(IT()?'niente':'nothing'))
@@ -1139,23 +1454,33 @@ function vistaMemoria(){
       +'<span class="mono" style="font-size:11px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
       +gb(g)+' GB'+(dentro?' · '+esc(dentro):'')+'</span><div class="sp"></div>'
       +(cap.scaricaSingoloModello?'':'<span style="font-size:11.5px;color:var(--warn-ink);text-align:right;max-width:32ch">'+esc(cap.nota||T().capAll)+'</span>')
-      +'<button class="b2 sm" onclick="esegui(\'libera\',{daFermare:['+arg(p.chiave)+']})">'
-      +esc(cap.scaricaSingoloModello?T().freeRAM:(IT()?'Ferma ':'Stop ')+p.nome)+'</button></div>';
+      /* Se non sa scaricare un modello solo, l'unica strada è fermare il
+         programma — e per fermarlo servono i suoi comandi. Un motore che i
+         client usano ma che nessuno ha dichiarato non li ha: il pulsante lo
+         dice invece di mandare una richiesta che tornerà indietro. */
+      +bottone('b2 sm', 'esegui(\'libera\',{daFermare:['+arg(p.chiave)+']})',
+        cap.scaricaSingoloModello?T().freeRAM:(IT()?'Ferma ':'Stop ')+p.nome,
+        (cap.scaricaSingoloModello || puoFermare(p.chiave)) ? ''
+          : (IT()?'Per liberarlo andrebbe fermato, ma il pannello non ha i suoi comandi: aggiungili in «configurazione».'
+                 :'Freeing it means stopping it, but the panel has no commands for it: add them in the config.'))
+      +'</div>';
   });
   h += '</div>';
 
-  const fr = frasi(), sug = suggeriti();
-  if(fr.length){
-    h += '<div class="card"><div class="corpo" style="display:flex;flex-direction:column;gap:8px">'
-      +'<div style="display:flex;align-items:center;gap:12px"><span class="k" style="color:var(--accent-ink)">'+esc(T().reading)+'</span>'
-      +'<span style="flex:1;height:1px;background:var(--line)"></span><span class="k">'+esc(T().readingNote)+'</span></div>'
-      +fr.map(p=>'<p style="margin:0;font-size:13px;line-height:1.55;text-wrap:pretty">'+esc(p)+'</p>').join('')
-      +(sug.length?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:3px">'
-        +sug.map((s,i)=>'<button class="b2 sm" title="'+esc(s.motivo)+'" onclick="SUG['+i+']()">'+esc(s.nome)+'</button>').join('')
-        +'</div>':'')
-      +'</div></div>';
-    window.SUG = sug.map(s=>s.fa);
-  }
+  const attivi=inRAM;
+  const titoloAdesso=attivi.length===1
+    ? nomeReale(attivi[0])+(IT()?' è attivo':' is active')
+    : attivi.length>1
+      ? attivi.length+(IT()?' modelli attivi':' active models')
+      : (IT()?'Nessun modello nella RAM':'No model in RAM');
+  const dettaglioAdesso=attivi.length
+    ? [...new Set(attivi.map(m=>nomeRuntime(m.runtime)))].join(' · ')+' · '+gb(occ)+' GB '+(IT()?'usati':'used')
+    : (IT()?'La memoria resta libera finché Pi, OpenCode o Gellow non usa un modello.':'Memory stays free until Pi, OpenCode, or Gellow uses a model.');
+  h += '<div class="stato-adesso'+(attivi.length?'':' spento')+'"><div class="titolo-adesso">'
+    +'<b>'+esc(titoloAdesso)+'</b><span>'+esc(dettaglioAdesso)+'</span></div><div class="numeri-adesso">'
+    +'<div class="numero-adesso"><span class="k">'+esc(IT()?'RAM libera':'Free RAM')+'</span><b>'+gb(lib)+' GB</b></div>'
+    +'<div class="numero-adesso"><span class="k">'+esc(IT()?'Per un altro modello':'For another model')+'</span><b>'+gb(disponibiliGB())+' GB</b></div>'
+    +'</div></div>';
 
   h += '<div style="display:flex;gap:16px;padding:14px 17px;border:1px solid var(--line2);border-radius:10px;'
     +'background:var(--inset);margin-bottom:18px;align-items:flex-start">'
@@ -1188,21 +1513,99 @@ function vistaMemoria(){
   return h;
 }
 
+function ordinaModelli(lista){
+  return lista.slice().sort((a,b)=>{
+    const statoRank=m=>({pronto:0,'in-memoria':1,'in-arrivo':2,spento:3,remoto:4,guasto:5}[statoDi(m)]??6);
+    const attivoRank=m=>(['pronto','in-memoria'].includes(statoDi(m))||(S.aiuto&&String(S.aiuto.modello)===String(m.id)))?0:1;
+    const primaGliAttivi=attivoRank(a)-attivoRank(b);
+    if(primaGliAttivi)return primaGliAttivi;
+    let d=0;
+    if(S.ordineModelli==='attivi')d=statoRank(a)-statoRank(b);
+    else if(S.ordineModelli==='recenti')d=(new Date(b.ultimoUso||0).getTime()||0)-(new Date(a.ultimoUso||0).getTime()||0);
+    else if(S.ordineModelli==='grandi')d=(b.gb||0)-(a.gb||0);
+    else if(S.ordineModelli==='veloci')d=(b.tokS||0)-(a.tokS||0);
+    else if(S.ordineModelli==='programma')d=nomeRuntime(a.runtime).localeCompare(nomeRuntime(b.runtime),LINGUA,{sensitivity:'base'});
+    if(!d)d=nomeReale(a).localeCompare(nomeReale(b),LINGUA,{numeric:true,sensitivity:'base'});
+    return d;
+  });
+}
+
 /* ── i modelli: l'elenco e nient'altro sopra ──────────────────────────────
    In cima solo una riga coi tre numeri, che porta alla memoria per chi li
    vuole vedere disegnati. Il titolo e i filtri restano a portata d'occhio
    anche quando la lista è lunga. */
 function vistaModelli(){
-  const nomiFiltri = {tutti:T().allModels,convivente:T().fCo,esclusivo:T().fEx,spento:T().fOff,remoto:T().fRem};
-  const visibili = S.modelli.filter(m => S.filtro==='tutti' ? true
-    : S.filtro==='spento' ? ['spento','guasto','in-arrivo'].includes(statoDi(m)) : classeDi(m)===S.filtro);
+  const inRAM=S.modelli.filter(m=>['pronto','in-memoria'].includes(statoDi(m))&&!remotoDi(m));
+  const automatico=m=>{
+    if(S.aiuto&&String(S.aiuto.modello)===String(m.id))return true;
+    const testo=(m.id+' '+(m.nome||'')).toLowerCase();
+    return (m.indizi||[]).some(x=>['ricerca-testi','diffusione','trascrive'].includes(x.tratto)) ||
+      /(ocr|embed|rerank|markitdown|diffusion|transcri)/.test(testo);
+  };
+  const nomiFiltri={tutti:IT()?'Tutti':'All',principali:IT()?'Chat e codice':'Chat and code',automatici:IT()?'Strumenti':'Tools',remoto:IT()?'Remoti':'Remote'};
+  const spiegaFiltro={
+    tutti:IT()?'Tutti i modelli, divisi fra quelli che scegli e quelli usati dagli strumenti.':'Every model, split between models you choose and models used by tools.',
+    principali:IT()?'I modelli che scegli direttamente in Pi e OpenCode per chat e programmazione.':'Models you choose directly in Pi and OpenCode for chat and coding.',
+    automatici:IT()?'Modelli usati dietro le quinte da Gellow, OCR, ricerca nei documenti e altri strumenti.':'Models used behind the scenes by Gellow, OCR, document search, and other tools.',
+    remoto:IT()?'Modelli che girano online e non occupano la RAM di questo Mac.':'Models that run online and do not use this Mac’s RAM.'};
+  if(!nomiFiltri[S.filtro])S.filtro='tutti';
+  const visibili=ordinaModelli(S.modelli.filter(m=>S.filtro==='tutti'?true:S.filtro==='principali'?!automatico(m):S.filtro==='automatici'?automatico(m):remotoDi(m)));
+
+  const uso=m=>{
+    if(S.aiuto&&String(S.aiuto.modello)===String(m.id))return 'Gellow';
+    const tratti=new Set((m.indizi||[]).map(x=>x.tratto));
+    const testo=(m.id+' '+(m.nome||'')+' '+(m.runtime||'')).toLowerCase();
+    if(tratti.has('ricerca-testi'))return IT()?'Ricerca nei documenti':'Document search';
+    if(tratti.has('diffusione'))return IT()?'Generazione sperimentale':'Experimental generation';
+    if(tratti.has('trascrive'))return IT()?'Trascrizione audio':'Audio transcription';
+    if(tratti.has('vede-immagini'))return IT()?'Testo e immagini':'Text and images';
+    if(tratti.has('programmazione')||/(code|coder|agentic|mtplx|ds4|deepseek)/.test(testo))return IT()?'Programmazione':'Coding';
+    return IT()?'Chat e scrittura':'Chat and writing';
+  };
+  const statoLista=m=>{
+    const s=statoDi(m),rt=S.runtime.find(r=>r.chiave===m.runtime);
+    const gellow=S.aiuto&&String(S.aiuto.modello)===String(m.id);
+    if(s==='pronto')return [IT()?'attivo':'active','p-ok',gellow?'Gellow':''];
+    if(s==='in-memoria')return [IT()?'caricato':'loaded','p-acc',gellow?'Gellow':''];
+    if(gellow&&s!=='guasto')return [IT()?'Gellow attivo':'Gellow active','p-ok',IT()?'fuori RAM':'out of RAM'];
+    if(s==='remoto')return [IT()?'remoto':'remote','p-acc'];
+    if(s==='in-arrivo')return [IT()?'in arrivo':'downloading','p-acc'];
+    if(s==='guasto')return [IT()?'problema':'problem','p-bad'];
+    if(m.servito)return [IT()?'disponibile':'available','p-neutro'];
+    if(rt&&!rt.attivo)return [IT()?'programma spento':'program off','p-warn'];
+    return [IT()?'non disponibile':'unavailable','p-bad'];
+  };
+  const dove=m=>{
+    const c=[m.inPi?'Pi':null,m.inOC?'OpenCode':null].filter(Boolean);
+    if(c.length)return c.join(' · ');
+    if(automatico(m))return IT()?'interno, fuori dai menu':'internal, outside menus';
+    return IT()?'da configurare':'not configured';
+  };
+  const intestazione='<div class="mod-head">'+[IT()?'Situazione':'Status',IT()?'Modello':'Model',IT()?'A cosa serve':'What it does',IT()?'Programma':'Program',IT()?'Dove compare':'Where it appears']
+    .map(x=>'<span class="k">'+esc(x)+'</span>').join('')+'</div>';
+  const tabella=lista=>'<div class="card">'+intestazione+ordinaModelli(lista).map(m=>{
+    const st=statoLista(m),meta=[m.gb?gb(m.gb)+' GB':null,m.misurato?gb(m.tokS)+' tok/s':null].filter(Boolean).join(' · ');
+    return '<div class="mod-row'+(m.id===S.sel?' on':'')+'" onclick="scegli('+arg(m.id)+')">'
+      +'<span class="stato-modello"><span class="pill '+st[1]+'">'+esc(st[0])+'</span>'+(st[2]?'<small>'+esc(st[2])+'</small>':'')+'</span>'
+      +'<span style="min-width:0"><span class="principale" title="'+esc(m.id)+'">'+esc(nomeReale(m))+'</span><span class="secondaria">'+esc(meta)+'</span></span>'
+      +'<span><span style="font-size:12.5px;color:var(--strong)">'+esc(uso(m))+'</span></span>'
+      +'<span style="font-size:12px;color:var(--body)">'+esc(nomeRuntime(m.runtime))+'</span>'
+      +'<span style="font-size:12px;color:'+(m.inPi||m.inOC?'var(--body)':'var(--muted)')+'">'+esc(dove(m))+'</span></div>';
+  }).join('')+'</div>';
 
   let h = '<div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:14px">'
-    +'<div style="flex:1;min-width:250px"><h1>'+esc(nomiFiltri[S.filtro])+'</h1>'
-    +'<p class="sub" style="margin:0">'+esc(T().modelsSub)+'</p></div>'
-    +'<div class="seg">'
-    +Object.keys(nomiFiltri).map(k=>'<button class="'+(S.filtro===k?'on':'')+'" onclick="vai(\'modelli\',\''+k+'\')">'
-      +esc(k==='tutti'?T().fAll:nomiFiltri[k])+'</button>').join('')+'</div></div>';
+    +'<div style="flex:1;min-width:250px"><h1>'+esc(IT()?'Modelli':'Models')+'</h1>'
+    +'<p class="sub" style="margin:0">'+esc(IT()?'Quale usare, a cosa serve e dove compare.':'Which to use, what it does, and where it appears.')+'</p></div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      +'<div class="seg filtri-modelli">'+Object.keys(nomiFiltri).map(k=>'<button class="'+(S.filtro===k?'on':'')+'" onclick="vai(\'modelli\',\''+k+'\')">'
+        +esc(nomiFiltri[k])+'</button>').join('')+'</div>'
+      +bottone(S.armato==='libera-tutta'?'bx':'b2','liberaTuttaRAM()',S.armato==='libera-tutta'?(IT()?'Conferma: togli dalla RAM':'Confirm: remove from RAM'):(IT()?'Togli i modelli dalla RAM':'Remove models from RAM'),
+        inRAM.length?'':(IT()?'La RAM dei modelli è già libera.':'Model RAM is already free.'))+'</div></div>';
+  h+='<p style="margin:-5px 0 14px;font-size:12px;color:var(--muted);line-height:1.45">'+esc(spiegaFiltro[S.filtro])+'</p>';
+  h+=scelteBottoni(IT()?'Ordina':'Sort',S.ordineModelli,
+    [['attivi',IT()?'Attivi prima':'Active first'],['recenti',IT()?'Usati di recente':'Recently used'],['grandi',IT()?'Più grandi':'Largest'],
+     ['veloci',IT()?'Più veloci':'Fastest'],['nome',IT()?'Nome A–Z':'Name A–Z'],['programma',IT()?'Programma':'Program']],
+    'impostaOrdineModelli')+'<div style="height:14px"></div>';
 
   /* i tre numeri in una riga sola: qui serve il contesto, non il disegno */
   if(totaleGB()) h += '<button class="b3" onclick="vai(\'memoria\')" style="display:flex;align-items:center;gap:16px;'
@@ -1212,33 +1615,24 @@ function vistaModelli(){
     +metrica(T().available, gb(disponibiliGB())+' GB')
     +'<span class="sp"></span><span class="k" style="color:var(--accent-ink)">'+esc(T().memory)+' →</span></button>';
 
+  if(S.armato==='libera-tutta')h+=nota('n-warn',IT()?'Scaricare tutti i modelli dalla RAM?':'Unload every model from RAM?',
+    IT()?'I programmi restano accesi quando sanno scaricare il singolo modello. Gellow e i client lo ricaricheranno soltanto al prossimo utilizzo. Premi di nuovo per confermare.'
+        :'Programs stay on when they can unload a single model. Gellow and the clients reload it only when next used. Press again to confirm.');
+  else if(!inRAM.length)h+=nota('n-ok',IT()?'RAM dei modelli libera':'Model RAM is free',
+    IT()?'Nessun modello è caricato. Resta così finché Pi, OpenCode o Gellow non ne usa uno.'
+        :'No model is loaded. It stays this way until Pi, OpenCode, or Gellow uses one.');
+
   if(!S.modelli.length){
     return h+'<div class="card"><div class="vuoto"><b>'+esc(T().noModels)+'</b>'+esc(T().noModelsWhy)+'</div></div>';
   }
   if(!visibili.length){
     h += '<div class="card"><div class="vuoto"><b>'+esc(T().noneHere)+'</b>'+esc(T().noneHereWhy)+'</div></div>';
   } else {
-    h += '<div class="intesta">'+[T().colState,T().colModel,T().colClass,T().colWeight,T().colSpeed]
-      .map((x,i)=>'<span class="k"'+(i>2?' style="text-align:right"':'')+'>'+esc(x)+'</span>').join('')+'</div>'
-      +'<div class="card" style="margin-bottom:14px">'
-      +visibili.map(m=>{
-        const st=statoDi(m), cl=classeDi(m);
-        /* in arrivo si mostra quanto è già scaricato: è l'unica cosa che si
-           muove, e viene dallo stesso elenco che alimenta lo stato. */
-        const dl = st==='in-arrivo' ? S.scarichi.find(x=>String(x.repo).toLowerCase()===String(m.id).toLowerCase()) : null;
-        const sotto = S.modo==='esperto'
-          ? m.id+' · '+(m.runtime||'')+' · '+Math.round((m.context||0)/1024)+'k'
-          : (dl ? gb(dl.gb)+' GB' : (m.runtime||''));
-        return '<div class="mriga'+(m.id===S.sel?' on':'')+'" onclick="scegli('+arg(m.id)+')">'
-          +'<button class="pill '+pillStato(st)+' chiedi" onclick="event.stopPropagation();spiega(\''+st+'\')">'+esc(T().st[st])+'</button>'
-          +'<span style="min-width:0"><span class="t" style="font-weight:500;color:var(--strong);display:block">'+esc(titoloDi(m))+'</span>'
-          +'<span class="i">'+esc(sotto)+'</span></span>'
-          +'<button class="tag chiedi" onclick="event.stopPropagation();spiega(\''+cl+'\')">'+esc(T().cl[cl])+'</button>'
-          /* peso zero non è «zero GB»: è «non lo sappiamo». Scriverlo 0,0
-             sarebbe l'unica cifra falsa di tutta la tabella. */
-          +'<span class="num">'+(remotoDi(m)?'-':(m.gb?gb(m.gb)+' GB':'—'))+'</span>'
-          +'<span class="num" style="color:var(--muted)">'+(m.misurato?gb(m.tokS)+' tok/s':(st==='guasto'?esc(T().silent):esc(T().notMeasured)))+'</span></div>';
-      }).join('')+'</div>';
+    if(S.filtro==='tutti'){
+      const principali=visibili.filter(m=>!automatico(m)),auto=visibili.filter(automatico);
+      if(principali.length)h+='<div class="sezione-modelli">'+esc(IT()?'Chat e codice':'Chat and code')+'</div>'+tabella(principali);
+      if(auto.length)h+='<div class="sezione-modelli">'+esc(IT()?'Strumenti interni':'Internal tools')+'</div>'+tabella(auto);
+    }else h+=tabella(visibili);
   }
   h += '<div style="display:flex;gap:9px;flex-wrap:wrap">'
     +'<button class="b2" onclick="vai(\'hf\')">'+esc(T().addHF)+'</button>'
@@ -1247,12 +1641,39 @@ function vistaModelli(){
       +'<button class="b1" onclick="salva()">'+esc(T().saveChanges)+'</button>':'')+'</div>';
   return h;
 }
+function impostaOrdineModelli(v){S.ordineModelli=v;localStorage.setItem('ordine-modelli',v);disegnaCentro();}
 const metrica = (k,v,cl) => '<span class="'+(cl||'')+'" style="white-space:nowrap"><span class="k">'+esc(k)+'</span> <b class="mono" style="font-weight:400;font-size:12px;color:var(--strong)">'+esc(v)+'</b></span>';
 const nota = (c,t,b) => '<div class="nota '+c+'"><div>'+(t?'<b>'+esc(t)+'</b>':'')+'<span>'+esc(b)+'</span></div></div>';
 
 function fermaTutto(){
   if(S.armato==='ferma'){ S.armato=''; esegui('ferma-tutto'); return; }
-  S.armato='ferma'; vai('memoria');
+  S.schermo='memoria'; S.inspAperto=false; S.armato='ferma'; disegnaTutto();
+}
+
+async function liberaTuttaRAM(){
+  const caricati=S.modelli.filter(m=>['pronto','in-memoria'].includes(statoDi(m))&&!remotoDi(m));
+  if(!caricati.length)return;
+  if(S.armato!=='libera-tutta'){ S.armato='libera-tutta'; return disegnaCentro(); }
+  S.armato=''; vai('manutenzione');
+  scriviConsole('> '+(IT()?'libero la RAM occupata dai modelli':'freeing RAM used by models')); disegnaCentro();
+  const fermati=new Set();
+  for(const m of caricati){
+    const cap=S.capacita[m.runtime]||{};
+    try{
+      if(cap.scaricaSingoloModello){
+        const r=await api('/api/modello/libera-memoria',{method:'POST',body:JSON.stringify({runtime:m.runtime,modello:m.id})});
+        log('  ✓ '+titoloDi(m)+' — '+((r&&r.output)||'ok'));
+      }else if(!fermati.has(m.runtime)&&puoFermare(m.runtime)){
+        fermati.add(m.runtime);
+        const r=await api('/api/servizio',{method:'POST',body:JSON.stringify({servizio:m.runtime,azione:'stop'})});
+        log('  ✓ '+nomeRuntime(m.runtime)+' — '+((r&&r.output)||'spento'));
+      }else if(!fermati.has(m.runtime)){
+        log('  ! '+nomeRuntime(m.runtime)+' — '+(IT()?'non ha un comando per liberare la memoria':'has no command to free memory'));
+      }
+    }catch(e){ log('  ! '+titoloDi(m)+' — '+e.message); }
+  }
+  log('> '+(IT()?'fatto: i modelli scaricati restano fuori fino al prossimo utilizzo; i programmi fermati restano spenti finché non li riaccendi':'done: unloaded models stay out until next use; stopped programs stay off until you start them again'));
+  await aggiorna();
 }
 
 function vistaProgrammi(){
@@ -1266,10 +1687,16 @@ function vistaProgrammi(){
       +'<span class="dot" style="background:'+(r.attivo?'var(--ok)':'var(--bad)')+'"></span>'+esc(r.attivo?T().on:T().off)+'</span>'
       +'<span class="cresci"><span class="t">'+esc(r.nome||r.chiave)+'</span><span class="m">'+esc(meta)+'</span></span>'
       +'<span class="tag grigio">'+esc(cap.scaricaSingoloModello?T().capSingle:T().capAll)+'</span>'
+      /* Prima, un programma senza comandi non mostrava nessun pulsante e
+         basta: la riga restava lì muta, e non c'era modo di capire se il
+         pannello non potesse o non volesse. Ora il pulsante c'è, spento, e
+         dice qual è il rimedio. */
       +(r.puoRiavviare?'<button class="b3 sm" onclick="servizio(\''+esc(r.chiave)+'\',\'restart\')">'+esc(T().restart)+'</button>':'')
-      +((r.attivo?r.puoFermare:r.puoAvviare)
-        ?'<button class="b2 sm" onclick="servizio(\''+esc(r.chiave)+'\',\''+(r.attivo?'stop':'start')+'\')">'
-        +esc(r.attivo?T().turnOff:T().turnOn)+'</button>':'')
+      +bottone('b2 sm', 'servizio(\''+esc(r.chiave)+'\',\''+(r.attivo?'stop':'start')+'\')',
+        r.attivo?T().turnOff:T().turnOn,
+        (r.attivo?r.puoFermare:r.puoAvviare) ? ''
+          : (IT()?'Il pannello lo vede e lo misura, ma non ha il comando per '+(r.attivo?'fermarlo':'accenderlo')+'. Aggiungilo in «configurazione».'
+                 :'The panel sees and measures it, but has no command to '+(r.attivo?'stop':'start')+' it. Add one in the config.'))
       +'</div>';
   }).join('')+'</div>';
   h += nota('n-info', T().cacheTitle, T().cacheBody+' avvia-server.command');
@@ -1277,39 +1704,130 @@ function vistaProgrammi(){
 }
 
 function vistaManutenzione(){
-  let h = '<h1>'+esc(T().maintenance)+'</h1><p class="sub">'+esc(T().maintenanceSub)+'</p>';
-  h += S.strumenti.length
-    ? '<div class="card">'+S.strumenti.map(s=>'<div class="riga" style="align-items:flex-start">'
-        +'<span class="cresci"><span class="t">'+esc(s.nome)+'</span><span class="m">'+esc(s.cosa||'')+'</span>'
-        +(S.modo==='esperto'&&s.comando?'<span class="mono" style="display:block;font-size:10.5px;color:var(--accent-ink);margin-top:5px">'+esc(s.comando)+'</span>':'')
-        +'</span><span class="tag grigio">'+esc(s.durata||'')+'</span>'
-        +'<button class="'+(s.rischio?'bx':'b2')+' sm" onclick="esegui(\''+esc(s.id)+'\')">'+esc(T().run)+'</button></div>').join('')+'</div>'
-    : '<div class="card"><div class="vuoto"><b>'+esc(T().noTools)+'</b>'+esc(T().noToolsWhy)+'</div></div>';
-  h += '<div style="display:flex;align-items:center;gap:10px;margin:16px 0 8px">'
-    +'<span class="k">'+esc(T().output)+'</span><div style="flex:1;height:1px;background:var(--line)"></div>'
-    +'<button class="b3 sm" onclick="S.console=[\'ready.\'];disegnaCentro()">'+esc(T().clear)+'</button></div>'
-    +'<pre class="out" id="uscita">'+S.console.map(r=>esc(r)).join('\n')+'</pre>';
+  const rapido=S.strumenti.find(x=>x.id==='controllo')||S.strumenti.find(x=>!x.rischio);
+  const altri=S.strumenti.filter(x=>!rapido||x.id!==rapido.id);
+  let h='<div class="hero-semplice"><span class="pill p-acc">'+esc(IT()?'UN CLIC':'ONE CLICK')+'</span>'
+    +'<h1>'+esc(IT()?'Controlla che funzioni tutto':'Check that everything works')+'</h1><p>'
+    +esc(IT()?'Verifica programmi, versioni e configurazioni. Il risultato leggibile appare qui sotto; non modifica nulla.'
+      :'Checks programs, versions and configurations. The readable result appears below; it changes nothing.')+'</p>'
+    +'<div class="azioni-home">'+(rapido?'<button class="b1" onclick="esegui('+arg(rapido.id)+')">'
+      +esc(IT()?'Avvia controllo':'Run check')+' · '+esc(rapido.durata||'')+'</button>':'')
+    +'<button class="b3" onclick="aggiorna()">'+esc(IT()?'Aggiorna stato':'Refresh status')+'</button></div></div>';
+  if(!S.strumenti.length) h+='<div class="card"><div class="vuoto"><b>'+esc(T().noTools)+'</b>'+esc(T().noToolsWhy)+'</div></div>';
+  if(altri.length) h+='<details class="card" style="margin-bottom:14px"><summary style="cursor:pointer;padding:14px 16px;font-weight:600">'
+    +esc(IT()?'Altri controlli e manutenzione':'Other checks and maintenance')+'</summary>'
+    +altri.map(s=>'<div class="riga" style="align-items:flex-start"><span class="cresci"><span class="t">'+esc(s.nome)+'</span>'
+      +'<span class="m">'+esc(s.cosa||'')+'</span>'+(S.modo==='esperto'&&s.comando?'<span class="mono" style="display:block;font-size:10.5px;color:var(--accent-ink);margin-top:5px">'+esc(s.comando)+'</span>':'')
+      +'</span><span class="tag grigio">'+esc(s.durata||'')+'</span><button class="'+(s.rischio?'bx':'b2')+' sm" onclick="esegui('+arg(s.id)+')">'
+      +esc(s.rischio?(IT()?'Modifica…':'Change…'):T().run)+'</button></div>').join('')+'</details>';
+  const ha=testoRisultato().length>0;
+  const iconaGellow='<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/><circle cx="8" cy="10.5" r=".8" fill="currentColor" stroke="none"/><circle cx="12" cy="10.5" r=".8" fill="currentColor" stroke="none"/><circle cx="16" cy="10.5" r=".8" fill="currentColor" stroke="none"/></svg>';
+  h+='<div class="barra-risultato"><div class="titolo-risultato"><b>'+esc(IT()?'Risultato del controllo':'Check result')+'</b><span>'
+    +esc(ha?(IT()?'Copialo oppure fallo spiegare in parole semplici.':'Copy it or have it explained in plain language.')
+           :(IT()?'Apparirà qui dopo il controllo.':'It will appear here after the check.'))+'</span></div>'
+    +bottone('b1','chiediRisultato()',iconaGellow+esc(IT()?'Chiedi a Gellow':'Ask Gellow'),ha?'':(IT()?'Prima avvia il controllo.':'Run the check first.'),true)
+    +bottone('b2','copiaRisultato()',esc(S.copiato?(IT()?'Copiato ✓':'Copied ✓'):(IT()?'Copia':'Copy')),ha?'':(IT()?'Non c\'\u00e8 ancora niente da copiare.':'There is nothing to copy yet.'),true)
+    +bottone('b3','S.console=[];disegnaCentro()',esc(T().clear),ha?'':(IT()?'Il risultato è già vuoto.':'The result is already empty.'),true)+'</div>'
+    +'<pre class="esito-semplice" id="uscita">'+esc(S.console.length?S.console.join('\n'):(IT()?'Premi «Avvia controllo».':'Press “Run check”.'))+'</pre>';
   return h;
 }
 
+function numeroHF(v){ return (Number(v)||0).toLocaleString(IT()?'it-IT':'en-US'); }
+function dataHF(v){
+  if(!v)return IT()?'data ignota':'unknown date';
+  const d=new Date(v); if(Number.isNaN(d.getTime()))return String(v).slice(0,10);
+  return new Intl.DateTimeFormat(IT()?'it-IT':'en-US',{day:'numeric',month:'short',year:'numeric'}).format(d);
+}
+function filtroHF(k,v){
+  if(['hfMinLikes','hfMinDownloads','hfMinGB','hfMaxGB'].includes(k))v=Math.max(0,Number(v)||0);
+  S[k]=v; disegnaCentro();
+}
+const setFormatoHF=v=>filtroHF('hfFormato',v);
+const setMemoriaHF=v=>filtroHF('hfMemoria',v);
+const setEtaHF=v=>filtroHF('hfEta',v);
+function azzeraFiltriHF(){
+  Object.assign(S,{hfFormato:'tutti',hfMemoria:'tutti',hfEta:'tutte',hfAutore:'',
+    hfMinLikes:0,hfMinDownloads:0,hfMinGB:0,hfMaxGB:0});
+  disegnaCentro();
+}
+function cambiaOrdineHF(v){
+  S.hfSort=v;
+  /* Ordina subito i risultati già presenti; in parallelo chiede a HF il
+     gruppo corretto per il nuovo criterio. Così il menu non sembra bloccato. */
+  disegnaCentro();
+  if(S.hfQuery)cerca();
+}
+function risultatiHF(){
+  const adesso=Date.now(), giorni={sette:7,trenta:30,anno:365}[S.hfEta]||0;
+  const autore=String(S.hfAutore||'').trim().toLowerCase();
+  const vis=(S.hf||[]).filter(t=>{
+    const peso=Number(t.gb)||0, formato=String(t.formato||'').toLowerCase();
+    if(S.hfFormato==='8'&&!formato.includes('8-bit'))return false;
+    if(S.hfFormato==='6'&&!formato.includes('6-bit'))return false;
+    if(S.hfMemoria==='entra'&&(!peso||peso>disponibiliGB()))return false;
+    if(S.hfMemoria==='liberare'&&(!peso||peso<=disponibiliGB()))return false;
+    if(S.hfMemoria==='presenti'&&!t.giaPresente)return false;
+    if(autore&&!String(t.id||'').split('/')[0].toLowerCase().includes(autore))return false;
+    if((Number(t.likes)||0)<S.hfMinLikes||(Number(t.downloads)||0)<S.hfMinDownloads)return false;
+    if(S.hfMinGB&&(!peso||peso<S.hfMinGB))return false;
+    if(S.hfMaxGB&&(!peso||peso>S.hfMaxGB))return false;
+    if(giorni){ const d=new Date(t.aggiornato||t.creato||0).getTime(); if(!d||adesso-d>giorni*86400000)return false; }
+    return true;
+  });
+  const valore=(t)=>S.hfSort==='likes'?Number(t.likes)||0:S.hfSort==='downloads'?Number(t.downloads)||0:
+    S.hfSort==='lastModified'?new Date(t.aggiornato||0).getTime()||0:Number(t.tendenza)||0;
+  return vis.sort((a,b)=>valore(b)-valore(a));
+}
+
 function vistaHF(){
-  let h = '<h1>HuggingFace</h1><p class="sub">'+esc(T().hfSub)+'</p>'
+  const visibili=risultatiHF();
+  const avanzati=[S.hfEta!=='tutte',S.hfAutore,S.hfMinLikes,S.hfMinDownloads,S.hfMinGB,S.hfMaxGB].filter(Boolean).length;
+  let h = '<h1>'+esc(IT()?'Scarica un modello':'Download a model')+'</h1><p class="sub">'
+    +esc(IT()?'Cerca per nome o per uso. Mostro soltanto versioni MLX compatibili con questo Mac; preferisco 8 bit e accetto 6 bit per i modelli molto grandi.'
+      :'Search by name or purpose. Only MLX versions compatible with this Mac are shown; 8-bit is preferred and 6-bit is accepted for very large models.')+'</p>'
     +'<div style="display:flex;gap:9px;margin-bottom:13px">'
-    +'<input id="hfq" type="search" placeholder="'+esc(T().searchPh)+'" onkeydown="if(event.key===\'Enter\')cerca()">'
-    +'<button class="b1" onclick="cerca()">'+esc(T().search)+'</button></div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
-    +'<span class="pill p-acc">MLX 8 bit</span><span class="pill p-neutro">MLX 4 bit</span>'
-    +'<span class="pill p-neutro">'+esc(T().fits)+' '+gb(disponibiliGB())+' GB</span></div>';
+    +'<input id="hfq" type="search" value="'+esc(S.hfQuery)+'" placeholder="'+esc(T().searchPh)+'" onkeydown="if(event.key===\'Enter\')cerca()">'
+    +'<button class="b1" onclick="cerca()">'+(S.hfCercando?'<span class="carica"></span>':esc(T().search))+'</button></div>'
+    +'<p style="font-size:12px;color:var(--muted);margin:0 0 15px">'
+    +esc((IT()?'Spazio utilizzabile adesso: ':'Space available now: ')+gb(disponibiliGB())+' GB. '
+      +(IT()?'Prima di scaricare vedi dimensione, formato e se entra nella memoria disponibile.':'Before downloading you see its size, format, and whether it fits in available memory.'))+'</p>';
+  h+='<div class="filtri-hf"><div class="base"><div class="scelte-hf">'
+    +scelteBottoni(IT()?'Ordine':'Sort',S.hfSort,[['trendingScore',IT()?'Tendenza':'Trending'],['downloads',IT()?'Download':'Downloads'],
+      ['likes','Like'],['lastModified',IT()?'Più recenti':'Recent']],'cambiaOrdineHF')
+    +scelteBottoni(IT()?'Formato':'Format',S.hfFormato,[['tutti',IT()?'8 e 6 bit':'8 and 6 bit'],['8','Solo 8-bit'],['6','Solo 6-bit']],'setFormatoHF')
+    +scelteBottoni(IT()?'Memoria':'Memory',S.hfMemoria,[['tutti',IT()?'Qualsiasi':'Any'],['entra',IT()?'Entra ora':'Fits now'],
+      ['liberare',IT()?'Serve RAM':'Needs RAM'],['presenti',IT()?'Già scaricato':'Downloaded']],'setMemoriaHF')
+    +'</div><span class="sp"></span><b style="font-size:12px">'+visibili.length+' / '+S.hf.length+' '+esc(IT()?'risultati':'results')
+      +(S.hfCercando?' · '+esc(IT()?'aggiorno…':'updating…'):'')+'</b>'
+    +'<button class="apri-filtri" onclick="S.hfFiltriAperti=!S.hfFiltriAperti;disegnaCentro()">'+(S.hfFiltriAperti?'▾ ':'▸ ')+esc(IT()?'Più filtri':'More filters')+(avanzati?' · '+avanzati:'')+'</button>'
+    +(S.hfFiltriAperti?'<div class="avanzati">'
+      +'<label>'+esc(IT()?'Autore contiene':'Author contains')+'<input type="text" value="'+esc(S.hfAutore)+'" placeholder="lmstudio-community" onchange="filtroHF(\'hfAutore\',this.value)"></label>'
+      +scelteBottoni(IT()?'Aggiornato':'Updated',S.hfEta,[['tutte',IT()?'Qualsiasi data':'Any date'],['sette',IT()?'7 giorni':'7 days'],
+        ['trenta',IT()?'30 giorni':'30 days'],['anno',IT()?'Un anno':'One year']], 'setEtaHF')
+      +'<label>'+esc(IT()?'Like minimi':'Minimum likes')+'<input type="number" min="0" value="'+S.hfMinLikes+'" onchange="filtroHF(\'hfMinLikes\',this.value)"></label>'
+      +'<label>'+esc(IT()?'Download minimi':'Minimum downloads')+'<input type="number" min="0" value="'+S.hfMinDownloads+'" onchange="filtroHF(\'hfMinDownloads\',this.value)"></label>'
+      +'<label>'+esc(IT()?'GB minimi':'Minimum GB')+'<input type="number" min="0" step="1" value="'+S.hfMinGB+'" onchange="filtroHF(\'hfMinGB\',this.value)"></label>'
+      +'<label>'+esc(IT()?'GB massimi':'Maximum GB')+'<input type="number" min="0" step="1" value="'+S.hfMaxGB+'" onchange="filtroHF(\'hfMaxGB\',this.value)"></label>'
+      +'<button class="b3" onclick="azzeraFiltriHF()">'+esc(IT()?'Azzera filtri':'Reset filters')+'</button>'
+    +'</div>':'')+'</div></div>';
   S.scarichi.forEach(x => { h += nota(x.stato==='errore'?'n-bad':(x.stato==='in corso'?'n-info':'n-ok'),
     x.repo, x.stato==='in corso' ? gb(x.gb)+' GB' : (x.errore||'ok')); });
-  h += S.hf.length ? '<div class="card">'+S.hf.map((t,i)=>{
-      const grosso = (t.gb||0)>sogliaGB();
+  if(S.hfErrore)h+=nota('n-bad',IT()?'Ricerca non riuscita':'Search failed',S.hfErrore);
+  if(S.hfCercato&&!S.hfCercando&&!S.hfErrore&&!S.hf.length)h+='<div class="card"><div class="vuoto"><b>'
+    +esc(IT()?'Nessun modello MLX trovato':'No MLX model found')+'</b>'
+    +esc(IT()?'Prova un nome più generale, per esempio «qwen», «gemma» o «coder».':'Try a broader name, such as “qwen”, “gemma”, or “coder”.')+'</div></div>';
+  if(S.hf.length&&!visibili.length)h+='<div class="card"><div class="vuoto"><b>'+esc(IT()?'Nessun risultato con questi filtri':'No results with these filters')+'</b>'
+    +esc(IT()?'Azzera uno o più filtri: la ricerca originale ha trovato '+S.hf.length+' modelli.':'Clear one or more filters: the original search found '+S.hf.length+' models.')+'</div></div>';
+  h += visibili.length ? '<div class="card">'+visibili.map(t=>{
+      const i=S.hf.indexOf(t), entra=!!t.gb&&t.gb<=disponibiliGB();
       return '<div class="riga"><span class="cresci">'
         +'<span class="mono" style="font-size:11.5px;color:var(--strong);word-break:break-all">'+esc(t.id)+'</span>'
-        +'<span class="m">'+[t.gb?gb(t.gb)+' GB':'', t.formato, t.downloads?t.downloads.toLocaleString(IT()?'it':'en'):'' ].filter(Boolean).map(esc).join(' · ')+'</span></span>'
-        +'<span class="pill '+(grosso?'p-warn':'p-acc')+'">'+esc(grosso?T().cl.esclusivo:T().cl.convivente)+'</span>'
+        +'<span class="m">'+[t.gb?gb(t.gb)+' GB':'',t.formato].filter(Boolean).map(esc).join(' · ')+'</span>'
+        +'<span class="hf-meta"><span>↓ '+numeroHF(t.downloads)+' download</span><span>♥ '+numeroHF(t.likes)+' like</span>'
+        +'<span class="trend">↗ '+numeroHF(t.tendenza)+' '+esc(IT()?'tendenza':'trend')+'</span><span>'+esc(IT()?'agg. ':'updated ')+esc(dataHF(t.aggiornato||t.creato))+'</span></span></span>'
+        +'<span class="pill '+(entra?'p-ok':'p-warn')+'">'+esc(entra?(IT()?'entra ora':'fits now'):(IT()?'serve RAM':'needs RAM'))+'</span>'
         +(t.giaPresente?'<span class="pill p-ok">'+esc(T().onDisk)+'</span>'
-          :'<button class="b2 sm" onclick="scarica('+i+')">'+esc((t.gb||0)>disponibiliGB()?T().noRoom:T().download)+'</button>')
+          :'<button class="b2 sm" onclick="scarica('+i+')">'+esc(T().download)+'</button>')
         +'</div>';
     }).join('')+'</div>' : '';
   return h;
@@ -1317,7 +1835,17 @@ function vistaHF(){
 async function cerca(){
   const q = ($('hfq')||{}).value || '';
   if(!q.trim()) return;
-  try{ S.hf = await api('/api/hf/cerca?q='+encodeURIComponent(q)) || []; }catch(e){ S.hf=[]; }
+  const nuova=q.trim(), cambiata=nuova!==S.hfQuery, richiesta=++S.hfRichiesta;
+  S.hfQuery=nuova; S.hfCercato=true; S.hfCercando=true; S.hfErrore='';
+  if(cambiata)S.hf=[];
+  disegnaCentro();
+  try{
+    const dati=await api('/api/hf/cerca?q='+encodeURIComponent(nuova)+'&sort='+encodeURIComponent(S.hfSort)) || [];
+    if(richiesta!==S.hfRichiesta)return;
+    S.hf=dati;
+  }catch(e){ if(richiesta===S.hfRichiesta){S.hf=[];S.hfErrore=e.message;} }
+  if(richiesta!==S.hfRichiesta)return;
+  S.hfCercando=false;
   disegnaCentro();
 }
 async function scarica(i){
@@ -1337,8 +1865,9 @@ function vistaConfig(){
   }
   let h = '<h1>'+esc(T().config)+'</h1><p class="sub">'+esc(T().configSub)+'</p><div class="card">'
     +'<div class="testa" style="gap:6px;background:var(--inset)">'
-    +S.documenti.map((x,i)=>'<button class="'+(d&&d.id===x.id?'b2':'b3')+' sm" onclick="apriDoc('+i+')"'
-      +(x.esiste?'':' disabled')+'>'+esc(x.nome)+'</button>').join('')
+    +S.documenti.map((x,i)=>bottone((d&&d.id===x.id?'b2':'b3')+' sm', 'apriDoc('+i+')', x.nome,
+      x.esiste?'':(IT()?'Questo file non esiste su questa macchina: '+(x.file||'')
+                       :'This file does not exist on this machine: '+(x.file||'')))).join('')
     +'<div class="sp"></div>'
     +'<button class="b3 sm" onclick="formatta()">'+esc(T().format)+'</button>'
     +'<button class="b3 sm" onclick="salvaDoc(false)">'+esc(T().check)+'</button>'
@@ -1399,10 +1928,18 @@ async function elimina(i){
 
 /* ── inspector ── */
 function disegnaInsp(){
+  const corpo=$('insp-corpo'), vecchioTop=corpo.scrollTop;
   $('tab-modello').textContent = T().tabModel; $('tab-aiuto').textContent = T().tabHelp;
   $('tab-modello').className = S.tab==='modello'?'on':''; $('tab-aiuto').className = S.tab==='aiuto'?'on':'';
-  $('insp-corpo').innerHTML = S.tab==='aiuto' ? inspAiuto() : inspModello();
-  if(S.tab==='aiuto'){ const c=$('insp-corpo'); c.scrollTop=c.scrollHeight; }
+  corpo.innerHTML = S.tab==='aiuto' ? inspAiuto() : inspModello();
+  if(S.tab==='aiuto'){
+    if(S.gellowScroll==='fondo')corpo.scrollTop=corpo.scrollHeight;
+    else if(S.gellowScroll==='risposta'){
+      const nuova=$('gellow-risposta-nuova');corpo.scrollTop=nuova?Math.max(0,nuova.offsetTop-8):vecchioTop;
+      const messaggio=S.chat.find(m=>m.nuova);if(messaggio)messaggio.nuova=false;
+    }else corpo.scrollTop=Math.min(vecchioTop,Math.max(0,corpo.scrollHeight-corpo.clientHeight));
+    S.gellowScroll='';
+  }
 }
 function inspModello(){
   const m = modelloSel();
@@ -1432,6 +1969,14 @@ function inspModello(){
   else if(st==='in-arrivo'){ vc='n-info'; v=[IT()?'Sta scaricando':'Downloading now',
       IT()?'Alla fine riavvia il suo programma, perché veda i file nuovi.':'Restart its program at the end so it sees the new files.']; }
   else if(st==='pronto'||st==='in-memoria'){ vc='n-ok'; v=[T().alreadyIn, T().alreadyInWhy]; }
+  /* Programma spento: prima si accende, poi ha senso chiedersi se il modello
+     ci sta. Chiederselo adesso darebbe una risposta su una macchina che fra un
+     minuto è un'altra. Se il pannello non sa accenderlo, lo dice. */
+  else if(st==='spento' && rt.chiave && !rt.attivo){ vc='n-warn';
+    v=[(rt.nome||m.runtime)+(IT()?' è spento':' is off'),
+      (IT()?'Il modello è dichiarato e a posto: manca solo il suo programma. ':'The model is declared and fine: only its program is missing. ')
+      +(rt.puoAvviare ? (IT()?'Accendilo dalla scheda Programmi.':'Start it from the Programs tab.')
+        : (IT()?'Il pannello non sa accenderlo: non ha i suoi comandi in configurazione.':'The panel cannot start it: its commands are not in the config.'))]; }
   else if(!haVerdetto(m)){ vc='n-warn'; v=[T().unknownWeight,
       IT()?'Non è mai stato misurato: senza il peso non posso dire se ci sta. Provalo una volta.'
          :'It was never measured: without a weight I cannot say whether it fits. Test it once.']; }
@@ -1443,7 +1988,8 @@ function inspModello(){
       : (IT()?'Non ci sta adesso':'It does not fit now'), motivoVerdetto(m)]; }
 
   const specs = [
-    [T().kClass, T().cl[cl]+(cl==='esclusivo'?' · ≥ '+sogliaGB()+' GB':cl==='convivente'?' · < '+sogliaGB()+' GB':'')],
+    [T().kClass, T().cl[cl]+(cl==='esclusivo'?' · ≥ '+sogliaGB()+' GB':cl==='convivente'?' · < '+sogliaGB()+' GB'
+      :cl==='ignota'?(IT()?' · provalo una volta e si sa':' · test it once and we know'):'')],
     [T().kWeight, remoto?T().elsewhere:(m.gb?gb(m.gb)+' GB':T().notWeighed)],
     [T().kSpeed, m.misurato?gb(m.tokS)+' tok/s'+(m.provato?' · '+m.provato:''):T().notMeasured],
     [T().kCtx, Math.round((m.context||0)/1024)+'k token'],
@@ -1458,12 +2004,15 @@ function inspModello(){
      il riquadro c'è sempre, e se è vuoto dice come riempirlo. */
   if(!remoto) h += '<div class="desc"><div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'
     +'<span class="k" style="flex:1">'+esc(T().describedBy)+'</span>'
-    +'<button class="b3 sm" style="min-height:24px;padding:0 8px;font-size:11px" onclick="ridescrivi('+arg(m.id)+')"'
-    +(S.descrivendo?' disabled':'')+'>'+(S.descrivendo===m.id?'<span class="carica"></span>':'↻')+'</button></div>'
-    +'<p>'+(m.note?esc(m.note):'<span style="color:var(--muted)">'+esc(IT()?'Ancora nessuna: premi ↻ e la scrive il modellino.'
-       :'None yet: press ↻ and the small model writes it.')+'</span>')+'</p></div>';
+    +bottone('b3 sm', 'ridescrivi('+arg(m.id)+')',
+      S.descrivendo===m.id?'<span class="carica"></span>':'↻',
+      S.descrivendo ? (IT()?'Gellow sta già descrivendo un modello.':'Gellow is already describing a model.') : '',
+      true)+'</div>'
+    +'<p>'+(m.note?esc(m.note):'<span style="color:var(--muted)">'+esc(IT()?'Ancora nessuna: premi ↻ e la scrive Gellow.'
+       :'None yet: press ↻ and Gellow writes it.')+'</span>')+'</p></div>';
   h += '<div class="specs">'+specs.map(([k,x])=>'<div>'+esc(k)+'</div><div>'+esc(x)+'</div>').join('')+'</div>';
-  h += '<div><div class="k" style="margin-bottom:7px">'+esc(T().ifLoaded)+'</div>'+nota(vc,v[0],v[1])+'</div>';
+  const inMemoria=st==='pronto'||st==='in-memoria';
+  h += '<div><div class="k" style="margin-bottom:7px">'+esc(inMemoria?(IT()?'SE VUOI SPEGNERLO':'IF YOU WANT TO TURN IT OFF'):T().ifLoaded)+'</div>'+nota(vc,v[0],v[1])+'</div>';
   if(S.avvisoProva) h += nota('n-warn','',S.avvisoProva);
   if(S.esitoProva) h += nota('n-ok','',S.esitoProva);
   if(remoto) h += '<div style="border:1px solid var(--line);border-radius:8px;padding:11px 13px;display:flex;flex-direction:column;gap:7px">'
@@ -1475,15 +2024,40 @@ function inspModello(){
     +'<div style="display:flex;gap:8px"><input id="chiave" type="password" placeholder="'+esc(T().keyNew)+'">'
     +'<button class="b2 sm" onclick="salvaChiave(\''+esc(m.runtime)+'\')">'+esc(T().keySave)+'</button></div>'
     +'<div style="font-size:11.5px;color:var(--muted);line-height:1.45">'+esc(T().keyNote)+'</div></div>';
+  /* Un pulsante che non può fare niente non deve essere premibile, e deve dire
+     perché: passandoci sopra si legge il motivo. Il difetto del 18/08/2026 non
+     era che «Libera RAM» sbagliasse — era che non faceva nulla in silenzio,
+     perché senza processi da fermare esegui('libera') esce senza una riga. */
+  const capModello=S.capacita[m.runtime]||{};
+  const puoDisattivare=!remoto&&(capModello.scaricaSingoloModello||puoFermare(m.runtime));
+  const puoArchiviare = !remoto;
   h += '<div class="azioni">'
-    +'<button class="b1" onclick="esegui(\'pronto\',{id:'+arg(m.id)+'})"'+(st==='pronto'?' disabled':'')+'>'
-      +esc(st==='pronto'?T().isReady:T().makeReady)+'</button>'
-    +'<div class="due"><button class="b2 sm" onclick="prova('+arg(m.id)+')"'+(S.provando?' disabled':'')+'>'
-      +(S.provando===m.id?'<span class="carica"></span> ':'')+esc(T().testTime)+'</button>'
-    +'<button class="b2 sm" onclick="esegui(\'libera\',{daFermare:['+daFermare(m).map(arg).join(',')+']})">'+esc(T().freeRAM)+'</button></div>'
-    +'<div class="due"><button class="b3 sm" onclick="apriNomi()">'+esc(T().namesClients)+'</button>'
-    +'<button class="'+(S.armato==='arch:'+m.id?'bx':'b3 bxq')+' sm" onclick="archivia('+arg(m.id)+')">'
-    +esc(S.armato==='arch:'+m.id?T().pressAgain:T().archiveBtn)+'</button></div></div>';
+    +(inMemoria
+      ? bottone('b2','disattiva('+arg(m.id)+')',
+          S.spegnendo===m.id?'<span class="carica"></span> '+esc(IT()?'Disattivo…':'Deactivating…')
+            :esc(capModello.scaricaSingoloModello?(IT()?'Disattiva modello':'Deactivate model'):(IT()?'Spegni '+nomeRuntime(m.runtime):'Stop '+nomeRuntime(m.runtime))),
+          S.spegnendo?(IT()?'Sto già disattivando un modello.':'A model is already being deactivated.')
+            :puoDisattivare?'':(IT()?'Il pannello non ha un comando per spegnerlo.':'The panel has no command to turn it off.'),true)
+      : bottone('b1', 'esegui(\'pronto\',{id:'+arg(m.id)+'})',
+          S.attivando===m.id?'<span class="carica"></span> '+esc(IT()?'Attivo…':'Activating…'):T().makeReady,
+          S.attivando ? (IT()?'Sto già attivando un modello.':'A model is already being activated.')
+          : remoto ? (IT()?'Gira sul server del provider: non c\'è niente da caricare qui.':'It runs on the provider server: nothing to load here.')
+          : '',S.attivando===m.id))
+    +'<div class="due">'
+    +bottone('b2 sm', 'prova('+arg(m.id)+')',
+      (S.provando===m.id?'<span class="carica"></span> ':'')+esc(T().testTime),
+      S.provando ? (IT()?'Sto già cronometrando un modello.':'Already timing a model.') : '', true)
+    +'</div><div class="due">'
+    +bottone('b3 sm', 'apriNomi()', T().namesClients, '')
+    +bottone(S.armato==='arch:'+m.id?'bx sm':'b3 bxq sm', 'archivia('+arg(m.id)+')',
+      S.archiviando===m.id?'<span class="carica"></span>':(S.armato==='arch:'+m.id?T().pressAgain:T().archiveBtn),
+      S.archiviando ? (IT()?'Archiviazione in corso.':'Archiving in progress.')
+      : puoArchiviare ? '' : (IT()?'I suoi file stanno su un\'altra macchina: da qui non si archivia.':'Its files are on another machine: nothing to archive from here.'),
+      S.archiviando===m.id)
+    +'</div></div>';
+  if(S.erroreArchivio)h+=nota('n-bad',IT()?'Non archiviato':'Not archived',S.erroreArchivio);
+  else if(S.armato==='arch:'+m.id&&S.esameArchivio)h+=nota('n-warn',IT()?'Conferma archivio':'Confirm archive',
+    (IT()?'Sposto ':'Move ')+S.esameArchivio.posti.length+(IT()?' posizione/i, ':' location(s), ')+gb(S.esameArchivio.gbTotali)+' GB. '+T().pressAgain+'.');
   if(S.nomiAperti===m.id) h += formNomi(m);
   return h;
 }
@@ -1520,11 +2094,23 @@ async function salva(){
 }
 async function archivia(id){
   const m = S.modelli.find(x=>x.id===id); if(!m) return;
-  if(S.armato!=='arch:'+id){ S.armato='arch:'+id; return disegnaInsp(); }
-  S.armato='';
-  try{ await api('/api/modello/rimuovi',{method:'POST',body:JSON.stringify({id:m.id,runtime:m.runtime})}); }
-  catch(e){ log('! '+e.message); }
-  caricaLento(); aggiorna();
+  S.erroreArchivio='';
+  if(S.armato!=='arch:'+id){
+    try{
+      const e=await api('/api/modello/esamina?id='+encodeURIComponent(m.id));S.esameArchivio=e;
+      if(!e||!(e.posti||[]).length){S.erroreArchivio=(e&&e.nota)||(IT()?'Non trovo i file sul disco.':'Files were not found on disk.');return disegnaInsp();}
+      if(!e.rimovibile){
+        const gravi=(e.dipendenze||[]).filter(x=>x.grave).map(x=>x.cosa+' — '+x.perche);
+        S.erroreArchivio=gravi.join('; ')||(IT()?'Prima va liberato o disattivato.':'It must be unloaded or deactivated first.');return disegnaInsp();
+      }
+      S.armato='arch:'+id;return disegnaInsp();
+    }catch(e){S.erroreArchivio=e.message;return disegnaInsp();}
+  }
+  S.armato='';S.archiviando=id;disegnaInsp();
+  try{
+    await api('/api/modello/rimuovi',{method:'POST',body:JSON.stringify({id:m.id,runtime:m.runtime})});
+    S.archiviando='';S.inspAperto=false;S.schermo='archivio';await Promise.all([caricaLento(),aggiorna()]);
+  }catch(e){S.archiviando='';S.erroreArchivio=e.message;disegnaInsp();}
 }
 async function salvaChiave(provider){
   const v = (($('chiave')||{}).value||'').trim(); if(!v) return;
@@ -1538,7 +2124,7 @@ async function salvaChiave(provider){
    volta. Senza `tutte` riempie solo i buchi; con un id rifà quel modello. */
 async function etichetteAuto(tutte){
   vai('manutenzione');
-  scriviConsole('> '+(IT()?'faccio descrivere i modelli al modellino':'asking the small model to describe the models'));
+  scriviConsole('> '+(IT()?'Gellow sta descrivendo i modelli':'Gellow is describing the models'));
   try{
     const r = await api('/api/etichetta-auto'+(tutte?'?tutte=1':''),{method:'POST'});
     ((r&&r.fatte)||[]).forEach(f => log('  '+f.id+(f.etichetta?' → '+f.etichetta:'')));
@@ -1556,15 +2142,21 @@ async function ridescrivi(id){
 
 function inspAiuto(){
   const sugg = (S.domande||[]).slice(0,3);
-  let h = S.chat.length ? S.chat.map(m=>'<div class="msg'+(m.io?' io':' md')+'">'+(m.io?esc(m.testo):md(m.testo))+'</div>').join('')
-    : '<div class="msg md">'+esc(IT()?'Vedo cosa sta facendo il Mac adesso. Chiedi cosa c\'è in memoria, perché un modello non parte, o cosa fa un comando.'
-        :'I can see what the Mac is doing right now. Ask what is in memory, why a model will not start, or what a command does.')+'</div>';
+  let h = S.chat.length ? S.chat.map(m=>m.caricando
+    ? '<div class="msg gellow-attesa" role="status" aria-live="polite"><span class="gellow-gira"></span><div><b>'
+      +esc(m.controllo?(IT()?'Gellow sta leggendo tutto il controllo':'Gellow is reading the whole check'):(IT()?'Gellow sta preparando la risposta':'Gellow is preparing the answer'))
+      +'<span class="gellow-punti" aria-hidden="true"><i></i><i></i><i></i></span></b><small id="gellow-tempo">'
+      +esc(IT()?'meno di un secondo':'less than a second')+'</small></div></div>'
+    : '<div '+(m.nuova?'id="gellow-risposta-nuova" ':'')+'class="msg'+(m.io?' io':' md')+'">'+(m.io?esc(m.testo):md(m.testo))+'</div>').join('')
+    : '<div class="msg md"><b>Gellow</b><br>'+esc(IT()?'Vedo cosa sta facendo il Mac adesso. Chiedimi cosa c\'è in memoria, perché un modello non parte o cosa significa un controllo.'
+        :'I can see what the Mac is doing right now. Ask me what is in memory, why a model will not start, or what a check means.')+'</div>';
   h += '<div class="sp"></div><div style="display:flex;gap:6px;flex-wrap:wrap">'
-    +sugg.map(q=>'<button class="b3 sm" style="border:1px solid var(--line);font-size:10.5px" onclick="chiedi('+arg(q)+')">'
+    +sugg.map(q=>'<button class="b3 sm" style="border:1px solid var(--line);font-size:10.5px" '+(S.gellowOccupato?'disabled title="'+esc(IT()?'Gellow sta già preparando una risposta.':'Gellow is already preparing an answer.')+'"':'')+' onclick="chiedi('+arg(q)+')">'
       +esc(q.length>34?q.slice(0,32)+'…':q)+'</button>').join('')+'</div>'
-    +'<div style="display:flex;gap:8px"><input id="domanda" type="text" placeholder="'+esc(T().askPh)+'" '
-    +'onkeydown="if(event.key===\'Enter\'){chiedi(this.value);this.value=\'\'}">'
-    +'<button class="b1 sm" onclick="var d=$(\'domanda\');chiedi(d.value);d.value=\'\'">'+esc(T().send)+'</button></div>';
+    +'<div style="display:flex;gap:8px"><input id="domanda" type="text" placeholder="'+esc(S.gellowOccupato?(IT()?'Gellow sta lavorando…':'Gellow is working…'):T().askPh)+'" '
+    +(S.gellowOccupato?'disabled title="'+esc(IT()?'Aspetta la risposta in corso.':'Wait for the current answer.')+'" ':'')+'onkeydown="if(event.key===\'Enter\'&&!S.gellowOccupato){chiedi(this.value);this.value=\'\'}">'
+    +'<button class="b1 sm" '+(S.gellowOccupato?'disabled title="'+esc(IT()?'Gellow sta già preparando una risposta.':'Gellow is already preparing an answer.')+'" ':'')+'onclick="var d=$(\'domanda\');chiedi(d.value);d.value=\'\'">'
+    +esc(S.gellowOccupato?(IT()?'In corso…':'Working…'):T().send)+'</button></div>';
   return h;
 }
 /* markdown minimo: le risposte del modellino arrivano in MD */
@@ -1639,7 +2231,11 @@ function tastiCmdk(e){
 }
 addEventListener('keydown', e=>{
   if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); apriCmdk(true); }
-  if(e.key==='Escape') apriCmdk(false);
+  if(e.key==='Escape'){
+    const velo=$('velo');e.preventDefault();
+    if(velo&&velo.classList.contains('aperto'))apriCmdk(false);
+    else if(S.inspAperto)chiudiInsp();
+  }
   if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='s' && S.schermo==='config'){ e.preventDefault(); salvaDoc(true); }
 });
 addEventListener('beforeunload', e=>{ if(S.cambiato){ e.preventDefault(); e.returnValue=''; } });
