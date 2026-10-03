@@ -62,6 +62,18 @@ func recentlyActive(runtime string) string {
 	return h.Model
 }
 
+// forgetActive: il modello è stato spento, l'indizio non vale più. Senza, un
+// programma che dichiara solo «ne ho uno caricato» continuerebbe a far
+// risultare attivo per venti minuti quello appena tolto.
+func forgetActive(runtime, model string) {
+	k := strings.ToLower(runtime)
+	activeHints.Lock()
+	if strings.EqualFold(activeHints.M[k].Model, model) {
+		delete(activeHints.M, k)
+	}
+	activeHints.Unlock()
+}
+
 func localDestination(porta int) destinazione {
 	return destinazione{baseURL: "http://127.0.0.1:" + itoa(porta) + "/v1"}
 }
@@ -188,34 +200,4 @@ func apiProbe(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, e)
-}
-
-func apiActivate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Porta   int    `json:"porta"`
-		Model   string `json:"modello"`
-		Runtime string `json:"runtime"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errJSON(w, err.Error())
-		return
-	}
-	if req.Model == "" || req.Runtime == "" {
-		errJSON(w, "modello o programma mancante")
-		return
-	}
-	var e Outcome
-	if d, ok := destinationFor(req.Runtime); ok && d.baseURL != "" {
-		e = activateModelAt(d, req.Model)
-	} else {
-		e = activateModelAt(localDestination(req.Porta), req.Model)
-	}
-	if !e.OK {
-		errJSON(w, e.Errore)
-		return
-	}
-	rememberActive(req.Runtime, req.Model)
-	updateProfile(req.Runtime, req.Model, func(p *Profile) { p.UltimoUso = time.Now() })
-	refreshMemory()
-	writeJSON(w, map[string]any{"ok": true, "modello": req.Model, "loadSec": e.LoadSec})
 }

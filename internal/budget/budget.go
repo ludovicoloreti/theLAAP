@@ -48,6 +48,17 @@ type Budget struct {
 	TotalBytes     uint64
 	OSReserveBytes uint64
 	Used           []RuntimeUsage
+	// FreeBytes: la memoria che si può ancora impegnare adesso — RAM meno
+	// memoria anonima, wired, compressore e il pavimento di cache dei file che
+	// il sistema non restituisce. Non le pagine «libere», che stanno al fondo
+	// anche in condizioni sane. Zero = lettura non disponibile, e allora decide
+	// solo l'aritmetica sui picchi.
+	//
+	// Serve perché il totale meno i picchi non vede il resto della macchina: il
+	// 03/10/2026 il desktop (app, OrbStack, cache: ~40 GiB) lasciava 1,85 GiB
+	// liberi dopo un carico che l'aritmetica dava per ammesso con ~23 GB di
+	// margine, e la macchina è andata in kernel panic.
+	FreeBytes uint64
 }
 
 // Verdict: the answer, carrying what to do when it is no.
@@ -55,6 +66,7 @@ type Verdict struct {
 	Allowed        bool     `json:"ammesso"`
 	RequestedBytes uint64   `json:"richiestoByte"`
 	AvailableBytes uint64   `json:"disponibileByte"`
+	FreeBytes      uint64   `json:"liberaByte,omitempty"` // la libera vera letta adesso, se nota
 	MissingBytes   uint64   `json:"mancanoByte,omitempty"`
 	ToFree         []string `json:"daLiberare,omitempty"` // keys of the runtimes to stop
 	Reason         string   `json:"motivo"`
@@ -69,6 +81,10 @@ type Policy struct {
 	// and would leave the system no margin to grow into.
 	OneLargeModelAtATime bool
 	LargeThresholdBytes  uint64
+	// MinFreeBytes: quanta memoria libera vera deve restare DOPO il carico.
+	// Zero = nessun controllo. Nel dubbio si rifiuta: un rifiuto costa un
+	// clic, un panic costa la sessione.
+	MinFreeBytes uint64
 }
 
 // usedBytes: how much is already committed.
@@ -90,12 +106,36 @@ func (b Budget) AvailableBytes() uint64 {
 	return b.TotalBytes - used
 }
 
+// LoadableBytes: the largest model Admits would accept right now (the rule on
+// large models aside). It is what the panel shows as «free for a model».
+//
+// The arithmetic on peaks only sees the runtimes of the stack. The real free
+// memory also sees everything else running on the machine, so when it is known
+// the smaller of the two wins: the page must not say «81 GB free» right above
+// a 35 GB model it refuses.
+func (b Budget) LoadableBytes(p Policy) uint64 {
+	loadable := b.AvailableBytes()
+	if b.FreeBytes > 0 && p.MinFreeBytes > 0 {
+		var real uint64
+		if b.FreeBytes > p.MinFreeBytes {
+			real = b.FreeBytes - p.MinFreeBytes
+		}
+		if real < loadable {
+			loadable = real
+		}
+	}
+	return loadable
+}
+
 // Admits answers the question the panel did not know how to ask itself: if I
 // load this, does it fit?
 func (b Budget) Admits(requestedBytes uint64, p Policy) Verdict {
+	// The verdict carries the free figure it decides on: the page prints
+	// needed, free and missing one under the other, and they have to add up.
 	v := Verdict{
 		RequestedBytes: requestedBytes,
-		AvailableBytes: b.AvailableBytes(),
+		AvailableBytes: b.LoadableBytes(p),
+		FreeBytes:      b.FreeBytes,
 	}
 	if requestedBytes == 0 {
 		v.Allowed = false
@@ -122,6 +162,20 @@ func (b Budget) Admits(requestedBytes uint64, p Policy) Verdict {
 				namesOf(large), sumGB(large), float64(requestedBytes)/1e9)
 			return v
 		}
+	}
+
+	// La memoria libera vera: l'aritmetica sui picchi non la conosce.
+	if b.FreeBytes > 0 && p.MinFreeBytes > 0 && requestedBytes+p.MinFreeBytes > b.FreeBytes {
+		v.Allowed = false
+		// What is missing is measured against the tighter of the two limits.
+		v.MissingBytes = requestedBytes - v.AvailableBytes
+		v.ToFree = keysOf(chosenToFree(b.Used, v.MissingBytes))
+		v.Reason = fmt.Sprintf(
+			"not enough memory: %.0f GB needed, and %.0f GB must stay free afterwards, "+
+				"but only %.0f GB can still be committed right now (model weights cannot be compressed). %.0f GB missing.",
+			float64(requestedBytes)/1e9, float64(p.MinFreeBytes)/1e9,
+			float64(b.FreeBytes)/1e9, float64(v.MissingBytes)/1e9)
+		return v
 	}
 
 	if requestedBytes <= v.AvailableBytes {

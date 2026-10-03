@@ -89,19 +89,38 @@ func safeName(id string) bool {
 // quantizzazione con confronti sfocati rischierebbe di archiviare il modello
 // sbagliato; `lms ls --json` e' invece la fonte che usa LM Studio stesso.
 func lmStudioAliases(id string) []string {
-	h, err := os.UserHomeDir()
-	if err != nil {
+	// Si chiede a LM Studio solo se è tra i programmi configurati: il comando
+	// lo risveglia da chiuso, e chi non lo usa se lo ritroverebbe acceso in
+	// sottofondo ogni volta che esamina un modello.
+	configurato := false
+	for _, r := range cfg().Runtime {
+		configurato = configurato || r.Chiave == "lmstudio"
+	}
+	if !configurato {
 		return nil
 	}
-	bin := filepath.Join(h, ".lmstudio", "bin", "lms")
-	if _, err := os.Stat(bin); err != nil {
-		return nil
-	}
-	b, err := exec.Command(bin, "ls", "--json").Output()
+	b, err := lmsList()
 	if err != nil {
 		return nil
 	}
 	return lmStudioAliasesJSON(id, b)
+}
+
+// lmsList: l'elenco dei modelli come lo dà LM Studio (`lms ls --json`).
+//
+// È una variabile perché il comando RISVEGLIA LM Studio quando è chiuso e lo
+// lascia aperto in sottofondo: le prove lo sostituiscono, così non lanciano
+// quello vero sul Mac di chi le esegue.
+var lmsList = func() ([]byte, error) {
+	h, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	bin := filepath.Join(h, ".lmstudio", "bin", "lms")
+	if _, err := os.Stat(bin); err != nil {
+		return nil, err
+	}
+	return exec.Command(bin, "ls", "--json").Output()
 }
 
 func lmStudioAliasesJSON(id string, b []byte) []string {

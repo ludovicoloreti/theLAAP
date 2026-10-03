@@ -261,3 +261,27 @@ func TestElenchiMaiNil(t *testing.T) {
 		t.Error("scarichiInCorso() è nil")
 	}
 }
+
+// «Libera per un modello» è quanto l'arbitro accetta davvero: se un'altra
+// applicazione tiene memoria (il 4/10/2026 erano 27 GB di un'app fuori dallo
+// stack), la pagina non deve promettere più di quanto poi concede.
+func TestLiberaPerUnModelloTieneContoDellaMemoriaVera(t *testing.T) {
+	withConfig(t, Config{}) // nessun programma: l'aritmetica darebbe quasi tutta la macchina
+	ultimaMemMu.Lock()
+	vecchiaMem := ultimaMem
+	ultimaMem = MemState{TotaleGB: 137.4}
+	ultimaMemMu.Unlock()
+	vecchio := freeMemoryReader
+	freeMemoryReader = func() uint64 { return 30e9 }
+	t.Cleanup(func() {
+		freeMemoryReader = vecchio
+		ultimaMemMu.Lock()
+		ultimaMem = vecchiaMem
+		ultimaMemMu.Unlock()
+	})
+
+	attesi := 30 - freeMarginGB()
+	if got := modelsWithState().DisponibiliGB; got < attesi-0.01 || got > attesi+0.01 {
+		t.Fatalf("libera per un modello = %.1f GB, attesi %.1f (30 impegnabili meno %.0f da lasciare)", got, attesi, freeMarginGB())
+	}
+}

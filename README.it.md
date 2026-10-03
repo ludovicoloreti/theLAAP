@@ -14,7 +14,7 @@ volta sola sul server.
 [![Swift](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white)](#-installazione)
 [![Dipendenze](https://img.shields.io/badge/dipendenze-1-brightgreen)](go.mod)
-[![Test](https://img.shields.io/badge/test-73-success)](#i-file)
+[![Test](https://img.shields.io/badge/test-146-success)](#i-file)
 [![Licenza](https://img.shields.io/badge/licenza-MIT-blue)](LICENSE)
 
 [English](README.md) · **Italiano**
@@ -43,31 +43,44 @@ browser di mezzo, nessuna barra degli indirizzi. Finché la finestra è aperta
 l'app compare anche nel Dock; chiudendola torna a vivere solo nella barra di
 stato, e il server continua a girare.
 
-## Due modalità
+## Un interruttore per modello
 
-L'interruttore in alto a destra commuta fra:
+Accendere e spegnere un modello è un gesto solo, e il programma che lo esegue
+lo segue da sé:
 
-- **guidato** — ogni cosa spiegata in italiano, senza gergo: a cosa serve un modello, quando usarlo, cosa fa un pulsante e quanto ci mette.
-- **esperto** — in più: identificativi completi, programma e porta, dimensione del contesto e le righe di comando degli strumenti.
+| gesto | cosa fa il pannello |
+|---|---|
+| **accendi** | se il programma è spento lo avvia, aspetta che risponda, poi carica il modello |
+| **spegni** | toglie il modello dalla memoria; se in quel programma non ne resta nessun altro, ferma anche il programma |
 
-La scelta resta memorizzata.
+Prima di avviare qualunque cosa l'arbitro risponde a «ci sta?», e se la risposta
+è no l'accensione viene rifiutata col verdetto a campi (serve, liberi, libera vera,
+mancano, da spegnere). L'arbitro guarda anche la **memoria libera vera** — pagine
+libere, speculative e purgeable, non la cache dei file — e dopo il carico ne
+devono restare almeno 16 GB (`margineLiberaGB`): il 03/10/2026 un'aritmetica che
+diceva sì ha portato la macchina in kernel panic. Il motivo di un avvio rifiutato
+dal controllore (`stackctl`) arriva alla pagina così com'è, e non viene riprovato:
+si riprova solo se il testo dice che il lock è occupato. Un programma che non sa togliere un solo modello (oMLX, MTPLX) si
+ferma soltanto se dentro non c'è altro; con altri modelli caricati
+l'interruttore è bloccato e dice perché. I comandi sono sempre quelli scritti in
+configurazione (`avvia`, `ferma`, `scaricaModello`): il pannello non lancia
+processi per conto suo. Le rotte sono `POST /api/modello/accendi` e
+`POST /api/modello/spegni`, con `{"runtime": …, "modello": …}`.
 
 ## Come è fatta la pagina
 
-La pagina parte da una vera **Panoramica** e ha quattro sole destinazioni
-principali:
+Tre colonne: la navigazione a sinistra, la pagina al centro e, a destra,
+l'ispettore — la scheda del modello scelto oppure Gellow — che si apre quando
+serve. La regola dei contenuti è una: **dati strutturati**, quindi tabelle,
+grafici e schemi. Il codice non scrive paragrafi; il testo libero lo scrive
+solo Gellow, quando glielo si chiede.
 
-| schermata | cosa risolve |
+| sezione | cosa mostra |
 |---|---|
-| **Panoramica** | dice subito cosa funziona, cosa va sistemato e offre il controllo in un clic |
-| **Modelli** | mostra insieme tutti i modelli dichiarati dai client e quelli trovati davvero nei motori locali |
-| **Configurazioni** | una matrice unica permette di aggiungere o togliere ogni modello da Pi, OpenCode e DeepSeek Harness con tre spunte |
-| **Controlla** | esegue il controllo rapido come azione primaria e mostra un risultato leggibile |
-
-Programmi, memoria dettagliata, download, archivio e file completi sono raccolti
-sotto **Altro**. Restano disponibili senza trasformare la navigazione nella
-mappa delle parti interne del programma. La colonna dei dettagli compare solo
-quando si apre l'elenco dei modelli; le altre schermate usano tutto lo spazio.
+| **Panoramica** | quattro numeri, la memoria disegnata per programma, e lo schema programmi → modelli: ogni modello ha il suo interruttore |
+| **Client** | una matrice unica: ogni modello in Pi, OpenCode e DeepSeek Harness con tre spunte |
+| **Controlli** | i comandi di manutenzione in tabella, il guardiano dello stack e l'esito, che Gellow può spiegare |
+| **Scarica modelli**, **Archivio**, **File** | ricerca su HuggingFace, modelli archiviati, file di configurazione completi |
 
 L'elenco non nasce più soltanto dai JSON dei client: viene unito a ciò che LM
 Studio, Ollama, oMLX e gli altri motori dichiarano davvero. Un modello installato
@@ -103,8 +116,9 @@ meno: sottrae i 24 GB tenuti da parte per il sistema operativo, e la differenza
 è esattamente ciò che ha evitato il secondo kernel panic.
 
 **`⌘K`, senza modello.** Un interprete deterministico di poche righe: capisce
-l'azione, la quantità in GB, il modello e il programma, mostra cosa ha capito, e
-propone *una* cosa da confermare con invio. Gli id eseguibili non sono scritti
+l'azione e il modello, mostra cosa ha capito, e propone *una* cosa da confermare
+con invio — «accendi gemma», «spegni qwen», «cronometra …». Per «accendi» i numeri
+sotto la proposta sono quelli del verdetto dell'arbitro, non una stima della pagina. Gli id eseguibili non sono scritti
 nella pagina: vengono da `/api/comandi`, che li ricava da strumenti, regimi e
 programmi dichiarati in configurazione, ognuno con la rotta e il corpo da usare.
 È il difetto del 16/08/2026 affrontato alla radice — un elenco scritto a mano
@@ -137,19 +151,21 @@ diventano chiavi da tradurre.
 
 ## Cosa c'è dentro
 
-**La memoria.** Una barra che rappresenta la memoria del Mac, con un blocco colorato per ogni programma che ne tiene: passandoci sopra vedi nome, GB occupati e — se differiscono — quanto pesano i file rispetto a quanto tiene il processo. Sui Mac Apple Silicon RAM e VRAM sono la stessa memoria, quindi questa barra è tutto quello che serve sapere. La riga tratteggiata è il tetto per un solo modello, e si disegna **solo** se il programma lo dichiara: zero vuol dire «non lo so», non «nessun limite».
+**La memoria.** Una barra impilata con un segmento colorato per ogni programma che ne tiene: passandoci sopra vedi GB occupati e modelli dentro (un `~` dopo il numero dice che è una stima). A destra, tratteggiata, la riserva lasciata al sistema. Se il resto del Mac (browser, altre applicazioni) tiene memoria che un modello non può usare, compare un tratto grigio «altre app»: il tratto libero è quanto l'arbitro concede davvero, lo stesso numero di «Libera per un modello», e non un resto aritmetico. Il colore segue il programma, non la sua posizione: spegnerne uno non ridipinge gli altri. Le otto tinte sono in ordine fisso e validate per chi non distingue i colori; oltre l'ottavo programma si usa un grigio, non una tinta inventata. Ogni valore del grafico è anche nella legenda: il mouse aggiunge, non nasconde. Sui Mac Apple Silicon RAM e VRAM sono la stessa memoria, quindi questa barra è tutto quello che serve sapere. La riga tratteggiata è il tetto per un solo modello, e si disegna **solo** se il programma lo dichiara: zero vuol dire «non lo so», non «nessun limite».
 
-**L'elenco dei modelli.** Una riga per ciascuno: stato, nome, classe, peso, velocità. Il nome dice **cosa fa e quando usarlo** in italiano — non l'identificativo tecnico. Un peso a zero si scrive «—», non «0,0 GB»: non è zero, è che non lo sappiamo, e sarebbe l'unica cifra falsa della tabella.
+**La tabella dei modelli.** Un gruppo per programma (stato, porta, memoria occupata), e sotto una riga per modello: interruttore, nome, uso, contesto, peso con la barretta in proporzione alla RAM, tok/s e client. Sotto il nome c'è, in breve, per cosa usarlo (la frase `motivo` di `catalogoModelli`; chi non l'ha scritta vede l'identificativo). Accanto all'uso compaiono solo le capacità che il modello ha davvero: «immagini» se i client dichiarano che le accetta, «ragiona» se lo si è misurato. Un modello troppo grande per convivere porta da solo l'etichetta «esclusivo», decisa dal peso e non scritta a mano. Chi ha qualcosa di acceso sta in cima.
 
-Cliccando una riga, la colonna di destra: la descrizione, la tabella delle caratteristiche, il verdetto «se lo carichi adesso», e le azioni. **Cronometra** manda una domanda vera al modello e misura, con un contatore nel pulsante; alla fine rileva da solo se il modello ragiona prima di rispondere. **Nomi e client** cambia nome e identificativo e sceglie separatamente se mostrarlo in Pi, OpenCode e DeepSeek Harness. **Archivia** lo toglie dal disco conservando percorso e configurazione: **Ripristina** rimette tutto a posto, e la cancellazione definitiva è disponibile soltanto dall'archivio e richiede due conferme.
+Sopra la tabella, le schede: **Recenti** (quella iniziale: i modelli accesi adesso o visti in memoria negli ultimi trenta giorni — lo registra il monitor, anche a pannello chiuso), **Preferiti**, **Tutti**, **Chat e codice**, **Strumenti**, **Immagini** (solo se ce n'è almeno uno) e **Remoti**. La scheda scelta a mano resta alla riapertura. Un peso a zero si scrive «—», non «0,0 GB»: non è zero, è che non lo sappiamo, e sarebbe l'unica cifra falsa della tabella. Passando sul peso di un modello spento si legge il verdetto «ci sta?» a numeri.
+
+Cliccando una riga, la colonna di destra: in alto la stella per aggiungere il modello ai **preferiti** o toglierlo (resta nel profilo, quindi vale nell'app e nel browser), per cosa usarlo scritto per intero, l'azione accendi/spegni con scritto cosa succede al programma, il verdetto «se lo accendi adesso» come tabella (serve, liberi, mancano, da spegnere), le caratteristiche e le azioni. **Cronometra** manda una domanda vera al modello (accendendolo prima, se è spento) e misura; alla fine rileva da solo se il modello ragiona prima di rispondere. **Nomi e client** cambia nome e identificativo e sceglie separatamente se mostrarlo in Pi, OpenCode e DeepSeek Harness. **Archivia** lo toglie dal disco conservando percorso e configurazione: **Ripristina** rimette tutto a posto, e la cancellazione definitiva è disponibile soltanto dall'archivio e richiede due conferme.
 
 **Editor JSON/YAML.** Il file principale di theLAAP e tutti i file dei client dichiarati in configurazione sono modificabili direttamente nel pannello. Ogni file si può vedere e modificare sia come JSON sia come YAML, pur venendo salvato nel formato originale. L'editor valida sintassi e struttura, formatta il JSON, inserisce gli spazi col tasto Tab, salva con `⌘S`/`Ctrl-S`, crea un backup e rileva se un altro programma ha modificato il file nel frattempo.
 
-**Aggiungi un modello.** Ricerca diretta su HuggingFace: scrivi "qwen coder" e vedi cosa c'è, con dimensione reale, formato e quanti l'hanno scaricato. Vengono mostrati solo i formati MLX che questo Mac sa eseguire, con in testa quelli a 8 bit. Il download va in sottofondo.
+**Scarica modelli.** Ricerca diretta su HuggingFace: scrivi "qwen coder" e vedi cosa c'è, con dimensione reale, formato e quanti l'hanno scaricato. Vengono mostrati solo i formati MLX che questo Mac sa eseguire, con in testa quelli a 8 bit. Il download va in sottofondo.
 
-**L'aiuto, in un pannello laterale.** Il modellino locale che gira su questo Mac, con davanti un piccolo RAG: **sedici** schede di manuale scritte a mano più **la fotografia dello stato reale, rigenerata a ogni domanda**. Chiedigli "cosa c'è in memoria adesso" e risponde coi numeri veri. Sotto la casella ci sono suggerimenti pescati da **28 domande**.
+**L'aiuto, in un pannello laterale.** Il modellino locale che gira su questo Mac, con davanti un piccolo RAG: **sedici** schede di manuale scritte a mano più **la fotografia dello stato reale, rigenerata a ogni domanda**. Chiedigli "cosa c'è in memoria adesso" e risponde coi numeri veri. Sotto la casella ci sono suggerimenti pescati da **28 domande**. Il pallino accanto al pulsante Gellow, in alto, dice se il suo programma risponde; se è spento, la risposta è un pulsante **Accendi Gellow** che lo avvia (con la stessa strada dell'interruttore) e rifà la domanda. Le etichette di stato e classe si spiegano cliccandole: la domanda va a Gellow, con lo stato vero davanti, e la pagina non tiene un glossario suo.
 
-**Quale sia il modellino lo decide il peso, non il nome.** Lo dice `/api/aiuto`, e il pannello lo nomina in fondo alla colonna di sinistra col suo peso e il suo stato. La regola: fra i modelli serviti, il più piccolo che sappia conversare, sotto gli 8 miliardi di parametri.
+**Quale sia il modellino lo decide il peso, non il nome.** Lo dice `/api/aiuto`, insieme al programma che lo serve (anche quando è spento, dal catalogo), e il pannello lo usa per accenderlo. La regola: fra i modelli serviti, il più piccolo che sappia conversare, sotto gli 8 miliardi di parametri.
 
 I parametri si leggono dal nome, e sono quelli **totali** a contare. In `gemma-4-26b-a4b` la sigla «a4b» sono i parametri *attivi* di un modello a esperti: dicono la velocità, non il peso — in memoria ce ne stanno 26. Ignorata anche la quantizzazione, perché `-8bit` non sono 8 miliardi. Un nome che dichiara solo gli attivi vale zero e non è eleggibile: contarlo vorrebbe dire chiamare 3B un modello che può pesarne trenta.
 
@@ -157,17 +173,17 @@ Chi non sa conversare è escluso — OCR, embedding, trascrizione, diffusione �
 
 Se fra i modelli serviti non c'è niente di piccolo si usa quello che c'è — senza aiuto il pannello perde le descrizioni e la chat — ma **la barra laterale lo scrive**, invece di mostrare un 26B come se fosse normale. Per non lasciarlo decidere alla macchina: `"modelloAiuto": "id-del-modello"` in configurazione, che ha la precedenza.
 
-**Le descrizioni si scrivono una volta.** Il riquadro «descritto dal modellino» legge il campo `note` di `profili.json`; il pulsante ↻ lo rigenera per quel modello, *Fai descrivere tutto* riempie i buchi. Sono frasi che non cambiano: generate una volta, il modellino può restare scaricato e la RAM torna ai modelli che lavorano.
+**Le descrizioni si scrivono una volta.** Il riquadro «Gellow» nella scheda legge il campo `note` di `profili.json`; il pulsante ↻ nella scheda lo rigenera per quel modello. Sono frasi che non cambiano: generate una volta, il modellino può restare scaricato e la RAM torna ai modelli che lavorano.
 
 **Due modelli non possono chiamarsi allo stesso modo.** È capitato: tre modelli diversi tutti «Analisi testi lunghi», perché al modellino non era stato detto quali nomi fossero già presi. Ora il prompt li elenca, e se torna un doppione si richiede — tre volte, poi il nome non si scrive: senza etichetta la pagina mostra l'identificativo, che almeno è unico. Il confronto ignora maiuscole, accenti, trattini e spazi doppi.
 
 Chiederlo nelle regole non basta, e si è visto: sono uscite «Esperti analisi token lunghe» e «Analisi del contesto e delle regole» — sei parole, e il gergo dei fatti che gli avevamo passato. Ora è verificato in codice: massimo cinque parole, e nessuna delle radici `token`, `contest`, `parametr`, `esperti`, `miliard`, `quantizz`. Chi non passa viene richiesto come un doppione.
 
-**Programmi.** Acceso/spento e riavvio dei programmi che eseguono i modelli. I pulsanti che si vedono sono quelli che funzionano: `avvia`, `ferma` e `riavvia` li decide `comandoServizio`, la stessa funzione che poi li esegue, e le righe di shell non escono verso il browser.
+**Programmi.** Nella Panoramica ogni programma è la riga di gruppo dei suoi modelli: stato, porta, memoria occupata e due icone per riavviarlo o spegnerlo a mano. Di norma non servono, perché il programma segue i suoi modelli. I pulsanti che si vedono sono quelli che funzionano: `avvia`, `ferma` e `riavvia` li decide `comandoServizio`, la stessa funzione che poi li esegue, e le righe di shell non escono verso il browser.
 
 **Manutenzione.** Gli strumenti dichiarati in configurazione — ognuno con scritto cosa fa e quanto ci mette, dall'occhiata di 2 secondi al controllo completo che misura ogni modello. Fra questi *Installa aggiornamenti*, che aggiorna i programmi e li riavvia (i modelli no: quelli pesano decine di GB e li scarichi tu). L'output arriva in diretta e si legge dall'alto in basso come in un terminale, ripulito dalle sequenze di colore ANSI — che altrimenti uscirebbero come `[92m` in mezzo alle frasi.
 
-**Regimi.** In alto, accanto a «Ferma tutto», i pulsanti che accendono e spengono una configurazione di macchina *tutta insieme*. Il caso per cui sono nati: un modello da 89 GB su un Mac da 128 ci sta comodamente da solo, ma non insieme a un secondo server da 79 GB — e anche da solo veniva rifiutato, non per mancanza di memoria ma per i margini che il programma si impone. Il regime ferma gli altri programmi **e poi** allarga quei margini: l'ordine non è estetico, perché allargarli con un altro modello ancora residente è precisamente la configurazione che fa bloccare la macchina. Passandoci sopra col mouse vedi in anticipo cosa verrà fermato, e il primo clic te lo dice invece di eseguire.
+**Regimi.** Una configurazione di macchina che si accende e si spegne *tutta insieme*: si entra accendendo l'interruttore del modello esclusivo, e prima di partire il pannello elenca i programmi che verranno spenti e chiede conferma. Il caso per cui sono nati: un modello da 89 GB su un Mac da 128 ci sta comodamente da solo, ma non insieme a un secondo server da 79 GB — e anche da solo veniva rifiutato, non per mancanza di memoria ma per i margini che il programma si impone. Il regime ferma gli altri programmi **e poi** allarga quei margini: l'ordine non è estetico, perché allargarli con un altro modello ancora residente è precisamente la configurazione che fa bloccare la macchina. Il primo clic mostra cosa verrà fermato, invece di eseguire.
 
 I regimi si dichiarano in `~/.config/thelaap/configurazione.json` — il programma non ne conosce nessuno:
 
@@ -199,7 +215,7 @@ sistema, e la barra dei menu in alto — che per come era fatta prima non c'era
     theLAAP    Informazioni · Nascondi · Nascondi gli altri · Mostra tutti · Esci
     Modifica   Annulla · Ripristina · Taglia · Copia · Incolla · Seleziona tutto
     Pannello   Chiedi o comanda… ⌘K · Aiuto ⌘/
-               Memoria ⌘1 · Programmi ⌘2 · Manutenzione ⌘3 · Configurazioni ⌘4
+               Panoramica ⌘1 · Client ⌘2 · Controlli ⌘3 · File ⌘4
                Ricarica ⌘R
     Vista      Ingrandisci ⌘+ · Riduci ⌘− · Dimensione reale ⌘0 · Schermo intero ⌃⌘F
     Finestra   Riduci a icona ⌘M · Zoom · Chiudi ⌘W
@@ -248,7 +264,10 @@ di manutenzione se sono in una cartella nota.
 **Cosa NON serve fare**: modificare il codice. Se hai un programma che qui non è
 previsto, aggiungi una voce a `runtime` nel file di configurazione: servono nome,
 porta e il percorso che elenca i modelli. I comandi per accenderlo e spegnerlo sono
-facoltativi — senza, il pannello ne mostra solo lo stato.
+facoltativi — senza, il pannello ne mostra solo lo stato. Un programma che è lo
+stesso motore avviato una seconda volta su un'altra porta (per esempio un modello
+esclusivo) può dichiarare `"gruppo": "<chiave dell'altro>"`: non avrà una sezione
+sua, e i suoi modelli compaiono sotto il programma che lo ospita.
 
 ```json
 {
@@ -465,6 +484,7 @@ team Go.
 | `internal/budget/budget.go` | l'arbitro: decide se un modello ci sta, prima di caricarlo. Nessun I/O, imposto dal compilatore |
 | `states.go` | stato e classe di ogni modello, e il registro dei comandi eseguibili: `/api/modelli` e `/api/comandi` |
 | `footprint*.go` | quanto occupa davvero un processo, per sistema operativo |
+| `lifecycle.go` | accendi/spegni un modello col suo programma: avvio e attesa della porta, scarico, arresto se era l'ultimo, interruttore calcolato dal server |
 | `runtimes.go` | cosa sa fare ogni programma: scarico per modello, o solo stop |
 | `security.go` | guardia delle rotte: localhost, `Host`, Origin e token |
 | `hf.go` | ricerca e scaricamento da HuggingFace |
@@ -485,7 +505,9 @@ rompendo la regola prima di scriverla:
 | `budget_test.go` | lo scenario del kernel panic del 27/07/2026 |
 | `states_test.go` | stato, classe e registro dei comandi: una fonte sola |
 | `helper_test.go` | la taglia si legge dai parametri totali; i nomi sono distinti e non gergo |
-| `menubar_contract_test.go` | la barra dei menu non cabla id, legge il registro, e dice lo stesso numero del pannello |
+| `lifecycle_test.go` | accendi/spegni su programmi finti: avvio, riprova sul lock, programma che non si alza, ultimo modello, alias, modello in caricamento, stato letto dalle porte |
+| `ui_simple_test.go` | la struttura a tre colonne, la tabella programmi → modelli, l'interruttore come gesto unico, ogni motivo di blocco con il suo testo, niente prosa |
+| `menubar_contract_test.go` | la barra dei menu non cabla id, legge il registro, dice lo stesso numero del pannello, e apre solo sezioni che la pagina ha |
 | `security_test.go` | localhost, `Host`, Origin, token, solo POST; e le rotte di configurazione chiuse anche in lettura |
 | `editor_test.go` `config_test.go` `models_test.go` `regimes_test.go` `measure_test.go` `server_test.go` | editor, configurazioni, disco, regimi, misure, rotte |
 
@@ -518,3 +540,29 @@ Desktop: rimetterlo rimetterebbe il blocco.
 ## 📄 Licenza
 
 MIT. Vedi [LICENSE](LICENSE).
+
+## Manutenzione autonoma locale
+
+Il campo facoltativo `controlloreStack`, con percorso assoluto, abilita la scheda
+Gellow in **Controlla** e `/api/autonomia`. L’API accetta solo stato, attivazione,
+disattivazione e controllo: non riceve comandi shell. Il controllore localstack
+funziona anche a finestra chiusa, verifica i servizi desiderati e fa scegliere
+al piccolo Gemma E2B fra riparazioni già ammesse dai guasti osservati. Ogni
+intervento viene verificato e registrato. Rispetta gli spegnimenti volontari,
+la manutenzione e le modalità esclusive. Ripara l’avvio dei servizi; non applica
+modifiche arbitrarie al codice generate dal modello.
+
+Un regime con `gestito: true` affida l’intero passaggio al comando `attiva` o
+`disattiva`: ordine, blocco delle operazioni concorrenti e verifica finale restano
+al controllore. Un errore non viene sostituito da un messaggio di successo.
+
+I modelli scoperti nei servizi non devono essere tutti registrati nei client di
+programmazione. `catalogoModelli` documenta supporti, embedding, modelli specialistici
+e alias con `runtime`, `id`, `uso`, `motivo` e, facoltativamente, `aliasDi`.
+Restano visibili fra le altre disponibilità. Dimensioni e contesti effettivi
+vengono letti anche dai cataloghi di LM Studio e oMLX.
+
+Per runtime Metal con pesi residenti mappati che macOS esclude da `phys_footprint`,
+`runtime[].pesiMappati` può elencare i file effettivi: le loro dimensioni si sommano
+al footprint misurato e il risultato compare come stima. Non usarlo per pesi
+MLX già conteggiati o per tabelle lette in streaming da SSD.

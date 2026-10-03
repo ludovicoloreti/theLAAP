@@ -192,7 +192,11 @@ func apiService(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, rc.Nome+" non si può governare da qui: manca il comando nella configurazione")
 		return
 	}
-	out, err := shErr(45*time.Second, linea+" 2>&1")
+	// Lo stesso lock di chi accende e spegne i modelli: due comandi insieme
+	// farebbero fallire il secondo sul lock del controllore dello stack.
+	stackMu.Lock()
+	out, err := execStack(linea)
+	stackMu.Unlock()
 	if err != nil {
 		messaggio := withoutAnsi(out)
 		if messaggio == "" {

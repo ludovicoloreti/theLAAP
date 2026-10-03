@@ -65,6 +65,12 @@ come **stima** nell'interfaccia. Mai far passare una stima per una misura.
 Il pannello deve mostrare la granularità reale di ciascun runtime. Un pulsante unico che
 sotto fa cose diverse è una bugia che costa cara.
 
+> **Aggiornamento 03/10/2026.** Il pulsante di spegnimento per modello non esiste più: c'è un
+> interruttore che accende il programma insieme al modello e lo ferma con l'ultimo. La
+> granularità resta quella di questa tabella, ma la applica il server e la pagina la mostra
+> come effetto («spegne anche …») o come motivo di blocco. Vedi
+> [interruttore per modello e pagina a dati](2026-10-03-interruttore-per-modello-e-pagina-a-dati-design.md).
+
 ### 5. Ogni server conosce solo sé stesso
 
 Il memory guard di oMLX con `memory_guard_tier: custom` restituisce un tetto fisso e non
@@ -248,7 +254,7 @@ Il progetto oggi non ha test. Non si introduce un framework: bastano i test stan
 - Nessuna cronologia storica né grafici nel tempo: la barra attuale basta.
 - Nessuna gestione multi-utente o multi-macchina.
 - Nessuna coda di caricamento: il preflight dice sì o no, non mette in fila.
-- Nessuna riscrittura dell'interfaccia: si aggiungono solo gli elementi necessari.
+- Nessuna riscrittura dell'interfaccia: si aggiungono solo gli elementi necessari. *(Superato il 03/10/2026: l'interfaccia è stata riorganizzata, vedi il documento sopra.)*
 
 ## Ordine di lavoro
 

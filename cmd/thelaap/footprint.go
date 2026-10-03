@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -22,6 +23,21 @@ type Footprint struct {
 
 func (o Footprint) CurrentGB() float64 { return float64(o.CorrenteByte) / 1e9 }
 func (o Footprint) PeakGB() float64    { return float64(o.PiccoByte) / 1e9 }
+
+// Metal can wire file-backed no-copy mappings without charging them to
+// phys_footprint. Account for explicitly declared resident mappings as an
+// estimate, in addition to the measured buffers and KV cache.
+func withMappedWeights(o Footprint, paths []string) Footprint {
+	for _, path := range paths {
+		if info, err := os.Stat(espandi(path)); err == nil && info.Mode().IsRegular() {
+			bytes := uint64(info.Size())
+			o.CorrenteByte += bytes
+			o.PiccoByte += bytes
+			o.Stimato = true
+		}
+	}
+	return o
+}
 
 // PesoDaPrevedere: su quale numero decidere se un modello ci sta.
 //

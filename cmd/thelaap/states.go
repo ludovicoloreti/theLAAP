@@ -63,6 +63,8 @@ type CardState struct {
 	// Verdict se lo si carica adesso, dall'arbitro di budget.go. Solo per i
 	// modelli non caricati: per quelli già in RAM la domanda non ha senso.
 	Verdetto *budget.Verdict `json:"verdetto,omitempty"`
+	// Cosa farebbe il suo interruttore se lo si premesse adesso (lifecycle.go).
+	Interruttore Switch `json:"interruttore"`
 }
 
 // ModelsResponse: tutto quello che serve a disegnare l'elenco in una richiesta
@@ -75,8 +77,10 @@ type ModelsResponse struct {
 	// barra disegna, e deve tornare a occhio.
 	LiberiGB float64 `json:"liberiGB"`
 	// DisponibiliGB è un'altra cosa: quanto resta per un modello NUOVO, tolta
-	// la riserva del sistema operativo. È il numero su cui l'arbitro decide, e
-	// va tenuto distinto da LiberiGB o il pannello promette spazio che non c'è.
+	// la riserva del sistema operativo e tenuto conto della memoria che si può
+	// davvero impegnare adesso (anche il resto del Mac ne usa). È il numero su
+	// cui l'arbitro decide, e va tenuto distinto da LiberiGB o il pannello
+	// promette spazio che non c'è.
 	DisponibiliGB float64     `json:"disponibiliGB"`
 	RiservaGB     float64     `json:"riservaGB"`
 	SogliaGB      float64     `json:"sogliaGB"` // da qui in su, classe esclusivo
@@ -90,6 +94,9 @@ func classOf(s Card, sogliaGB float64) string {
 		return ClasseRemoto
 	}
 	for _, rc := range knownRuntimes() {
+		if rc.Chiave == s.Runtime && rc.Esclusivo {
+			return ClasseEsclusivo
+		}
 		if rc.Chiave == s.Runtime && rc.ModelloResidente {
 			return ClasseResidente
 		}
@@ -110,7 +117,7 @@ func stateOf(s Card, m MemState, inArrivo map[string]bool, spenti map[string]boo
 	if provRemote(s.Runtime) {
 		return StatoRemoto
 	}
-	if inArrivo[strings.ToLower(s.ID)] {
+	if s.InInstallazione || inArrivo[strings.ToLower(s.ID)] {
 		return StatoInArrivo
 	}
 	if !s.Servito {
@@ -136,8 +143,33 @@ func caricato(s Card, m MemState) bool {
 		if strings.EqualFold(c.Nome, s.ID) {
 			return true
 		}
+		for _, alias := range s.Alias {
+			if strings.EqualFold(c.Nome, alias.ID) {
+				return true
+			}
+		}
 	}
 	return false
+}
+
+// othersLoaded: quanti altri modelli tiene in memoria il programma di questa
+// scheda, oltre a lei e ai suoi alias. Il programma si riconosce dal nome,
+// perché è col nome che la fotografia della memoria lo registra.
+func othersLoaded(s Card, rc *RuntimeCfg, m MemState) int {
+	if rc == nil {
+		return 0
+	}
+	propri := []string{s.ID}
+	for _, a := range s.Alias {
+		propri = append(propri, a.ID)
+	}
+	n := 0
+	for _, c := range m.Caricati {
+		if c.Runtime == rc.Nome && !containsFold(propri, c.Nome) {
+			n++
+		}
+	}
+	return n
 }
 
 // pickReady: fra i modelli in memoria, quello che il pannello propone.
@@ -148,13 +180,13 @@ func caricato(s Card, m MemState) bool {
 func pickReady(ss []CardState) int {
 	candidati := []int{}
 	for i, s := range ss {
-		if s.Stato == StatoInMemoria && s.Classe != ClasseResidente {
+		if s.Stato == StatoInMemoria && s.Classe != ClasseResidente && s.Uso != "embedding" {
 			candidati = append(candidati, i)
 		}
 	}
 	if len(candidati) == 0 {
 		for i, s := range ss {
-			if s.Stato == StatoInMemoria {
+			if s.Stato == StatoInMemoria && s.Uso != "embedding" {
 				candidati = append(candidati, i)
 			}
 		}
@@ -180,6 +212,11 @@ func modelsWithState() ModelsResponse {
 		inArrivo[strings.ToLower(d)] = true
 	}
 	spenti := stoppedRuntimes()
+	motori := map[string]*RuntimeCfg{}
+	for _, rc := range knownRuntimes() {
+		c := rc
+		motori[rc.Chiave] = &c
+	}
 
 	// La barra disegna l'occupazione misurata sui processi, non i pesi dei
 	// file: mtplx dichiara 29,3 GB e ne occupa 84,8 (vedi memory.go).
@@ -196,7 +233,7 @@ func modelsWithState() ModelsResponse {
 		TotaleGB:      m.TotaleGB,
 		OccupatiGB:    occupati,
 		LiberiGB:      liberi,
-		DisponibiliGB: float64(b.AvailableBytes()) / 1e9,
+		DisponibiliGB: float64(b.LoadableBytes(p)) / 1e9,
 		RiservaGB:     systemReserveGB(),
 		SogliaGB:      sogliaGB,
 		TettoGB:       m.CeilingGB,
@@ -216,6 +253,9 @@ func modelsWithState() ModelsResponse {
 			v := b.Admits(uint64(s.GB*1e9), p)
 			x.Verdetto = &v
 		}
+		rc := motori[s.Runtime]
+		x.Interruttore = switchOf(rc, x.Stato, rc != nil && !spenti[strings.ToLower(s.Runtime)],
+			othersLoaded(s, rc, m))
 		out.Modelli = append(out.Modelli, x)
 	}
 	if i := pickReady(out.Modelli); i >= 0 {

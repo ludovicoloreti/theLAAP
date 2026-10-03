@@ -173,6 +173,9 @@ func readsMemory() MemState {
 					esiti[i] = esitoRT{rc: rc, err: fmt.Errorf("errore interno: %v", r)}
 				}
 			}()
+			if _, err := pidListeningOnPort(rc.Porta); err != nil {
+				return // a stopped runtime has no loaded models to query
+			}
 			o, err := shErr(12*time.Second, rc.Caricati+" 2>/dev/null")
 			esiti[i] = esitoRT{rc: rc, out: o, err: err}
 		}(i, rc)
@@ -194,28 +197,7 @@ func readsMemory() MemState {
 		if out == "" {
 			continue
 		}
-		for _, riga := range strings.Split(out, "\n") {
-			campi := strings.Fields(riga)
-			if len(campi) < 3 || strings.EqualFold(campi[0], "IDENTIFIER") ||
-				strings.EqualFold(campi[0], "NAME") {
-				continue
-			}
-			for i := 1; i < len(campi); i++ {
-				gb, ok := measureGB(campi, i)
-				if !ok {
-					continue
-				}
-				stato := "caricato"
-				if i >= 2 {
-					if s := strings.ToLower(campi[i-1]); s == "idle" || s == "loaded" || s == "ready" {
-						stato = s
-					}
-				}
-				m.Caricati = append(m.Caricati, ModelInRAM{
-					Nome: campi[0], Runtime: rc.Nome, GB: gb, Stato: stato})
-				break
-			}
-		}
+		m.Caricati = append(m.Caricati, parseLoadedTable(rc, out)...)
 	}
 
 	// I programmi che tengono il modello sempre residente lo dicono nel loro
@@ -240,54 +222,37 @@ func readsMemory() MemState {
 		if rc.Caricati != "" {
 			continue
 		}
-		if caricati, tetto := loadedModelsStatus(statiModelli[i], rc.Nome); len(caricati) > 0 {
-			m.Caricati = append(m.Caricati, caricati...)
-			if tetto > 0 {
-				m.CeilingGB = tetto
-			}
-			continue
-		}
-		b := corpi[i]
-		if b == nil {
-			continue
-		}
-		var h struct {
-			Model      string `json:"model"`
-			ModelPath  string `json:"model_path"`
-			EnginePool struct {
-				LoadedCount   int     `json:"loaded_count"`
-				CurrentMemory float64 `json:"current_model_memory"`
-				FinalCeiling  float64 `json:"final_ceiling"`
-			} `json:"engine_pool"`
-		}
-		if json.Unmarshal(b, &h) != nil {
-			continue
-		}
-		if h.EnginePool.FinalCeiling > 0 {
-			m.CeilingGB = h.EnginePool.FinalCeiling / 1e9
-		}
-		switch {
-		case h.Model != "":
-			gb := 0.0
-			if h.ModelPath != "" {
-				gb = sizeGB(h.ModelPath)
-			}
-			m.Caricati = append(m.Caricati, ModelInRAM{
-				Nome: h.Model, Runtime: rc.Nome, GB: gb, Stato: "residente"})
-		case h.EnginePool.LoadedCount > 0 && h.EnginePool.CurrentMemory > 0:
-			nome := recentlyActive(rc.Chiave)
-			if nome == "" {
-				nome = "modello attivo"
-			}
-			m.Caricati = append(m.Caricati, ModelInRAM{
-				Nome: nome, Runtime: rc.Nome,
-				GB: h.EnginePool.CurrentMemory / 1e9, Stato: "caricato"})
+		caricati, tetto := loadedFromHTTP(rc, statiModelli[i], corpi[i])
+		m.Caricati = append(m.Caricati, caricati...)
+		if tetto > 0 {
+			m.CeilingGB = tetto
 		}
 	}
 
 	// Quanto tengono davvero i processi. Va dopo la raccolta dei modelli
 	// perché associa a ogni programma i modelli che ha dentro.
 	m.Processi = runtimeFootprints(m.Caricati)
+	// Some single-model servers expose only /v1/models, with no /health model
+	// field. A live explicitly resident runtime still owns its model; otherwise
+	// the UI would say RAM is empty beside a 100 GB process.
+	for i := range m.Processi {
+		p := &m.Processi[i]
+		if len(p.Models) > 0 {
+			continue
+		}
+		for _, rc := range motori {
+			if rc.Chiave != p.Key || !rc.ModelloResidente {
+				continue
+			}
+			for _, entry := range cfg().CatalogoModelli {
+				if entry.Runtime == rc.Chiave && entry.AliasDi == "" {
+					p.Models = []string{entry.ID}
+					m.Caricati = append(m.Caricati, ModelInRAM{Nome: entry.ID, Runtime: rc.Nome, GB: float64(p.CurrentBytes) / 1e9, Stato: "residente"})
+					break
+				}
+			}
+		}
+	}
 
 	// avvisi utili
 	//
@@ -327,6 +292,103 @@ func readsMemory() MemState {
 			somma, m.TotaleGB))
 	}
 	return m
+}
+
+// parseLoadedTable legge la tabella stampata dal comando «modelliCaricati»: il
+// formato atteso è una riga per modello, con da qualche parte un numero seguito
+// da GB.
+func parseLoadedTable(rc RuntimeCfg, out string) []ModelInRAM {
+	var caricati []ModelInRAM
+	for _, riga := range strings.Split(out, "\n") {
+		campi := strings.Fields(riga)
+		if len(campi) < 3 || strings.EqualFold(campi[0], "IDENTIFIER") ||
+			strings.EqualFold(campi[0], "NAME") {
+			continue
+		}
+		for i := 1; i < len(campi); i++ {
+			gb, ok := measureGB(campi, i)
+			if !ok {
+				continue
+			}
+			stato := "caricato"
+			if i >= 2 {
+				if s := strings.ToLower(campi[i-1]); s == "idle" || s == "loaded" || s == "ready" {
+					stato = s
+				}
+			}
+			caricati = append(caricati, ModelInRAM{
+				Nome: campi[0], Runtime: rc.Nome, GB: gb, Stato: stato})
+			break
+		}
+	}
+	return caricati
+}
+
+// loadedFromHTTP: cosa dichiara di avere in memoria un programma che non ha un
+// comando apposta, da /v1/models/status oppure da /health. Torna anche il tetto
+// per singolo modello, se il programma lo dice (zero = non lo dice).
+func loadedFromHTTP(rc RuntimeCfg, status, health []byte) ([]ModelInRAM, float64) {
+	if caricati, tetto := loadedModelsStatus(status, rc.Nome); len(caricati) > 0 {
+		return caricati, tetto
+	}
+	if health == nil {
+		return nil, 0
+	}
+	var h struct {
+		Model      string `json:"model"`
+		ModelPath  string `json:"model_path"`
+		MemoryPlan struct {
+			ModelWeights float64 `json:"model_weights_bytes"`
+		} `json:"memory_plan"`
+		EnginePool struct {
+			LoadedCount   int     `json:"loaded_count"`
+			CurrentMemory float64 `json:"current_model_memory"`
+			FinalCeiling  float64 `json:"final_ceiling"`
+		} `json:"engine_pool"`
+	}
+	if json.Unmarshal(health, &h) != nil {
+		return nil, 0
+	}
+	tetto := h.EnginePool.FinalCeiling / 1e9
+	switch {
+	case h.Model != "":
+		gb := h.MemoryPlan.ModelWeights / 1e9
+		if gb <= 0 && h.ModelPath != "" {
+			gb = sizeGB(h.ModelPath)
+		}
+		return []ModelInRAM{{Nome: h.Model, Runtime: rc.Nome, GB: gb, Stato: "residente"}}, tetto
+	case h.EnginePool.LoadedCount > 0 && h.EnginePool.CurrentMemory > 0:
+		nome := recentlyActive(rc.Chiave)
+		if nome == "" {
+			nome = "modello attivo"
+		}
+		return []ModelInRAM{{Nome: nome, Runtime: rc.Nome,
+			GB: h.EnginePool.CurrentMemory / 1e9, Stato: "caricato"}}, tetto
+	}
+	return nil, tetto
+}
+
+// loadedIn: i modelli che questo programma tiene in memoria ADESSO, chiesti a
+// lui in questo momento.
+//
+// La fotografia del monitor ha fino a qualche secondo, e va bene per disegnare.
+// Non va bene per decidere se fermare un programma: in quei secondi un client
+// può averci caricato un altro modello, e fermarlo glielo toglierebbe da sotto.
+// L'errore torna solo quando il programma ha un comando per dirlo e il comando
+// fallisce: «non lo so» non è «non c'è niente».
+func loadedIn(rc RuntimeCfg) ([]ModelInRAM, error) {
+	if rc.Caricati != "" {
+		out, err := shErr(12*time.Second, rc.Caricati+" 2>/dev/null")
+		if err != nil {
+			return nil, err
+		}
+		return parseLoadedTable(rc, out), nil
+	}
+	base := fmt.Sprintf("http://127.0.0.1:%d", rc.Porta)
+	caricati, _ := loadedFromHTTP(rc,
+		httpGet(base+"/v1/models/status", 3*time.Second),
+		httpGet(base+"/health", 3*time.Second))
+	return caricati, nil
 }
 
 // Raccogliere lo stato costa ~4 secondi, quasi tutti spesi da `lms ps` (è un
@@ -378,6 +440,7 @@ func readCycle() {
 	ultimaMemMu.Lock()
 	ultimaMem = m
 	ultimaMemMu.Unlock()
+	registraUso(m, time.Now())
 }
 
 // currentMemory: l'ultima fotografia disponibile.

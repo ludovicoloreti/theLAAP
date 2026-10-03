@@ -91,6 +91,22 @@ type Model struct {
 	InOC        bool           `json:"inOC"`
 	InDSH       bool           `json:"inDSH"`
 	Servito     bool           `json:"servito"` // esiste davvero sul server?
+	// Che cosa accetta in ingresso ("text", "image"…), come lo dichiarano i
+	// client: Pi in `input`, OpenCode in `modalities.input`. Vuoto = nessuno lo
+	// dichiara, e la pagina non mostra niente invece di indovinare.
+	Ingressi []string `json:"ingressi,omitempty"`
+}
+
+// testi: un elenco JSON di stringhe, oppure nil se non c'è.
+func testi(v any) []string {
+	lista, _ := v.([]any)
+	var out []string
+	for _, x := range lista {
+		if s, ok := x.(string); ok && s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func readJSON(path string) (map[string]any, error) {
@@ -169,7 +185,7 @@ func configState() ([]Model, []string) {
 					Runtime: chiave, ID: id, Nome: nome, Reasoning: reas, ThinkBloccato: bloccato,
 					MappaEffort: mappa,
 					Context:     num(m["contextWindow"], 131072), MaxTokens: num(m["maxTokens"], 32768),
-					InPi: true,
+					InPi: true, Ingressi: testi(m["input"]),
 				}
 			}
 		}
@@ -197,11 +213,18 @@ func configState() ([]Model, []string) {
 				if lim, ok := m["limit"].(map[string]any); ok {
 					ctx, out = num(lim["context"], ctx), num(lim["output"], out)
 				}
+				var ingressi []string
+				if mod, ok := m["modalities"].(map[string]any); ok {
+					ingressi = testi(mod["input"])
+				}
 				if ex, ok := indice[k]; ok {
 					ex.InOC = true
+					if ex.Ingressi == nil {
+						ex.Ingressi = ingressi
+					}
 				} else {
 					indice[k] = &Model{Runtime: chiave, ID: id, Nome: nome,
-						Context: ctx, MaxTokens: out, InOC: true}
+						Context: ctx, MaxTokens: out, InOC: true, Ingressi: ingressi}
 				}
 			}
 		}

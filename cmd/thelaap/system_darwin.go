@@ -32,7 +32,11 @@ func systemMemory() (totale, libera, wired, compressa, swap float64) {
 		}
 		return 0
 	}
-	libera = pag("Pages free") + pag("Pages inactive")
+	// Pagine libere, speculative e purgeable: è il numero che si mostra, non
+	// quello su cui si decide. Sta al fondo anche in condizioni sane, perché
+	// macOS riempie di cache la memoria che non serve. Per decidere se un
+	// modello ci sta si usa budgetMemoryGB.
+	libera = pag("Pages free") + pag("Pages speculative") + pag("Pages purgeable")
 	wired = pag("Pages wired down")
 	compressa = pag("Pages occupied by compressor")
 
@@ -41,11 +45,18 @@ func systemMemory() (totale, libera, wired, compressa, swap float64) {
 		if m := re.FindStringSubmatch(sw); len(m) > 2 {
 			swap = parseFloat(m[1])
 			if m[2] == "M" {
-				swap /= 1024
+				swap *= 1048576 / 1e9
+			} else {
+				swap *= 1073741824 / 1e9
 			}
 		}
 	}
 	return
+}
+
+// budgetMemoryGB: quanta memoria un modello può ancora impegnare adesso.
+func budgetMemoryGB() float64 {
+	return budgetFromVMStat(cmd("vm_stat"), parseFloat(cmd("sysctl", "-n", "hw.memsize"))) / 1e9
 }
 
 // tettoGrafica: quanta memoria può bloccare la GPU. Solo Apple Silicon.
@@ -65,7 +76,7 @@ func darkTheme() bool {
 // dimensioneCartellaGB
 func folderSize(path string) float64 {
 	if o := sh("du -sk " + shQuote(path) + " 2>/dev/null | cut -f1"); o != "" {
-		return parseFloat(o) / 1e6
+		return parseFloat(o) * 1024 / 1e9
 	}
 	return 0
 }

@@ -5,7 +5,19 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestManagedRegimeKeepsControllerFailure(t *testing.T) {
+	withConfig(t, testConfig())
+	rg := RegimeCfg{Gestito: true, Attiva: "/usr/bin/false", Disattiva: "/usr/bin/true"}
+	if _, err := shErr(time.Second, composeRegime(rg, "on")); err == nil {
+		t.Fatal("a failed controller transition must not report success")
+	}
+	if out, err := shErr(time.Second, composeRegime(rg, "off")); err != nil || out != "" {
+		t.Fatalf("managed transition ran additional service commands: %q, %v", out, err)
+	}
+}
 
 func withConfig(t *testing.T, c Config) {
 	t.Helper()
