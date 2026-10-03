@@ -7,7 +7,7 @@ import (
 
 func TestGellowSpiegaComeSpegnereUnModelloSenzaInventareMenu(t *testing.T) {
 	got := aiutoDiretto("come si spegne un modello?")
-	for _, atteso := range []string{"Modelli", "Disattiva modello", "non cancella i file", "non lo rimuove da Pi o OpenCode"} {
+	for _, atteso := range []string{"Modelli", "Disattiva modello", "non cancella i file", "non lo rimuove da Pi, OpenCode o DeepSeek Harness"} {
 		if !strings.Contains(got, atteso) {
 			t.Errorf("risposta diretta senza %q: %s", atteso, got)
 		}

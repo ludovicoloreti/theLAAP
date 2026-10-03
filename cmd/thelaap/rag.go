@@ -22,7 +22,7 @@ var KNOWLEDGE = []Doc{
 		Titolo: "A cosa serve questo pannello",
 		Chiavi: []string{"pannello", "webapp", "app", "sito", "pagina", "aipanel", "serve", "cos'è"},
 		Testo: `Questo pannello serve a gestire i modelli AI installati sul Mac senza toccare file di configurazione.
-Da qui si fanno quattro cose: vedere quanta memoria stanno usando i modelli, scegliere quali modelli compaiono nel menu di Pi e OpenCode, cercarne di nuovi su HuggingFace e scaricarli, e accendere o spegnere i programmi che li eseguono.
+Da qui si fanno quattro cose: vedere quanta memoria stanno usando i modelli, scegliere quali modelli compaiono nei menu di Pi, OpenCode e DeepSeek Harness, cercarne di nuovi su HuggingFace e scaricarli, e accendere o spegnere i programmi che li eseguono.
 Si apre all'indirizzo 127.0.0.1:7070 e parte da solo all'accensione del Mac. Funziona solo da questo computer.`,
 	},
 	{
@@ -86,8 +86,8 @@ Ha sostituito Laguna il 16 agosto 2026.`,
 	{
 		Titolo: "Cosa succede quando salvo",
 		Chiavi: []string{"salva", "salvare", "modifiche", "pi", "opencode", "menu", "configurazione"},
-		Testo: `Il pannello scrive la lista dei modelli in due programmi: Pi e OpenCode, i due assistenti da terminale.
-I due usano formati diversi, ma non è un problema tuo: il pannello traduce e li tiene sempre allineati, così nel menu di entrambi trovi le stesse voci.
+		Testo: `Il pannello scrive la lista dei modelli in tre client: Pi, OpenCode e DeepSeek Harness.
+Usano formati diversi, ma non è un problema tuo: il pannello traduce fra JSON e YAML e permette di scegliere separatamente in quali menu compare ogni modello.
 Prima di ogni salvataggio viene fatta una copia di sicurezza, e se qualcosa non torna il salvataggio viene annullato invece di scrivere un file rotto. Togliere un modello dal menu non cancella nulla dal disco.`,
 	},
 	{
@@ -207,9 +207,9 @@ func liveState() string {
 	}
 
 	if modelli, _ := configState(); len(modelli) > 0 {
-		b.WriteString("\nMODELLI NEL MENU DI PI E OPENCODE ADESSO:\n")
+		b.WriteString("\nMODELLI NEI MENU DEI CLIENT ADESSO:\n")
 		for _, mm := range modelli {
-			if mm.InPi || mm.InOC {
+			if mm.InPi || mm.InOC || mm.InDSH {
 				r := ""
 				if mm.Reasoning {
 					r = ", ragiona prima di rispondere"

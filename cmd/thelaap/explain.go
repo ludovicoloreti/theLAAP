@@ -284,7 +284,7 @@ func aiutoDiretto(domanda string) string {
 	if !vuoleSpegnere || !parlaDiModello {
 		return ""
 	}
-	risposta := "Vai in «Modelli» e clicca la riga del modello. Se è caricato, nella sua scheda trovi il pulsante «Disattiva modello»: lo toglie dalla RAM, ma non cancella i file e non lo rimuove da Pi o OpenCode. Il programma che lo esegue resta acceso; se quel programma non sa scaricare un singolo modello, il pulsante dice invece chiaramente quale programma verrà spento."
+	risposta := "Vai in «Modelli» e clicca la riga del modello. Se è caricato, nella sua scheda trovi il pulsante «Disattiva modello»: lo toglie dalla RAM, ma non cancella i file e non lo rimuove da Pi, OpenCode o DeepSeek Harness. Il programma che lo esegue resta acceso; se quel programma non sa scaricare un singolo modello, il pulsante dice invece chiaramente quale programma verrà spento."
 	if caricati := readsMemory().Caricati; len(caricati) > 0 {
 		nomi := make([]string, 0, len(caricati))
 		for _, c := range caricati {

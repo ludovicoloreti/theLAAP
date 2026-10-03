@@ -23,7 +23,7 @@ func TestPaginaParteDallaPanoramicaSemplice(t *testing.T) {
 	}
 }
 
-func TestConfigurazioniMostranoPiEOpenCodeInsieme(t *testing.T) {
+func TestConfigurazioniMostranoTreClientInsieme(t *testing.T) {
 	i := strings.Index(UI, "function vistaConfigurazioni()")
 	if i < 0 {
 		t.Fatal("vista configurazioni assente")
@@ -33,7 +33,7 @@ func TestConfigurazioniMostranoPiEOpenCodeInsieme(t *testing.T) {
 		t.Fatal("non riesco a delimitare vistaConfigurazioni")
 	}
 	corpo := UI[i : i+1+fine]
-	for _, atteso := range []string{"Pi", "OpenCode", "cambiaClient", "salva()"} {
+	for _, atteso := range []string{"Pi", "OpenCode", "DSH", "cambiaClient", "salva()"} {
 		if !strings.Contains(corpo, atteso) {
 			t.Errorf("la matrice configurazioni non contiene %q", atteso)
 		}
@@ -135,7 +135,7 @@ func TestListaModelliSpiegaRAMEPesoEMetteGliAttiviInCima(t *testing.T) {
 
 func TestConfigurazioniPartonoDaiModelliConLeSpunte(t *testing.T) {
 	for _, atteso := range []string{
-		"ordineConfigurazioni", "Con spunte prima", "['pi','Pi']", "['opencode','OpenCode']",
+		"ordineConfigurazioni", "Con spunte prima", "['pi','Pi']", "['opencode','OpenCode']", "['dsh','DSH']",
 		"Nome A–Z", "localStorage.setItem('ordine-configurazioni'", "ordinati.map",
 	} {
 		if !strings.Contains(UI, atteso) {

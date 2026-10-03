@@ -47,7 +47,7 @@ type RuntimeCfg struct {
 type ClientCfg struct {
 	Nome    string `json:"nome"`
 	File    string `json:"file"`
-	Formato string `json:"formato"` // "pi" oppure "opencode"
+	Formato string `json:"formato"` // "pi", "opencode" oppure "dsh"
 }
 
 type ToolCfg struct {
@@ -161,6 +161,16 @@ func loadConfig() {
 			cambiata := false
 			if c.Porta == 0 {
 				c.Porta, cambiata = 7070, true
+			}
+			haDSH := false
+			for _, cl := range c.Clienti {
+				haDSH = haDSH || cl.Formato == "dsh"
+			}
+			if !haDSH && binaryExists("~/.dsh/settings.yaml") {
+				c.Clienti = append(c.Clienti, ClientCfg{
+					Nome: "DeepSeek Harness", File: "~/.dsh/settings.yaml", Formato: "dsh",
+				})
+				cambiata = true
 			}
 			for i := range c.Runtime {
 				if c.Runtime[i].Elenco == "" {
@@ -338,6 +348,7 @@ func detectMachine() Config {
 	for _, cl := range []ClientCfg{
 		{Nome: "Pi", File: "~/.pi/agent/models.json", Formato: "pi"},
 		{Nome: "OpenCode", File: "~/.config/opencode/opencode.json", Formato: "opencode"},
+		{Nome: "DeepSeek Harness", File: "~/.dsh/settings.yaml", Formato: "dsh"},
 	} {
 		if binaryExists(cl.File) {
 			c.Clienti = append(c.Clienti, cl)

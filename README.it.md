@@ -61,7 +61,7 @@ principali:
 |---|---|
 | **Panoramica** | dice subito cosa funziona, cosa va sistemato e offre il controllo in un clic |
 | **Modelli** | mostra insieme tutti i modelli dichiarati dai client e quelli trovati davvero nei motori locali |
-| **Configurazioni** | una matrice unica permette di aggiungere o togliere ogni modello da Pi e OpenCode con due spunte |
+| **Configurazioni** | una matrice unica permette di aggiungere o togliere ogni modello da Pi, OpenCode e DeepSeek Harness con tre spunte |
 | **Controlla** | esegue il controllo rapido come azione primaria e mostra un risultato leggibile |
 
 Programmi, memoria dettagliata, download, archivio e file completi sono raccolti
@@ -71,7 +71,7 @@ quando si apre l'elenco dei modelli; le altre schermate usano tutto lo spazio.
 
 L'elenco non nasce più soltanto dai JSON dei client: viene unito a ciò che LM
 Studio, Ollama, oMLX e gli altri motori dichiarano davvero. Un modello installato
-ma non ancora presente in Pi o OpenCode compare quindi come **non configurato**
+ma non ancora presente in nessun client compare quindi come **non configurato**
 e si può aggiungere dalla matrice, senza modificare file a mano.
 
 **Due assi, non uno.** Ogni modello ha uno *stato* — com'è adesso — e una
@@ -141,7 +141,7 @@ diventano chiavi da tradurre.
 
 **L'elenco dei modelli.** Una riga per ciascuno: stato, nome, classe, peso, velocità. Il nome dice **cosa fa e quando usarlo** in italiano — non l'identificativo tecnico. Un peso a zero si scrive «—», non «0,0 GB»: non è zero, è che non lo sappiamo, e sarebbe l'unica cifra falsa della tabella.
 
-Cliccando una riga, la colonna di destra: la descrizione, la tabella delle caratteristiche, il verdetto «se lo carichi adesso», e le azioni. **Cronometra** manda una domanda vera al modello e misura, con un contatore nel pulsante; alla fine rileva da solo se il modello ragiona prima di rispondere. **Nomi e client** cambia nome e identificativo e sceglie separatamente se mostrarlo in Pi e OpenCode. **Archivia** lo toglie dal disco conservando percorso e configurazione: **Ripristina** rimette tutto a posto, e la cancellazione definitiva è disponibile soltanto dall'archivio e richiede due conferme.
+Cliccando una riga, la colonna di destra: la descrizione, la tabella delle caratteristiche, il verdetto «se lo carichi adesso», e le azioni. **Cronometra** manda una domanda vera al modello e misura, con un contatore nel pulsante; alla fine rileva da solo se il modello ragiona prima di rispondere. **Nomi e client** cambia nome e identificativo e sceglie separatamente se mostrarlo in Pi, OpenCode e DeepSeek Harness. **Archivia** lo toglie dal disco conservando percorso e configurazione: **Ripristina** rimette tutto a posto, e la cancellazione definitiva è disponibile soltanto dall'archivio e richiede due conferme.
 
 **Editor JSON/YAML.** Il file principale di theLAAP e tutti i file dei client dichiarati in configurazione sono modificabili direttamente nel pannello. Ogni file si può vedere e modificare sia come JSON sia come YAML, pur venendo salvato nel formato originale. L'editor valida sintassi e struttura, formatta il JSON, inserisce gli spazi col tasto Tab, salva con `⌘S`/`Ctrl-S`, crea un backup e rileva se un altro programma ha modificato il file nel frattempo.
 
@@ -301,7 +301,7 @@ messaggio che dice cosa fare.
 - I nomi dei modelli arrivano da repository di terzi. Dentro un `onclick` sono sfuggiti per **entrambi** i parser, l'attributo HTML e la stringa JavaScript: sfuggirli per uno solo è ciò che ha lasciato dieci pulsanti morti, in silenzio, fino a che qualcuno non ha provato a cliccarli.
 - La cancellazione dall'archivio risolve il percorso dentro la radice dell'archivio, rifiutando `..`, i percorsi assoluti e un symlink in qualunque componente.
 - Prima di scrivere le configurazioni fa una copia di sicurezza, scrive su file temporaneo e poi rinomina. Rifiuta JSON/YAML non valido e non sovrascrive in silenzio modifiche esterne. Una lista modelli vuota è consentita: serve per poter rimuovere anche l'ultimo modello.
-- Lo stato operativo resta nei file di Pi e OpenCode; theLAAP conserva soltanto etichette/misure e i manifesti necessari a ripristinare i modelli archiviati.
+- Lo stato operativo resta nei file di Pi, OpenCode e DeepSeek Harness; theLAAP conserva soltanto etichette/misure e i manifesti necessari a ripristinare i modelli archiviati.
 
 ## Note tecniche imparate a caro prezzo
 
@@ -456,7 +456,7 @@ team Go.
 |---|---|
 | `main.go` | server, tabella delle rotte (`rotte()`, quella vera anche per i test), pagina incorporata |
 | `discovery.go` | interroga i quattro programmi in parallelo |
-| `config.go` | legge e scrive le configurazioni di Pi e OpenCode, traducendo fra i due formati |
+| `config.go` | legge e scrive le configurazioni di Pi, OpenCode e DeepSeek Harness, traducendo fra JSON e YAML |
 | `editor.go` | editor sicuro JSON/YAML, conversione, validazione, backup e controllo dei conflitti |
 | `probe.go` | prova un modello: velocità e rilevamento del ragionamento |
 | `memory.go` | memoria da `vm_stat`, tetto da oMLX, modelli caricati; con cache e monitor in sottofondo |

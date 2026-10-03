@@ -330,13 +330,13 @@ svg.ico{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-wi
 .filtri-hf .avanzati{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:10px}
 .hf-meta{display:flex;gap:11px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--muted)}
 .hf-meta span{white-space:nowrap}.hf-meta .trend{color:var(--accent-ink)}
-.config-riga{display:grid;grid-template-columns:minmax(220px,1fr) 120px 90px 110px 105px;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.config-riga{display:grid;grid-template-columns:minmax(220px,1fr) 120px 70px 110px 90px 105px;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
 .config-riga:first-child{border-top:0}.config-riga .check{text-align:center}.config-riga input{width:18px;min-height:18px}
 .config-head{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--inset)}
 .esito-semplice{background:var(--code-bg);color:var(--code-fg);border-radius:9px;padding:14px;white-space:pre-wrap;line-height:1.5;max-height:420px;overflow:auto;font-family:var(--mono);font-size:11.5px}
 main.senza-insp{grid-template-columns:224px minmax(0,1fr)}
 main.senza-insp #insp{display:none}
-@media(max-width:900px){.griglia-home{grid-template-columns:1fr}.config-riga{grid-template-columns:minmax(160px,1fr) 80px 65px 85px}.config-riga>*:nth-child(2){display:none}}
+@media(max-width:900px){.griglia-home{grid-template-columns:1fr}.config-riga{grid-template-columns:minmax(150px,1fr) 55px 75px 65px 85px}.config-riga>*:nth-child(2){display:none}}
 @media(max-width:820px){main.senza-insp{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
@@ -437,7 +437,7 @@ en:{whatItIs:"The local AI admin panel",ask:"Ask or command",guided:"Guided",exp
   yes:"yes, before answering",no:"no, answers straight",none:"in none",notMeasured:"not measured",notWeighed:"not measured",silent:"silent",
   elsewhere:"runs elsewhere",heldMore:"the process holds more",port:"port",
   yourName:"Your own name",menuName:"Name in the client menus",serverId:"Id for the server",idWarn:"getting it wrong makes it silent",
-  inPi:"in the Pi menu",inOC:"in the OpenCode menu",saveChanges:"Save changes",unsaved:"unsaved changes",
+  inPi:"in the Pi menu",inOC:"in the OpenCode menu",inDSH:"in the DeepSeek Harness menu",saveChanges:"Save changes",unsaved:"unsaved changes",
   keyLabel:"Provider key",keyEnds:"key ending",keyNew:"new key",keySave:"Save and check",
   keyNote:"The current key is never shown, only its last four digits.",
   noModels:"No model configured",noModelsWhy:"Add one from HuggingFace, or write it by hand in the config file.",
@@ -491,7 +491,7 @@ it:{whatItIs:"Il pannello di amministrazione dell'AI locale",ask:"Chiedi o coman
   yes:"sì, prima di rispondere",no:"no, risponde diretto",none:"in nessuno",notMeasured:"non misurata",notWeighed:"non misurato",silent:"muto",
   elsewhere:"gira altrove",heldMore:"il processo ne tiene di più",port:"porta",
   yourName:"Come lo chiami tu",menuName:"Nome nei menu dei client",serverId:"Id per il server",idWarn:"sbagliarlo lo rende muto",
-  inPi:"nel menu di Pi",inOC:"nel menu di OpenCode",saveChanges:"Salva le modifiche",unsaved:"modifiche non salvate",
+  inPi:"nel menu di Pi",inOC:"nel menu di OpenCode",inDSH:"nel menu di DeepSeek Harness",saveChanges:"Salva le modifiche",unsaved:"modifiche non salvate",
   keyLabel:"Chiave del provider",keyEnds:"chiave che finisce",keyNew:"chiave nuova",keySave:"Salva e verifica",
   keyNote:"La chiave attuale non si mostra mai, solo le ultime quattro cifre.",
   noModels:"Nessun modello configurato",noModelsWhy:"Aggiungine uno da HuggingFace, o scrivilo a mano nel file di configurazione.",
@@ -1276,7 +1276,7 @@ let ultimoDisegno = '';
    tecnici restano nelle viste dedicate; qui ogni problema ha una sola uscita. */
 function vistaHome(){
   const guasti=S.modelli.filter(m=>statoDi(m)==='guasto');
-  const nonConfigurati=S.modelli.filter(m=>!m.inPi&&!m.inOC);
+  const nonConfigurati=S.modelli.filter(m=>!m.inPi&&!m.inOC&&!m.inDSH);
   const attivi=S.runtime.filter(r=>r.attivo).length;
   const aiutoId=(S.aiuto&&S.aiuto.modello)||'';
   const aiuto=S.modelli.find(m=>String(m.id)===String(aiutoId));
@@ -1292,10 +1292,10 @@ function vistaHome(){
     +esc(problemi?(IT()?'ATTENZIONE':'ATTENTION'):'OK')+'</span><h1>'+esc(titolo)+'</h1><p>'+esc(sottotitolo)+'</p>'
     +'<div class="azioni-home"><button class="b1" onclick="controllaOra()">'+esc(IT()?'Controlla ora':'Check now')+'</button>'
     +'<button class="b2" onclick="vai(\'modelli\',\'tutti\')">'+esc(IT()?'Vedi tutti i modelli':'See all models')+'</button>'
-    +'<button class="b3" onclick="vai(\'configurazioni\')">'+esc(IT()?'Apri Pi e OpenCode':'Open Pi and OpenCode')+'</button></div></div>';
+    +'<button class="b3" onclick="vai(\'configurazioni\')">'+esc(IT()?'Apri i client':'Open clients')+'</button></div></div>';
   h+='<div class="griglia-home">'
     +'<div class="riquadro-home"><span class="k">'+esc(IT()?'Modelli trovati':'Models found')+'</span><span class="numero">'+S.modelli.length+'</span>'
-      +'<span class="sub">'+esc(S.modelli.filter(m=>m.inPi).length+' Pi · '+S.modelli.filter(m=>m.inOC).length+' OpenCode'
+      +'<span class="sub">'+esc(S.modelli.filter(m=>m.inPi).length+' Pi · '+S.modelli.filter(m=>m.inOC).length+' OpenCode · '+S.modelli.filter(m=>m.inDSH).length+' DSH'
         +(nonConfigurati.length?' · '+nonConfigurati.length+(IT()?' da aggiungere':' to add'):''))+'</span></div>'
     +'<div class="riquadro-home"><span class="k">'+esc(IT()?'Programmi accesi':'Programs running')+'</span><span class="numero">'+attivi+' / '+S.runtime.length+'</span>'
       +'<span class="sub">'+esc(S.runtime.filter(r=>r.attivo).map(r=>r.nome||r.chiave).join(' · ')||(IT()?'nessuno':'none'))+'</span></div>'
@@ -1323,22 +1323,23 @@ function vistaHome(){
             :(IT()?'Nessun piccolo modello conversazionale è disponibile.':'No small conversational model is available.'));
   (S.configErrori||[]).forEach(e=>h+=nota('n-bad',IT()?'Configurazione non leggibile':'Configuration cannot be read',e));
   if(nonConfigurati.length) h+=nota('n-info',IT()?'Modelli trovati ma non nei client':'Models found but missing from clients',
-    nonConfigurati.length+(IT()?' modelli sono installati ma non compaiono ancora in Pi o OpenCode. Sistemali dalla vista Configurazioni.'
-      :' models are installed but not yet present in Pi or OpenCode. Fix them in Configurations.'));
+    nonConfigurati.length+(IT()?' modelli sono installati ma non compaiono ancora nei client. Sistemali dalla vista Configurazioni.'
+      :' models are installed but not yet present in the clients. Fix them in Configurations.'));
   return h;
 }
 
 function cambiaClient(runtime,id,quale,valore){
   const m=S.modelli.find(x=>x.runtime===runtime&&x.id===id); if(!m)return;
-  if(quale==='pi')m.inPi=valore; else m.inOC=valore;
+  if(quale==='pi')m.inPi=valore; else if(quale==='oc')m.inOC=valore; else m.inDSH=valore;
   S.cambiato=true; disegnaCentro();
 }
 function ordinaConfigurazioni(lista){
   return lista.slice().sort((a,b)=>{
     let d=0;
-    if(S.ordineConfigurazioni==='configurati')d=(Number(!!b.inPi)+Number(!!b.inOC))-(Number(!!a.inPi)+Number(!!a.inOC));
+    if(S.ordineConfigurazioni==='configurati')d=(Number(!!b.inPi)+Number(!!b.inOC)+Number(!!b.inDSH))-(Number(!!a.inPi)+Number(!!a.inOC)+Number(!!a.inDSH));
     else if(S.ordineConfigurazioni==='pi')d=Number(!!b.inPi)-Number(!!a.inPi);
     else if(S.ordineConfigurazioni==='opencode')d=Number(!!b.inOC)-Number(!!a.inOC);
+    else if(S.ordineConfigurazioni==='dsh')d=Number(!!b.inDSH)-Number(!!a.inDSH);
     else if(S.ordineConfigurazioni==='programma')d=nomeRuntime(a.runtime).localeCompare(nomeRuntime(b.runtime),LINGUA,{sensitivity:'base'});
     if(!d)d=nomeReale(a).localeCompare(nomeReale(b),LINGUA,{numeric:true,sensitivity:'base'});
     return d;
@@ -1348,26 +1349,27 @@ function ordinaConfigurazioni(lista){
 /* Una matrice sola sostituisce il giro file -> provider -> modello. Qui si
    vede l'intera configurazione e si cambia un client con una spunta. */
 function vistaConfigurazioni(){
-  const pi=S.modelli.filter(m=>m.inPi).length, oc=S.modelli.filter(m=>m.inOC).length;
+  const pi=S.modelli.filter(m=>m.inPi).length, oc=S.modelli.filter(m=>m.inOC).length, dsh=S.modelli.filter(m=>m.inDSH).length;
   const ordinati=ordinaConfigurazioni(S.modelli);
   let h='<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px"><div class="cresci">'
-    +'<h1>'+esc(T().config)+'</h1><p class="sub">'+esc(IT()?'Tutti i modelli di Pi e OpenCode, insieme. Spunta, salva, fine.'
-      :'Every Pi and OpenCode model together. Check, save, done.')+'</p></div>'
+    +'<h1>'+esc(T().config)+'</h1><p class="sub">'+esc(IT()?'Tutti i modelli di Pi, OpenCode e DeepSeek Harness, insieme. Spunta, salva, fine.'
+      :'Every Pi, OpenCode, and DeepSeek Harness model together. Check, save, done.')+'</p></div>'
     +(S.cambiato?'<button class="b1" onclick="salva()">'+esc(T().saveChanges)+'</button>':'')+'</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><span class="pill p-neutro">'+S.modelli.length+' '+esc(T().models.toLowerCase())+'</span>'
-    +'<span class="pill p-acc">Pi '+pi+'</span><span class="pill p-acc">OpenCode '+oc+'</span>'
+    +'<span class="pill p-acc">Pi '+pi+'</span><span class="pill p-acc">OpenCode '+oc+'</span><span class="pill p-acc">DSH '+dsh+'</span>'
     +(S.cambiato?'<span class="pill p-warn">'+esc(T().unsaved)+'</span>':'')+'</div>';
   if((S.configErrori||[]).length) S.configErrori.forEach(e=>h+=nota('n-bad','',e));
   h+=scelteBottoni(IT()?'Ordina':'Sort',S.ordineConfigurazioni,
-    [['configurati',IT()?'Con spunte prima':'Checked first'],['pi','Pi'],['opencode','OpenCode'],
+    [['configurati',IT()?'Con spunte prima':'Checked first'],['pi','Pi'],['opencode','OpenCode'],['dsh','DSH'],
      ['nome',IT()?'Nome A–Z':'Name A–Z'],['programma',IT()?'Programma':'Program']],
     'impostaOrdineConfigurazioni')+'<div style="height:12px"></div>';
-  h+='<div class="card"><div class="config-riga config-head"><span>'+esc(T().colModel)+'</span><span>'+(IT()?'Programma':'Program')+'</span><span class="check">Pi</span><span class="check">OpenCode</span><span>'+(IT()?'Disponibilità':'Availability')+'</span></div>'
+  h+='<div class="card"><div class="config-riga config-head"><span>'+esc(T().colModel)+'</span><span>'+(IT()?'Programma':'Program')+'</span><span class="check">Pi</span><span class="check">OpenCode</span><span class="check">DSH</span><span>'+(IT()?'Disponibilità':'Availability')+'</span></div>'
     +ordinati.map(m=>'<div class="config-riga"><span style="min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis">'+esc(titoloDi(m))+'</b>'
       +'<span class="mono" style="display:block;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis">'+esc(m.id)+'</span></span>'
       +'<span>'+esc(nomeRuntime(m.runtime))+'</span>'
       +'<label class="check" title="Pi"><input type="checkbox" '+(m.inPi?'checked':'')+' onchange="cambiaClient('+arg(m.runtime)+','+arg(m.id)+',\'pi\',this.checked)"></label>'
       +'<label class="check" title="OpenCode"><input type="checkbox" '+(m.inOC?'checked':'')+' onchange="cambiaClient('+arg(m.runtime)+','+arg(m.id)+',\'oc\',this.checked)"></label>'
+      +'<label class="check" title="DeepSeek Harness"><input type="checkbox" '+(m.inDSH?'checked':'')+' onchange="cambiaClient('+arg(m.runtime)+','+arg(m.id)+',\'dsh\',this.checked)"></label>'
       +'<span class="pill '+pillStato(statoDi(m))+'">'+esc(T().st[statoDi(m)])+'</span></div>').join('')+'</div>';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap"><span class="sub">'
     +esc(IT()?'Ogni salvataggio crea prima una copia di sicurezza.':'Every save creates a backup first.')+'</span>'
@@ -1550,7 +1552,7 @@ function vistaModelli(){
   const nomiFiltri={tutti:IT()?'Tutti':'All',principali:IT()?'Chat e codice':'Chat and code',automatici:IT()?'Strumenti':'Tools',remoto:IT()?'Remoti':'Remote'};
   const spiegaFiltro={
     tutti:IT()?'Tutti i modelli, divisi fra quelli che scegli e quelli usati dagli strumenti.':'Every model, split between models you choose and models used by tools.',
-    principali:IT()?'I modelli che scegli direttamente in Pi e OpenCode per chat e programmazione.':'Models you choose directly in Pi and OpenCode for chat and coding.',
+    principali:IT()?'I modelli che scegli direttamente in Pi, OpenCode e DeepSeek Harness per chat e programmazione.':'Models you choose directly in Pi, OpenCode, and DeepSeek Harness for chat and coding.',
     automatici:IT()?'Modelli usati dietro le quinte da Gellow, OCR, ricerca nei documenti e altri strumenti.':'Models used behind the scenes by Gellow, OCR, document search, and other tools.',
     remoto:IT()?'Modelli che girano online e non occupano la RAM di questo Mac.':'Models that run online and do not use this Mac’s RAM.'};
   if(!nomiFiltri[S.filtro])S.filtro='tutti';
@@ -1581,7 +1583,7 @@ function vistaModelli(){
     return [IT()?'non disponibile':'unavailable','p-bad'];
   };
   const dove=m=>{
-    const c=[m.inPi?'Pi':null,m.inOC?'OpenCode':null].filter(Boolean);
+    const c=[m.inPi?'Pi':null,m.inOC?'OpenCode':null,m.inDSH?'DSH':null].filter(Boolean);
     if(c.length)return c.join(' · ');
     if(automatico(m))return IT()?'interno, fuori dai menu':'internal, outside menus';
     return IT()?'da configurare':'not configured';
@@ -1595,7 +1597,7 @@ function vistaModelli(){
       +'<span style="min-width:0"><span class="principale" title="'+esc(m.id)+'">'+esc(nomeReale(m))+'</span><span class="secondaria">'+esc(meta)+'</span></span>'
       +'<span><span style="font-size:12.5px;color:var(--strong)">'+esc(uso(m))+'</span></span>'
       +'<span style="font-size:12px;color:var(--body)">'+esc(nomeRuntime(m.runtime))+'</span>'
-      +'<span style="font-size:12px;color:'+(m.inPi||m.inOC?'var(--body)':'var(--muted)')+'">'+esc(dove(m))+'</span></div>';
+      +'<span style="font-size:12px;color:'+(m.inPi||m.inOC||m.inDSH?'var(--body)':'var(--muted)')+'">'+esc(dove(m))+'</span></div>';
   }).join('')+'</div>';
 
   let h = '<div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:14px">'
@@ -2011,7 +2013,7 @@ function inspModello(){
     [T().kCtx, Math.round((m.context||0)/1024)+'k token'],
     [T().kProg, (rt.nome||m.runtime||'')+(S.modo==='esperto'&&rt.porta?' · '+T().port+' '+rt.porta:'')],
     [T().kReason, m.reasoning?T().yes:T().no],
-    [T().kClients, [m.inPi?'Pi':null, m.inOC?'OpenCode':null].filter(Boolean).join(' · ')||T().none]
+    [T().kClients, [m.inPi?'Pi':null, m.inOC?'OpenCode':null, m.inDSH?'DSH':null].filter(Boolean).join(' · ')||T().none]
   ];
   let h = '<div><span class="pill '+pillStato(st)+'">'+esc(T().st[st])+'</span>'
     +'<h2 style="margin:9px 0 4px;line-height:1.25">'+esc(titoloDi(m))+'</h2>'
@@ -2084,6 +2086,7 @@ function formNomi(m){
     +campo(T().serverId, 'idm', m.id, T().idWarn)
     +'<label style="display:flex;gap:8px;align-items:center;font-size:12.5px"><input type="checkbox" id="cpi" '+(m.inPi?'checked':'')+' style="width:auto;min-height:0"> '+esc(T().inPi)+'</label>'
     +'<label style="display:flex;gap:8px;align-items:center;font-size:12.5px"><input type="checkbox" id="coc" '+(m.inOC?'checked':'')+' style="width:auto;min-height:0"> '+esc(T().inOC)+'</label>'
+    +'<label style="display:flex;gap:8px;align-items:center;font-size:12.5px"><input type="checkbox" id="cdsh" '+(m.inDSH?'checked':'')+' style="width:auto;min-height:0"> '+esc(T().inDSH)+'</label>'
     +'<button class="b1 sm" onclick="applicaNomi('+arg(m.id)+')">'+esc(T().saveChanges)+'</button></div>';
 }
 const campo = (etichetta,id,valore,aiuto) => '<label style="display:flex;flex-direction:column;gap:4px">'
@@ -2094,13 +2097,13 @@ async function applicaNomi(id){
   const m = S.modelli.find(x=>x.id===id); if(!m) return;
   const et=($('et')||{}).value||'', nm=($('nm')||{}).value||'', nuovo=($('idm')||{}).value||m.id;
   if(et!==m.etichetta){ try{ await api('/api/etichetta',{method:'POST',body:JSON.stringify({runtime:m.runtime,id:m.id,etichetta:et})}); m.etichetta=et; }catch(e){} }
-  m.nome=nm; m.id=nuovo; m.inPi=($('cpi')||{}).checked; m.inOC=($('coc')||{}).checked;
+  m.nome=nm; m.id=nuovo; m.inPi=($('cpi')||{}).checked; m.inOC=($('coc')||{}).checked; m.inDSH=($('cdsh')||{}).checked;
   S.cambiato=true; S.nomiAperti=null; S.sel=nuovo;
   disegnaTutto();
 }
 async function salva(){
   try{
-    await api('/api/config',{method:'POST',body:JSON.stringify(S.modelli.filter(m=>m.inPi||m.inOC))});
+    await api('/api/config',{method:'POST',body:JSON.stringify(S.modelli.filter(m=>m.inPi||m.inOC||m.inDSH))});
     S.cambiato=false;
     /* si ricarica invece di fidarsi della risposta: /api/config torna le voci
        nude, senza stato né classe, e assegnarle svuoterebbe la tabella. */

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // I percorsi dei client vengono dalla configurazione; questi valgono solo se
@@ -31,9 +34,28 @@ func fileOC() string {
 	return OC_CFG
 }
 
+func fileDSH() string {
+	for _, c := range cfg().Clienti {
+		if c.Formato == "dsh" {
+			return espandi(c.File)
+		}
+	}
+	return DSH_CFG
+}
+
+func hasClient(formato string) bool {
+	for _, c := range cfg().Clienti {
+		if c.Formato == formato {
+			return true
+		}
+	}
+	return false
+}
+
 var (
-	PI_CFG = home(".pi/agent/models.json")
-	OC_CFG = home(".config/opencode/opencode.json")
+	PI_CFG  = home(".pi/agent/models.json")
+	OC_CFG  = home(".config/opencode/opencode.json")
+	DSH_CFG = home(".dsh/settings.yaml")
 	// Accanto alla configurazione, per la stessa ragione di PROFILI in
 	// profiles.go: una cartella utente protetta da TCC può bloccare una .app in
 	// modo silenzioso. Qui il danno sarebbe più insidioso che all'avvio: il
@@ -67,6 +89,7 @@ type Model struct {
 	MaxTokens   int            `json:"maxTokens"`
 	InPi        bool           `json:"inPi"`
 	InOC        bool           `json:"inOC"`
+	InDSH       bool           `json:"inDSH"`
 	Servito     bool           `json:"servito"` // esiste davvero sul server?
 }
 
@@ -82,9 +105,28 @@ func readJSON(path string) (map[string]any, error) {
 	return m, nil
 }
 
+func readYAML(path string) (map[string]any, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]any
+	if err := yaml.Unmarshal(b, &m); err != nil {
+		return nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
+	}
+	return m, nil
+}
+
 func num(v any, def int) int {
-	if f, ok := v.(float64); ok {
-		return int(f)
+	switch n := v.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case uint64:
+		return int(n)
+	case float64:
+		return int(n)
 	}
 	return def
 }
@@ -165,6 +207,44 @@ func configState() ([]Model, []string) {
 		}
 	}
 
+	if hasClient("dsh") {
+		dsh, err := readYAML(fileDSH())
+		if err != nil {
+			errori = append(errori, "DeepSeek Harness: "+err.Error())
+		} else if llm, ok := dsh["llm-pi-ai"].(map[string]any); ok {
+			if provs, ok := llm["providers"].(map[string]any); ok {
+				for chiave, pv := range provs {
+					p, _ := pv.(map[string]any)
+					ms, _ := p["models"].([]any)
+					for _, mv := range ms {
+						m, _ := mv.(map[string]any)
+						id, _ := m["id"].(string)
+						if id == "" {
+							continue
+						}
+						k := chiave + "|" + id
+						nome, _ := m["name"].(string)
+						reasoning := false
+						if v, presente := m["reasoningEfforts"]; presente {
+							_, reasoning = v.(map[string]any)
+						}
+						if ex, presente := indice[k]; presente {
+							ex.InDSH = true
+							if ex.Nome == "" {
+								ex.Nome = nome
+							}
+							ex.Reasoning = ex.Reasoning || reasoning
+						} else {
+							indice[k] = &Model{Runtime: chiave, ID: id, Nome: nome, Reasoning: reasoning,
+								Context: num(m["contextWindow"], 131072), MaxTokens: num(m["maxTokens"], 32768),
+								InDSH: true}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Incrocia con ciò che i server dichiarano davvero e aggiunge anche i
 	// modelli che non sono ancora nei menu dei client.
 	//
@@ -217,8 +297,102 @@ func backup(path string) error {
 	return os.WriteFile(dst, b, 0o644)
 }
 
-// writeConfig rigenera le sezioni "models" di entrambe le config dalla lista data,
-// lasciando intatto tutto il resto (agent, compat, provider non gestiti).
+func yamlMappingValue(n *yaml.Node, key string) *yaml.Node {
+	if n == nil || n.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		if n.Content[i].Value == key {
+			return n.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func dshReasoningEfforts(m Model) any {
+	if !m.Reasoning {
+		return false
+	}
+	effort := map[string]any{}
+	for livello, valore := range m.MappaEffort {
+		if valore != nil && livello != "off" {
+			effort[livello] = valore
+		}
+	}
+	if len(effort) == 0 {
+		return map[string]any{"low": "low", "medium": "medium", "high": "high"}
+	}
+	return effort
+}
+
+// updateDSHModels sostituisce soltanto le liste dei modelli nel documento YAML.
+// I provider, le compatibilità, il modello predefinito e i commenti esterni alle
+// liste restano intatti.
+func updateDSHModels(raw []byte, perRuntime map[string][]Model) ([]byte, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
+	if len(doc.Content) == 0 {
+		return nil, fmt.Errorf("settings.yaml e' vuoto")
+	}
+	root := doc.Content[0]
+	llm := yamlMappingValue(root, "llm-pi-ai")
+	provs := yamlMappingValue(llm, "providers")
+	if provs == nil {
+		return nil, fmt.Errorf("settings.yaml non contiene llm-pi-ai.providers")
+	}
+	for i := 0; i+1 < len(provs.Content); i += 2 {
+		chiave, p := provs.Content[i].Value, provs.Content[i+1]
+		modelsNode := yamlMappingValue(p, "models")
+		if modelsNode == nil {
+			continue
+		}
+		var esistenti []map[string]any
+		_ = modelsNode.Decode(&esistenti)
+		perID := map[string]map[string]any{}
+		for _, voce := range esistenti {
+			if id, _ := voce["id"].(string); id != "" {
+				perID[id] = voce
+			}
+		}
+		lista := []map[string]any{}
+		for _, m := range perRuntime[chiave] {
+			if !m.InDSH {
+				continue
+			}
+			voce := perID[m.ID]
+			if voce == nil {
+				voce = map[string]any{"input": []string{"text"}, "reasoningEfforts": dshReasoningEfforts(m)}
+			}
+			voce["id"], voce["name"] = m.ID, m.Nome
+			voce["contextWindow"], voce["maxTokens"] = m.Context, m.MaxTokens
+			lista = append(lista, voce)
+		}
+		var nuovo yaml.Node
+		if err := nuovo.Encode(lista); err != nil {
+			return nil, err
+		}
+		if nuovo.Kind == yaml.DocumentNode && len(nuovo.Content) > 0 {
+			*modelsNode = *nuovo.Content[0]
+		} else {
+			*modelsNode = nuovo
+		}
+	}
+	var out bytes.Buffer
+	enc := yaml.NewEncoder(&out)
+	enc.SetIndent(2)
+	if err := enc.Encode(&doc); err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
+// writeConfig rigenera le sezioni dei modelli di tutti i client dalla lista
+// data, lasciando intatto il resto (agent, compat, provider non gestiti).
 func writeConfig(modelli []Model) error {
 	pi, err := readJSON(filePi())
 	if err != nil {
@@ -227,6 +401,13 @@ func writeConfig(modelli []Model) error {
 	oc, err := readJSON(fileOC())
 	if err != nil {
 		return err
+	}
+	var dshRaw []byte
+	if hasClient("dsh") {
+		dshRaw, err = os.ReadFile(fileDSH())
+		if err != nil {
+			return err
+		}
 	}
 
 	perRuntime := map[string][]Model{}
@@ -328,9 +509,8 @@ func writeConfig(modelli []Model) error {
 		p["models"] = ms
 	}
 
-	// Prepara e valida entrambi i file prima di toccarne uno. Se la seconda
-	// scrittura fallisce, il primo torna ai byte originali: Pi e OpenCode non
-	// devono restare disallineati per un disco pieno o un permesso cambiato.
+	// Prepara e valida tutti i file prima di toccarne uno. Se una scrittura
+	// fallisce, quelli precedenti tornano ai byte originali.
 	type scrittura struct {
 		path, nome     string
 		nuovo, vecchio []byte
@@ -352,6 +532,17 @@ func writeConfig(modelli []Model) error {
 			return err
 		}
 	}
+	if hasClient("dsh") {
+		nuovo, err := updateDSHModels(dshRaw, perRuntime)
+		if err != nil {
+			return fmt.Errorf("DeepSeek Harness: %w", err)
+		}
+		var prova map[string]any
+		if err := yaml.Unmarshal(nuovo, &prova); err != nil {
+			return fmt.Errorf("YAML generato non valido per %s", filepath.Base(fileDSH()))
+		}
+		scritture = append(scritture, scrittura{path: fileDSH(), nome: "DeepSeek Harness", nuovo: nuovo, vecchio: dshRaw})
+	}
 	for _, s := range scritture {
 		if err := backup(s.path); err != nil {
 			return fmt.Errorf("backup %s: %w", filepath.Base(s.path), err)
@@ -369,7 +560,7 @@ func writeConfig(modelli []Model) error {
 				return fmt.Errorf("scrittura %s fallita: %w; anche il rollback e' incompleto: %s",
 					s.nome, err, strings.Join(rollback, "; "))
 			}
-			return fmt.Errorf("scrittura %s fallita: %w (l'altro client e' stato ripristinato)", s.nome, err)
+			return fmt.Errorf("scrittura %s fallita: %w (gli altri client sono stati ripristinati)", s.nome, err)
 		}
 	}
 	return nil
@@ -441,7 +632,7 @@ func apiConfig(w http.ResponseWriter, r *http.Request) {
 		forgetRemote()
 		dopo, errori := configState()
 		writeJSON(w, map[string]any{"ok": true, "modelli": dopo, "errori": errori,
-			"messaggio": fmt.Sprintf("salvate %d voci in Pi e OpenCode (backup in %s)", len(modelli), BACKUP)})
+			"messaggio": fmt.Sprintf("salvate %d voci nei client (backup in %s)", len(modelli), BACKUP)})
 		return
 	}
 	modelli, errori := configState()

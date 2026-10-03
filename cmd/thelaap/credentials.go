@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Cambiare la chiave di un provider.
@@ -65,6 +67,9 @@ func apiCredentials(w http.ResponseWriter, r *http.Request) {
 // merita di sopravvivere.
 func writeKey(percorso, provider, chiave string, formato string) error {
 	percorso = expandHome(percorso)
+	if formato == "dsh" {
+		return writeDSHKey(percorso, provider, chiave)
+	}
 	b, err := os.ReadFile(percorso)
 	if err != nil {
 		return err
@@ -108,6 +113,46 @@ func writeKey(percorso, provider, chiave string, formato string) error {
 		return err
 	}
 	return os.Rename(tmp, percorso)
+}
+
+func writeDSHKey(settingsPath, provider, chiave string) error {
+	b, err := os.ReadFile(settingsPath)
+	if err != nil {
+		return err
+	}
+	var settings map[string]any
+	if err := yaml.Unmarshal(b, &settings); err != nil {
+		return fmt.Errorf("%s non è YAML valido, non lo tocco", filepath.Base(settingsPath))
+	}
+	llm, _ := settings["llm-pi-ai"].(map[string]any)
+	provs, _ := llm["providers"].(map[string]any)
+	p, _ := provs[provider].(map[string]any)
+	ref, _ := p["apiKeyEnv"].(string)
+	if ref == "" {
+		return fmt.Errorf("provider «%s» assente o senza apiKeyEnv in %s", provider, filepath.Base(settingsPath))
+	}
+
+	credsPath := filepath.Join(filepath.Dir(settingsPath), ".credentials.yaml")
+	vecchio, err := os.ReadFile(credsPath)
+	if err != nil {
+		return err
+	}
+	var creds map[string]any
+	if err := yaml.Unmarshal(vecchio, &creds); err != nil {
+		return fmt.Errorf("%s non è YAML valido, non lo tocco", filepath.Base(credsPath))
+	}
+	refs, _ := creds["refs"].(map[string]any)
+	if refs == nil {
+		refs = map[string]any{}
+		creds["refs"] = refs
+	}
+	refs[ref] = chiave
+	nuovo, err := yaml.Marshal(creds)
+	if err != nil {
+		return err
+	}
+	_ = os.WriteFile(fmt.Sprintf("%s.bak-%d", credsPath, time.Now().Unix()), vecchio, 0o600)
+	return writeAtomic(credsPath, nuovo)
 }
 
 func apiSetCredential(w http.ResponseWriter, r *http.Request) {

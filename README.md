@@ -146,8 +146,8 @@ installed. Add a server it has never heard of without touching the code:
 the refusal. `riservaSistemaGB` is what stays with the OS. `modelloAiuto` pins the
 helper model; empty means the smallest one that can hold a conversation.
 
-Detected on its own: Ollama, LM Studio, oMLX, MTPLX, llama.cpp, vLLM, plus the Pi and
-OpenCode config files.
+Detected on its own: Ollama, LM Studio, oMLX, MTPLX, llama.cpp, vLLM, plus the Pi,
+OpenCode, and DeepSeek Harness config files.
 
 ---
 

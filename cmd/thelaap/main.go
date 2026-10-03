@@ -3,8 +3,8 @@
 //	go build -o aipanel . && ./aipanel      → http://127.0.0.1:7070
 //
 // Legge lo stato reale dai runtime, non si fida di file di stato propri:
-// la verità restano i due JSON di Pi e OpenCode, questo è solo un editor
-// che non sbaglia la traduzione fra i due schemi.
+// la verità resta nei file di Pi, OpenCode e DeepSeek Harness; questo è solo
+// un editor che non sbaglia la traduzione fra JSON e YAML.
 package main
 
 import (

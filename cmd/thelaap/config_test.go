@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -61,6 +62,86 @@ func TestScriviConfigRispettaIClientSeparatiEListaVuota(t *testing.T) {
 	ocModels = oc["provider"].(map[string]any)["x"].(map[string]any)["models"].(map[string]any)
 	if len(piModels) != 0 || len(ocModels) != 0 {
 		t.Fatal("la lista vuota non ha rimosso tutti i modelli")
+	}
+}
+
+func TestDeepSeekHarnessPartecipaAllaVistaEAlSalvataggio(t *testing.T) {
+	dir := t.TempDir()
+	piPath := filepath.Join(dir, "pi.json")
+	ocPath := filepath.Join(dir, "opencode.json")
+	dshPath := filepath.Join(dir, "settings.yaml")
+	if err := os.WriteFile(piPath, []byte(`{"providers":{"x":{"models":[]}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ocPath, []byte(`{"provider":{"x":{"models":{}}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dsh := `# commento da conservare
+llm-pi-ai:
+  providers:
+    x:
+      api: openai-completions
+      baseURL: http://127.0.0.1:9999/v1
+      models:
+        - id: solo-dsh
+          name: Solo DSH
+          contextWindow: 8192
+          maxTokens: 1024
+          input: [text]
+          reasoningEfforts: false
+agent-default-model:
+  provider: x
+  model: solo-dsh
+`
+	if err := os.WriteFile(dshPath, []byte(dsh), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	vecchiaCfg, vecchioBackup := cfg(), BACKUP
+	BACKUP = filepath.Join(dir, "backup")
+	cfgMu.Lock()
+	CFG = Config{
+		Runtime: []RuntimeCfg{{Chiave: "x", ChiaveOC: "x", Nome: "X", Porta: 9999, Elenco: "/v1/models"}},
+		Clienti: []ClientCfg{{Nome: "Pi", File: piPath, Formato: "pi"},
+			{Nome: "OpenCode", File: ocPath, Formato: "opencode"},
+			{Nome: "DeepSeek Harness", File: dshPath, Formato: "dsh"}},
+	}
+	cfgMu.Unlock()
+	t.Cleanup(func() {
+		BACKUP = vecchioBackup
+		cfgMu.Lock()
+		CFG = vecchiaCfg
+		cfgMu.Unlock()
+	})
+
+	modelli, errori := configState()
+	if len(errori) != 0 || len(modelli) != 1 || !modelli[0].InDSH || modelli[0].InPi || modelli[0].InOC {
+		t.Fatalf("vista DSH inattesa: modelli=%+v errori=%v", modelli, errori)
+	}
+	modelli[0].Nome = "Nome aggiornato"
+	if err := writeConfig(modelli); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(dshPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "# commento da conservare") {
+		t.Fatal("il salvataggio DSH ha perso i commenti esterni alla lista modelli")
+	}
+	got, err := readYAML(dshPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	llm := got["llm-pi-ai"].(map[string]any)
+	providers := llm["providers"].(map[string]any)
+	models := providers["x"].(map[string]any)["models"].([]any)
+	if len(models) != 1 || models[0].(map[string]any)["name"] != "Nome aggiornato" {
+		t.Fatalf("modelli DSH inattesi: %+v", models)
+	}
+	predefinito := got["agent-default-model"].(map[string]any)
+	if predefinito["model"] != "solo-dsh" {
+		t.Fatalf("il modello predefinito DSH è stato alterato: %+v", predefinito)
 	}
 }
 

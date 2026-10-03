@@ -786,7 +786,7 @@ func sameConfiguredModel(m Model, runtime, id string) bool {
 func withoutConfiguredModel(in []Model, runtime, id string) (restanti, associate []Model) {
 	for _, m := range in {
 		if sameConfiguredModel(m, runtime, id) {
-			if m.InPi || m.InOC {
+			if m.InPi || m.InOC || m.InDSH {
 				associate = append(associate, m)
 			}
 			continue
@@ -805,6 +805,7 @@ func mergeConfiguredModels(in, daRipristinare []Model) []Model {
 				// Il manifesto conserva esattamente in quali client compariva.
 				out[i].InPi = out[i].InPi || torna.InPi
 				out[i].InOC = out[i].InOC || torna.InOC
+				out[i].InDSH = out[i].InDSH || torna.InDSH
 				if out[i].Nome == "" {
 					out[i].Nome = torna.Nome
 				}
@@ -858,13 +859,13 @@ func apiRemoveModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Archivio e menu dei client sono una sola operazione: niente voci fantasma
-	// in Pi/OpenCode. Se la scrittura fallisce, rimettiamo subito i file dov'erano.
+	// nei client. Se la scrittura fallisce, rimettiamo subito i file dov'erano.
 	if err := writeConfig(restanti); err != nil {
 		if _, rollbackErr := restoreArchived(voce.ID); rollbackErr != nil {
 			errJSON(w, "configurazione non aggiornata: "+err.Error()+"; anche il ripristino dei file e' incompleto: "+rollbackErr.Error())
 			return
 		}
-		errJSON(w, "non ho archiviato nulla: non riesco ad aggiornare Pi e OpenCode: "+err.Error())
+		errJSON(w, "non ho archiviato nulla: non riesco ad aggiornare i client: "+err.Error())
 		return
 	}
 	refreshMemory()
@@ -902,7 +903,7 @@ func apiRestoreModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := writeConfig(mergeConfiguredModels(configurate, m.Configurazioni)); err != nil {
-		errJSON(w, "file ripristinati, ma non riesco a rimettere il modello in Pi e OpenCode: "+err.Error())
+		errJSON(w, "file ripristinati, ma non riesco a rimettere il modello nei client: "+err.Error())
 		return
 	}
 	refreshMemory()

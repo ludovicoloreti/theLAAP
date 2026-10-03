@@ -108,7 +108,7 @@ func TestAliasLMStudioUsaLaMappaUfficiale(t *testing.T) {
 }
 
 func TestArchivioToglieERipristinoRimetteIClient(t *testing.T) {
-	a := Model{Runtime: "omlx", ID: "modello-a", Nome: "A", InPi: true, InOC: false}
+	a := Model{Runtime: "omlx", ID: "modello-a", Nome: "A", InPi: true, InOC: false, InDSH: true}
 	b := Model{Runtime: "lmstudio", ID: "modello-b", Nome: "B", InPi: true, InOC: true}
 	restanti, associate := withoutConfiguredModel([]Model{a, b}, "omlx", "modello-a")
 	if len(restanti) != 1 || restanti[0].ID != b.ID || len(associate) != 1 || associate[0].ID != a.ID {
@@ -119,7 +119,7 @@ func TestArchivioToglieERipristinoRimetteIClient(t *testing.T) {
 		t.Fatalf("ripristino configurazione errato: %+v", merged)
 	}
 	for _, m := range merged {
-		if m.ID == a.ID && (!m.InPi || m.InOC) {
+		if m.ID == a.ID && (!m.InPi || m.InOC || !m.InDSH) {
 			t.Fatalf("client non conservati: %+v", m)
 		}
 	}
