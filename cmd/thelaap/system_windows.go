@@ -86,3 +86,9 @@ func stopAllCommands(rr []RuntimeCfg) (ferma, riaccendi string) {
 	r = append(r, `Write-Host ""; Write-Host "fatto"`)
 	return strings.Join(f, "; "), strings.Join(r, "; ")
 }
+
+// budgetMemoryGB: qui la memoria libera è già quella su cui decidere.
+func budgetMemoryGB() float64 {
+	_, libera, _, _, _ := systemMemory()
+	return libera
+}

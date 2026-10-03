@@ -6,7 +6,26 @@ package main
 // vive in footprint.go, che legge dal sistema operativo e resta qui: il test la
 // segue, invece di tenere internal/budget legato a un tipo che non gli appartiene.
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestMappedWeightsIncludedOnlyWhenDeclared(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "weights.gguf")
+	if err := os.WriteFile(path, make([]byte, 100), 0600); err != nil {
+		t.Fatal(err)
+	}
+	measured := Footprint{CorrenteByte: 20, PiccoByte: 30}
+	if got := withMappedWeights(measured, nil); got != measured {
+		t.Fatalf("ordinary runtime changed: %+v", got)
+	}
+	got := withMappedWeights(measured, []string{path})
+	if got.CorrenteByte != 120 || got.PiccoByte != 130 || !got.Stimato {
+		t.Fatalf("mapped weights missing: %+v", got)
+	}
+}
 
 const GB = 1_000_000_000
 

@@ -13,7 +13,7 @@ before it takes the machine down. Two axes per model, computed once on the serve
 [![Swift](https://img.shields.io/badge/Swift-6.3-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white)](#-install)
 [![Dependencies](https://img.shields.io/badge/dependencies-1-brightgreen)](go.mod)
-[![Tests](https://img.shields.io/badge/tests-73-success)](#-tests)
+[![Tests](https://img.shields.io/badge/tests-146-success)](#-tests)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **English** · [Italiano](README.it.md)
@@ -53,10 +53,13 @@ That is what this is.
 
 | | |
 |---|---|
-| 🧠 **Unified memory, measured** | One bar for the whole Mac. RAM and VRAM are the same pool on Apple Silicon. Occupancy comes from the **processes**, not from the model files: one server here declares 29.3 GB and holds 33.3. |
+| 🧠 **Unified memory, measured** | One bar for the whole Mac. RAM and VRAM are the same pool on Apple Silicon. Occupancy comes from the **processes**, not from the model files: one server here declares 29.3 GB and holds 33.3. What the rest of the Mac holds is drawn as *other apps*, never as free, and «free for a model» is exactly what the arbiter would accept. |
+| ⭐ **Recent, favorites, purpose** | The table opens on the models used in the last 30 days (recorded by the monitor, even with the panel closed); a star in the model inspector adds it to **Favorites**. Each row says in one line what the model is for, its context, and only the capabilities it really has (images, reasoning); a model too large to share memory is marked *exclusive* by its weight alone. |
 | ⚖️ **An arbiter that says no** | Before loading, `budget.go` answers "does it fit?" with a verdict: how much is missing, and what to stop to make room. One large model at a time, above a threshold you set. |
+| 🔌 **One switch per model** | Turning a model on first asks the arbiter (which also checks the **truly free** memory: free + speculative + purgeable pages, never file cache, with a 16 GB margin left afterwards), then starts its program if it is off, waits for it to answer, and loads the model. Turning it off unloads it and, if it was the last model in that program, stops the program too. The commands are the ones declared in the config. |
+| 📊 **Data, not prose** | Three columns: navigation, page, and an inspector that opens on the right. Tables, a per-program memory chart and a programs → models schema; free text comes only from the local helper model, on request. |
 | 🧭 **Two axes, one source** | Every model carries a **state** (how it is now) and a **class** (how it can coexist), computed on the server so the panel cannot contradict the arbiter. |
-| ⌘ **⌘K without a model** | A deterministic interpreter. It reads the action, the amount in GB, the model and the program, shows what it understood, and proposes one thing. No LLM in the loop. |
+| ⌘ **⌘K without a model** | A deterministic interpreter. It reads the action and the model, shows what it understood, and proposes one thing; for "turn on" the numbers under it are the arbiter's verdict. No LLM in the loop. |
 | 🤖 **A small local model** | Writes model descriptions and answers questions about the panel, with the live machine state in front of it. Picked by weight, never above 8B. |
 | 📝 **Config editor** | The panel's own file and every client file, JSON or YAML, validated, backed up, conflict checked. |
 | 🔎 **HuggingFace search** | Only the MLX formats this Mac can run, with real sizes and whether each one fits right now. |
@@ -146,8 +149,8 @@ installed. Add a server it has never heard of without touching the code:
 the refusal. `riservaSistemaGB` is what stays with the OS. `modelloAiuto` pins the
 helper model; empty means the smallest one that can hold a conversation.
 
-Detected on its own: Ollama, LM Studio, oMLX, MTPLX, llama.cpp, vLLM, plus the Pi and
-OpenCode config files.
+Detected on its own: Ollama, LM Studio, oMLX, MTPLX, llama.cpp, vLLM, plus the Pi,
+OpenCode, and DeepSeek Harness config files.
 
 ---
 
@@ -160,8 +163,8 @@ NSWindow + WKWebView           127.0.0.1:7070, localhost only
         +--------- HTTP + token -------+
                        |
         +--------------+--------------+
-    budget.go       states.go      memory.go
-    the arbiter    state/class    the measure
+    budget.go       states.go      memory.go      lifecycle.go
+    the arbiter    state/class    the measure    on/off per model
 ```
 
 ```
@@ -196,15 +199,17 @@ that name states itself that it is not affiliated with the Go team.
 
 ## ✅ Tests
 
-65 tests. Each one was verified by breaking the rule before writing it: a test that
+146 tests. Each one was verified by breaking the rule before writing it: a test that
 does not tell correct code from broken code is not a test.
 
 | | |
 |---|---|
 | `budget_test.go` | the 27/07/2026 kernel panic scenario, without risking the machine |
+| `lifecycle_test.go` | turning a model on or off against fake programs: start and wait for the port, retry on a busy lock, a program that never comes up, last model, aliases, a model still loading, state read from ports |
+| `ui_simple_test.go` | three-column layout, the programs → models table, the switch as the single gesture, every block reason has its text, no prose |
 | `states_test.go` | state, class and the command registry: one source |
 | `helper_test.go` | size read from total parameters; names distinct and jargon free |
-| `menubar_contract_test.go` | the menu bar hardcodes no id, reads the registry, and reports the same number as the panel |
+| `menubar_contract_test.go` | the menu bar hardcodes no id, reads the registry, reports the same number as the panel, and opens only sections the page has |
 | `security_test.go` | localhost, `Host`, Origin, token, POST only; config routes closed to unauthenticated reads |
 
 ```bash
@@ -277,3 +282,29 @@ The long version, with the call graphs and the numbers, is in the
 ## 📄 License
 
 MIT. See [LICENSE](LICENSE).
+
+## Local autonomous maintenance
+
+An optional `controlloreStack` absolute path enables the maintenance card and
+`/api/autonomia`. The controller accepts only `guardian status`, `guardian enable`,
+`guardian disable` and `guardian --repair`; HTTP callers cannot supply shell commands.
+A per-user schedule runs independently of the window. The localstack controller
+checks desired services, asks Gemma E2B to select from fault-derived actions,
+verifies the result, and keeps a bounded journal. Intentional stops, exclusive
+model modes and maintenance are respected. This repairs service availability;
+it does not apply arbitrary model-generated source patches.
+
+Regimes with `gestito: true` delegate their complete transition to `attiva` or
+`disattiva`. Their controller owns ordering, locking and readiness, and its error
+is returned without being replaced by a success message.
+
+A discovered service entry does not have to be in every coding client.
+`catalogoModelli` can document helpers, embeddings, specialist models and aliases
+with `runtime`, `id`, `uso`, `motivo` and optional `aliasDi`. They remain visible
+under optional service entries. The panel also reads current model sizes and
+context limits from the LM Studio and oMLX catalogs.
+
+For Metal runtimes whose fully resident file mappings are omitted from macOS
+`phys_footprint`, `runtime[].pesiMappati` may list the actual files. Their sizes
+are added to the measured footprint and the result is labeled as estimated.
+Do not use this for already accounted MLX weights or SSD-streamed tables.

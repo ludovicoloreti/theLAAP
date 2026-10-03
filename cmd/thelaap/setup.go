@@ -42,12 +42,21 @@ type RuntimeCfg struct {
 	// domanda. Non è una proprietà del prodotto ma di come è fatto: va
 	// dichiarata, non indovinata dal nome.
 	ModelloResidente bool `json:"modelloResidente,omitempty"`
+	Esclusivo        bool `json:"esclusivo,omitempty"`
+	// Sotto quale programma mostrarlo nella pagina (la sua chiave). Vuoto = ha
+	// una sezione sua. Serve quando lo stesso motore gira due volte su porte
+	// diverse, come MTPLX col 27B e MTPLX col modello esclusivo: per il server
+	// restano due programmi, chi guarda li cerca nello stesso posto.
+	Gruppo string `json:"gruppo,omitempty"`
+	// Full resident file mappings omitted by the OS process footprint (for
+	// example Metal no-copy GGUF weights). Do not list streamed or MLX weights.
+	PesiMappati []string `json:"pesiMappati,omitempty"`
 }
 
 type ClientCfg struct {
 	Nome    string `json:"nome"`
 	File    string `json:"file"`
-	Formato string `json:"formato"` // "pi" oppure "opencode"
+	Formato string `json:"formato"` // "pi", "opencode" oppure "dsh"
 }
 
 type ToolCfg struct {
@@ -60,13 +69,15 @@ type ToolCfg struct {
 }
 
 type Config struct {
-	Porta          int          `json:"porta"`
-	ModelloAiuto   string       `json:"modelloAiuto,omitempty"` // vuoto = lo sceglie da sé
-	Runtime        []RuntimeCfg `json:"runtime"`
-	Clienti        []ClientCfg  `json:"clienti"`
-	Strumenti      []ToolCfg    `json:"strumenti"`
-	FermaTutto     string       `json:"fermaTutto,omitempty"`
-	RiaccendiTutto string       `json:"riaccendiTutto,omitempty"`
+	CatalogoModelli  []CatalogEntry `json:"catalogoModelli,omitempty"`
+	ControlloreStack string         `json:"controlloreStack,omitempty"`
+	Porta            int            `json:"porta"`
+	ModelloAiuto     string         `json:"modelloAiuto,omitempty"` // vuoto = lo sceglie da sé
+	Runtime          []RuntimeCfg   `json:"runtime"`
+	Clienti          []ClientCfg    `json:"clienti"`
+	Strumenti        []ToolCfg      `json:"strumenti"`
+	FermaTutto       string         `json:"fermaTutto,omitempty"`
+	RiaccendiTutto   string         `json:"riaccendiTutto,omitempty"`
 	// Configurazioni di macchina che si accendono e si spengono tutte insieme.
 	// Vedi regimes.go.
 	Regimi []RegimeCfg `json:"regimi,omitempty"`
@@ -76,6 +87,10 @@ type Config struct {
 	// con 6,4 GB lasciati al sistema. 24 è quasi quattro volte tanto.
 	// Zero = usa il valore predefinito.
 	RiservaSistemaGB float64 `json:"riservaSistemaGB,omitempty"`
+	// Quanta memoria LIBERA VERA deve restare dopo aver caricato un modello:
+	// non la cache dei file. Il 03/10/2026 una macchina da 128 GiB è andata in
+	// kernel panic con un'aritmetica che diceva sì. Zero = usa il predefinito.
+	MargineLiberaGB float64 `json:"margineLiberaGB,omitempty"`
 	// Cartelle aggiuntive dove cercare i modelli, oltre a quelle standard dei
 	// prodotti. Serve a chi tiene i modelli in un posto suo.
 	ModelRoots []string `json:"radiciModelli,omitempty"`
@@ -87,6 +102,7 @@ type Config struct {
 // Valori predefiniti, usati quando la configurazione non dice altro.
 const (
 	riservaSistemaGBDefault      = 24.0
+	margineLiberaGBDefault       = 16.0
 	sogliaModelloGrandeGBDefault = 40.0
 	// Soglia separata, e volutamente più bassa, per il tetto grafico. Il tetto
 	// *autorizza* la GPU a bloccare memoria, non gliela prenota: da solo non
@@ -130,6 +146,13 @@ func systemReserveGB() float64 {
 	return riservaSistemaGBDefault
 }
 
+func freeMarginGB() float64 {
+	if v := cfg().MargineLiberaGB; v > 0 {
+		return v
+	}
+	return margineLiberaGBDefault
+}
+
 func largeModelThresholdGB() float64 {
 	if v := cfg().SogliaModelloGrandeGB; v > 0 {
 		return v
@@ -161,6 +184,16 @@ func loadConfig() {
 			cambiata := false
 			if c.Porta == 0 {
 				c.Porta, cambiata = 7070, true
+			}
+			haDSH := false
+			for _, cl := range c.Clienti {
+				haDSH = haDSH || cl.Formato == "dsh"
+			}
+			if !haDSH && binaryExists("~/.dsh/settings.yaml") {
+				c.Clienti = append(c.Clienti, ClientCfg{
+					Nome: "DeepSeek Harness", File: "~/.dsh/settings.yaml", Formato: "dsh",
+				})
+				cambiata = true
 			}
 			for i := range c.Runtime {
 				if c.Runtime[i].Elenco == "" {
@@ -338,6 +371,7 @@ func detectMachine() Config {
 	for _, cl := range []ClientCfg{
 		{Nome: "Pi", File: "~/.pi/agent/models.json", Formato: "pi"},
 		{Nome: "OpenCode", File: "~/.config/opencode/opencode.json", Formato: "opencode"},
+		{Nome: "DeepSeek Harness", File: "~/.dsh/settings.yaml", Formato: "dsh"},
 	} {
 		if binaryExists(cl.File) {
 			c.Clienti = append(c.Clienti, cl)

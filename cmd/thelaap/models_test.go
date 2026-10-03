@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -108,7 +109,7 @@ func TestAliasLMStudioUsaLaMappaUfficiale(t *testing.T) {
 }
 
 func TestArchivioToglieERipristinoRimetteIClient(t *testing.T) {
-	a := Model{Runtime: "omlx", ID: "modello-a", Nome: "A", InPi: true, InOC: false}
+	a := Model{Runtime: "omlx", ID: "modello-a", Nome: "A", InPi: true, InOC: false, InDSH: true}
 	b := Model{Runtime: "lmstudio", ID: "modello-b", Nome: "B", InPi: true, InOC: true}
 	restanti, associate := withoutConfiguredModel([]Model{a, b}, "omlx", "modello-a")
 	if len(restanti) != 1 || restanti[0].ID != b.ID || len(associate) != 1 || associate[0].ID != a.ID {
@@ -119,7 +120,7 @@ func TestArchivioToglieERipristinoRimetteIClient(t *testing.T) {
 		t.Fatalf("ripristino configurazione errato: %+v", merged)
 	}
 	for _, m := range merged {
-		if m.ID == a.ID && (!m.InPi || m.InOC) {
+		if m.ID == a.ID && (!m.InPi || m.InOC || !m.InDSH) {
 			t.Fatalf("client non conservati: %+v", m)
 		}
 	}
@@ -334,5 +335,61 @@ func TestIgnoraLeCartelleDiServizio(t *testing.T) {
 		if strings.Contains(p.Percorso, ".locks") {
 			t.Errorf("ha incluso una cartella di servizio: %s", p.Percorso)
 		}
+	}
+}
+
+// Le prove non lanciano mai il vero `lms`: risveglierebbe LM Studio sul Mac di
+// chi le esegue, e lo lascerebbe aperto in sottofondo (successo il 3/10/2026).
+func init() {
+	lmsList = func() ([]byte, error) { return nil, errors.New("nelle prove `lms` non si lancia") }
+}
+
+// contaChiamateLMS sostituisce `lms ls --json` con una risposta fissa e conta
+// quante volte viene chiesto.
+func contaChiamateLMS(t *testing.T, risposta string) *int {
+	t.Helper()
+	n := 0
+	vera := lmsList
+	lmsList = func() ([]byte, error) { n++; return []byte(risposta), nil }
+	t.Cleanup(func() { lmsList = vera })
+	return &n
+}
+
+func radiceDiProva(t *testing.T, cartelle ...string) {
+	t.Helper()
+	radice := t.TempDir()
+	vecchie := ModelRoots
+	ModelRoots = []string{radice}
+	t.Cleanup(func() { ModelRoots = vecchie })
+	for _, d := range cartelle {
+		p := filepath.Join(radice, d)
+		os.MkdirAll(p, 0o755)
+		os.WriteFile(filepath.Join(p, "peso.bin"), make([]byte, 512), 0o644)
+	}
+}
+
+// `lms ls` risveglia LM Studio quando è chiuso. Chi non lo ha tra i programmi
+// non deve ritrovarselo acceso solo perché ha esaminato un modello.
+func TestEsaminareUnModelloNonInterrogaLMStudioSeNonEConfigurato(t *testing.T) {
+	chiamate := contaChiamateLMS(t, `[]`)
+	withConfig(t, Config{Runtime: []RuntimeCfg{{Chiave: "omlx", Nome: "oMLX", Porta: 8000}}})
+	radiceDiProva(t, "models--tizio--m")
+	if posti := findOnDisk("tizio--m"); len(posti) != 1 {
+		t.Fatalf("il modello non è stato trovato: %+v", posti)
+	}
+	if *chiamate != 0 {
+		t.Fatalf("LM Studio interrogato %d volte pur non essendo tra i programmi", *chiamate)
+	}
+}
+
+// Chi invece usa LM Studio continua ad avere la sua mappa dei nomi: l'API dice
+// «corto», sul disco c'è «editore/nome-lungo-8bit».
+func TestEsaminareUnModelloUsaGliAliasDiLMStudioSeEConfigurato(t *testing.T) {
+	chiamate := contaChiamateLMS(t, `[{"modelKey":"corto","path":"editore/nome-lungo-8bit"}]`)
+	withConfig(t, Config{Runtime: []RuntimeCfg{{Chiave: "lmstudio", Nome: "LM Studio", Porta: 1234}}})
+	radiceDiProva(t, "editore/nome-lungo-8bit")
+	posti := findOnDisk("corto")
+	if *chiamate != 1 || len(posti) != 1 || !strings.HasSuffix(posti[0].Percorso, "nome-lungo-8bit") {
+		t.Fatalf("alias di LM Studio non usati: chiamate=%d posti=%+v", *chiamate, posti)
 	}
 }

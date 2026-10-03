@@ -45,6 +45,8 @@ type RegimeCfg struct {
 	// File la cui esistenza dice che il regime è attivo. Senza questo il
 	// pannello non saprebbe distinguere «spento» da «non lo so».
 	Segno string `json:"segno,omitempty"`
+	// A controller owns the complete transition, including locking and readiness.
+	Gestito bool `json:"gestito,omitempty"`
 }
 
 type RegimeState struct {
@@ -143,6 +145,12 @@ func apiRegime(w http.ResponseWriter, r *http.Request) {
 // ancora residente è precisamente la configurazione che ha fatto panicare la
 // macchina. Uscendo, l'ordine si inverte per lo stesso motivo.
 func composeRegime(rg RegimeCfg, azione string) string {
+	if rg.Gestito {
+		if azione == "on" {
+			return rg.Attiva
+		}
+		return rg.Disattiva
+	}
 	var passi []string
 	eco := func(s string) string { return "echo " + shQuote(s) }
 

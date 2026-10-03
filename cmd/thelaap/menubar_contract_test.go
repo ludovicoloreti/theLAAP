@@ -159,3 +159,44 @@ func TestMenubarNonNominaLaguna(t *testing.T) {
 		}
 	}
 }
+
+// TestMenubarChiamaSoloCioCheLaPaginaHa: le voci «Pannello» del menu non
+// passano da HTTP: eseguono JavaScript dentro la pagina (`vai('…')`,
+// `vaiTab('…')`, `apriCmdk(true)`). È un terzo contratto fra Swift e la pagina,
+// e si rompe allo stesso modo degli altri due: in silenzio. Tolte le sezioni
+// Memoria e Programmi il 03/10/2026, le voci ⌘1 e ⌘2 avrebbero continuato a
+// chiamare schermate che non esistono più.
+func TestMenubarChiamaSoloCioCheLaPaginaHa(t *testing.T) {
+	src := readSwift(t)
+	pagina := mustRead(t, "ui.html")[0]
+
+	i := strings.Index(pagina, "const SCHERMI = [")
+	if i < 0 {
+		t.Fatal("ui.html non dichiara più l'elenco delle sezioni")
+	}
+	elenco := pagina[i : i+strings.Index(pagina[i:], "];")]
+	sezioni := map[string]bool{}
+	for _, m := range regexp.MustCompile(`\['([a-z]+)',`).FindAllStringSubmatch(elenco, -1) {
+		sezioni[m[1]] = true
+	}
+	if len(sezioni) < 3 {
+		t.Fatalf("trovate solo %d sezioni in ui.html: il test non sta guardando niente", len(sezioni))
+	}
+
+	chiamate := regexp.MustCompile(`chiama\("([A-Za-z]+)\(([^"]*)\)"\)`).FindAllStringSubmatch(src, -1)
+	if len(chiamate) < 3 {
+		t.Fatalf("trovate solo %d chiamate alla pagina nello Swift: il test non sta guardando niente", len(chiamate))
+	}
+	for _, c := range chiamate {
+		funzione, argomenti := c[1], c[2]
+		if !strings.Contains(pagina, "function "+funzione+"(") {
+			t.Errorf("%s chiama %s(), che la pagina non definisce", swiftSource, funzione)
+		}
+		if funzione == "vai" {
+			sezione := strings.Trim(strings.Split(argomenti, ",")[0], "' ")
+			if !sezioni[sezione] {
+				t.Errorf("%s apre la sezione %q, che la pagina non ha (ha: %v)", swiftSource, sezione, chiavi(sezioni))
+			}
+		}
+	}
+}

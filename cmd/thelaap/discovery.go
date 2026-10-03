@@ -22,6 +22,8 @@ type Runtime struct {
 	// Tiene il modello sempre caricato: l'interfaccia lo dice invece di
 	// ricavarlo dal nome del programma.
 	ModelloResidente bool `json:"modelloResidente"`
+	// Sotto quale programma la pagina deve mostrarlo; vuoto = sezione sua.
+	Gruppo string `json:"gruppo,omitempty"`
 	// Che cosa si può davvero fare a questo programma. Sono i comandi
 	// dichiarati in configurazione, ridotti a tre sì/no: le righe di shell non
 	// escono verso il browser, e l'interfaccia mostra solo i pulsanti che
@@ -50,6 +52,7 @@ func configuredRuntimes() []Runtime {
 		out = append(out, Runtime{Chiave: r.Chiave, ChiaveOC: chiaveOC,
 			Nome: r.Nome, Cosa: r.Cosa, Porta: r.Porta, Elenco: elenco,
 			ModelloResidente: r.ModelloResidente,
+			Gruppo:           r.Gruppo,
 			PuoAvviare:       serviceCommand(r, "start") != "",
 			PuoFermare:       serviceCommand(r, "stop") != "",
 			PuoRiavviare:     serviceCommand(r, "restart") != ""})
@@ -92,12 +95,7 @@ func discoverRuntimes() []Runtime {
 		go func(i int) {
 			defer wg.Done()
 			r := &out[i]
-			var url string
-			if r.Porta == 11434 {
-				url = "http://127.0.0.1:11434/api/tags"
-			} else {
-				url = "http://127.0.0.1:" + itoa(r.Porta) + "/v1/models"
-			}
+			url := "http://127.0.0.1:" + itoa(r.Porta) + r.Elenco
 			// timeout corto: sono server sulla stessa macchina, se non rispondono
 			// in 2 secondi sono bloccati — e il pannello non deve restare fermo con loro
 			b := httpGet(url, 2*time.Second)

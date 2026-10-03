@@ -103,3 +103,9 @@ func stopAllCommands(rr []RuntimeCfg) (ferma, riaccendi string) {
 	r = append(r, "echo; echo '✅ fatto. I modelli si ricaricano alla prima domanda.'")
 	return strings.Join(f, ";\n"), strings.Join(r, ";\n")
 }
+
+// budgetMemoryGB: qui la memoria libera è già quella su cui decidere.
+func budgetMemoryGB() float64 {
+	_, libera, _, _, _ := systemMemory()
+	return libera
+}

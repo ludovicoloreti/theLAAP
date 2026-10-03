@@ -89,19 +89,38 @@ func safeName(id string) bool {
 // quantizzazione con confronti sfocati rischierebbe di archiviare il modello
 // sbagliato; `lms ls --json` e' invece la fonte che usa LM Studio stesso.
 func lmStudioAliases(id string) []string {
-	h, err := os.UserHomeDir()
-	if err != nil {
+	// Si chiede a LM Studio solo se è tra i programmi configurati: il comando
+	// lo risveglia da chiuso, e chi non lo usa se lo ritroverebbe acceso in
+	// sottofondo ogni volta che esamina un modello.
+	configurato := false
+	for _, r := range cfg().Runtime {
+		configurato = configurato || r.Chiave == "lmstudio"
+	}
+	if !configurato {
 		return nil
 	}
-	bin := filepath.Join(h, ".lmstudio", "bin", "lms")
-	if _, err := os.Stat(bin); err != nil {
-		return nil
-	}
-	b, err := exec.Command(bin, "ls", "--json").Output()
+	b, err := lmsList()
 	if err != nil {
 		return nil
 	}
 	return lmStudioAliasesJSON(id, b)
+}
+
+// lmsList: l'elenco dei modelli come lo dà LM Studio (`lms ls --json`).
+//
+// È una variabile perché il comando RISVEGLIA LM Studio quando è chiuso e lo
+// lascia aperto in sottofondo: le prove lo sostituiscono, così non lanciano
+// quello vero sul Mac di chi le esegue.
+var lmsList = func() ([]byte, error) {
+	h, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	bin := filepath.Join(h, ".lmstudio", "bin", "lms")
+	if _, err := os.Stat(bin); err != nil {
+		return nil, err
+	}
+	return exec.Command(bin, "ls", "--json").Output()
 }
 
 func lmStudioAliasesJSON(id string, b []byte) []string {
@@ -786,7 +805,7 @@ func sameConfiguredModel(m Model, runtime, id string) bool {
 func withoutConfiguredModel(in []Model, runtime, id string) (restanti, associate []Model) {
 	for _, m := range in {
 		if sameConfiguredModel(m, runtime, id) {
-			if m.InPi || m.InOC {
+			if m.InPi || m.InOC || m.InDSH {
 				associate = append(associate, m)
 			}
 			continue
@@ -805,6 +824,7 @@ func mergeConfiguredModels(in, daRipristinare []Model) []Model {
 				// Il manifesto conserva esattamente in quali client compariva.
 				out[i].InPi = out[i].InPi || torna.InPi
 				out[i].InOC = out[i].InOC || torna.InOC
+				out[i].InDSH = out[i].InDSH || torna.InDSH
 				if out[i].Nome == "" {
 					out[i].Nome = torna.Nome
 				}
@@ -858,13 +878,13 @@ func apiRemoveModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Archivio e menu dei client sono una sola operazione: niente voci fantasma
-	// in Pi/OpenCode. Se la scrittura fallisce, rimettiamo subito i file dov'erano.
+	// nei client. Se la scrittura fallisce, rimettiamo subito i file dov'erano.
 	if err := writeConfig(restanti); err != nil {
 		if _, rollbackErr := restoreArchived(voce.ID); rollbackErr != nil {
 			errJSON(w, "configurazione non aggiornata: "+err.Error()+"; anche il ripristino dei file e' incompleto: "+rollbackErr.Error())
 			return
 		}
-		errJSON(w, "non ho archiviato nulla: non riesco ad aggiornare Pi e OpenCode: "+err.Error())
+		errJSON(w, "non ho archiviato nulla: non riesco ad aggiornare i client: "+err.Error())
 		return
 	}
 	refreshMemory()
@@ -902,7 +922,7 @@ func apiRestoreModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := writeConfig(mergeConfiguredModels(configurate, m.Configurazioni)); err != nil {
-		errJSON(w, "file ripristinati, ma non riesco a rimettere il modello in Pi e OpenCode: "+err.Error())
+		errJSON(w, "file ripristinati, ma non riesco a rimettere il modello nei client: "+err.Error())
 		return
 	}
 	refreshMemory()

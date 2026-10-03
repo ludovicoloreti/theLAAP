@@ -498,10 +498,10 @@ final class Barra: NSObject, NSApplicationDelegate {
     }
     @objc func menuPalette() { conFinestra { $0.chiama("apriCmdk(true)") } }
     @objc func menuAiuto() { conFinestra { $0.chiama("vaiTab('aiuto')") } }
-    @objc func menuMemoria() { conFinestra { $0.chiama("vai('memoria','tutti')") } }
-    @objc func menuProgrammi() { conFinestra { $0.chiama("vai('programmi')") } }
-    @objc func menuManutenzione() { conFinestra { $0.chiama("vai('manutenzione')") } }
-    @objc func menuConfig() { conFinestra { $0.chiama("vai('config')") } }
+    @objc func menuPanoramica() { conFinestra { $0.chiama("vai('home','tutti')") } }
+    @objc func menuClient() { conFinestra { $0.chiama("vai('configurazioni')") } }
+    @objc func menuControlli() { conFinestra { $0.chiama("vai('manutenzione')") } }
+    @objc func menuFile() { conFinestra { $0.chiama("vai('config')") } }
     @objc func menuRicarica() { conFinestra { $0.ricarica() } }
     @objc func menuZoomPiu() { conFinestra { $0.zoom(0.1) } }
     @objc func menuZoomMeno() { conFinestra { $0.zoom(-0.1) } }
@@ -695,10 +695,10 @@ func costruisciMenuPrincipale() -> NSMenu {
         ("Chiedi o comanda…", #selector(Barra.menuPalette), "k", [.command]),
         ("Aiuto del pannello", #selector(Barra.menuAiuto), "/", [.command]),
         ("-", nil, "", []),
-        ("Memoria unificata", #selector(Barra.menuMemoria), "1", [.command]),
-        ("Programmi", #selector(Barra.menuProgrammi), "2", [.command]),
-        ("Manutenzione", #selector(Barra.menuManutenzione), "3", [.command]),
-        ("Configurazioni", #selector(Barra.menuConfig), "4", [.command]),
+        ("Panoramica", #selector(Barra.menuPanoramica), "1", [.command]),
+        ("Client", #selector(Barra.menuClient), "2", [.command]),
+        ("Controlli", #selector(Barra.menuControlli), "3", [.command]),
+        ("File", #selector(Barra.menuFile), "4", [.command]),
         ("-", nil, "", []),
         ("Ricarica il pannello", #selector(Barra.menuRicarica), "r", [.command]),
     ])

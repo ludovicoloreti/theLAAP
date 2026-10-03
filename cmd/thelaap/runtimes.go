@@ -77,8 +77,13 @@ func unloadModel(chiave, modello string) (string, error) {
 	if rc == nil {
 		return "", fmt.Errorf("non conosco il programma: %s", chiave)
 	}
+	return unloadFrom(*rc, modello)
+}
+
+// unloadFrom: lo scarico vero e proprio, per chi ha già in mano il programma.
+func unloadFrom(rc RuntimeCfg, modello string) (string, error) {
 	if strings.TrimSpace(rc.ScaricaModello) == "" {
-		cap := capacita(*rc)
+		cap := capacita(rc)
 		msg := rc.Nome + ": " + cap.Nota
 		if cap.Alternativa != "" {
 			msg += ". Puoi " + cap.Alternativa
@@ -137,7 +142,18 @@ func currentBudget() budget.Budget {
 		// Già misurate dal monitor: rifarle a ogni richiesta costerebbe un
 		// lsof e un footprint per runtime, mezzo secondo buttato.
 		Used: m.Processi,
+		// Il bilancio si rilegge ogni volta: costa un vm_stat, e una lettura
+		// vecchia di qualche secondo è proprio quella su cui si sbaglia.
+		FreeBytes: freeMemoryReader(),
 	}
+}
+
+// freeMemoryReader: quanta memoria si può ancora impegnare adesso, in byte;
+// zero se non si sa. È un bilancio (RAM meno ciò che non si comprime né si
+// butta), non le pagine libere: vedi budgetFromVMStat.
+// Variabile per poter provare l'arbitro senza dipendere dalla macchina.
+var freeMemoryReader = func() uint64 {
+	return uint64(budgetMemoryGB() * 1e9)
 }
 
 // runtimeFootprints misura quanto pesa davvero ogni programma acceso.
@@ -157,6 +173,7 @@ func runtimeFootprints(caricati []ModelInRAM) []budget.RuntimeUsage {
 		if err != nil {
 			continue
 		}
+		occ = withMappedWeights(occ, rc.PesiMappati)
 		var modelli []string
 		for _, c := range caricati {
 			if c.Runtime == rc.Nome {
@@ -180,6 +197,7 @@ func currentPolicy() budget.Policy {
 	return budget.Policy{
 		OneLargeModelAtATime: true,
 		LargeThresholdBytes:  uint64(largeModelThresholdGB() * 1e9),
+		MinFreeBytes:         uint64(freeMarginGB() * 1e9),
 	}
 }
 

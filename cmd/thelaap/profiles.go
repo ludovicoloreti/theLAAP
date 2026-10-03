@@ -29,7 +29,8 @@ type Profile struct {
 	Context   int       `json:"context"`
 	Provato   time.Time `json:"provato"`
 	UltimoUso time.Time `json:"ultimoUso,omitempty"`
-	Etichetta string    `json:"etichetta"` // scritta dall'utente, vince su tutto
+	Preferito bool      `json:"preferito,omitempty"` // scelto dall'utente dal dettaglio del modello
+	Etichetta string    `json:"etichetta"`           // scritta dall'utente, vince su tutto
 	Note      string    `json:"note"`
 }
 
@@ -82,6 +83,47 @@ func saveProfiles() {
 	}
 	os.MkdirAll(filepath.Dir(PROFILI), 0o755)
 	os.WriteFile(PROFILI, b, 0o644)
+}
+
+// segnaUso: un modello visto in memoria è stato usato. Serve alla vista
+// «Recenti». Scrive al più una volta ogni dieci minuti per modello: la pagina
+// chiede lo stato di continuo, il file non va riscritto a ogni giro.
+func segnaUso(runtime, id string, adesso time.Time) bool {
+	profiliMu.RLock()
+	p := profili[runtime+"|"+id]
+	fresco := p != nil && adesso.Sub(p.UltimoUso) < 10*time.Minute
+	profiliMu.RUnlock()
+	if fresco {
+		return false
+	}
+	updateProfile(runtime, id, func(p *Profile) { p.UltimoUso = adesso })
+	return true
+}
+
+// segnaCaricati: chi è in memoria adesso è «usato di recente». Il confronto è
+// quello di `caricato`, lo stesso che decide lo stato mostrato nella tabella.
+func segnaCaricati(schede []Card, m MemState, adesso time.Time) {
+	for _, s := range schede {
+		if caricato(s, m) {
+			segnaUso(s.Runtime, s.ID, adesso)
+		}
+	}
+}
+
+// registraUso lo chiama il monitor della memoria a ogni giro, cioè sempre:
+// segnare l'uso solo quando la pagina chiedeva i modelli lasciava fuori da
+// «Recenti» tutto ciò che si usa a pannello chiuso — da Pi, per esempio.
+//
+// Al più una volta al minuto, e mai a memoria vuota: mettere insieme le schede
+// costa la lettura dei file dei client, e il monitor gira ogni quattro secondi.
+var ultimoRegistroUso time.Time
+
+func registraUso(m MemState, adesso time.Time) {
+	if len(m.Caricati) == 0 || adesso.Sub(ultimoRegistroUso) < time.Minute {
+		return
+	}
+	ultimoRegistroUso = adesso
+	segnaCaricati(schede(), m, adesso)
 }
 
 func readProfile(runtime, id string) *Profile {
@@ -160,12 +202,19 @@ func indizi(id string) []Hint {
 // già messo insieme e con l'origine di ogni informazione.
 type Card struct {
 	Model
-	TokS      float64 `json:"tokS"`
-	GB        float64 `json:"gb"`
-	Provato   string  `json:"provato"`
-	UltimoUso string  `json:"ultimoUso,omitempty"`
-	Indizi    []Hint  `json:"indizi"`
-	Etichetta string  `json:"etichetta"`
+	Uso             string  `json:"uso,omitempty"`
+	MotivoCatalogo  string  `json:"motivoCatalogo,omitempty"`
+	AliasDi         string  `json:"aliasDi,omitempty"`
+	Alias           []Model `json:"alias,omitempty"`
+	InInstallazione bool    `json:"inInstallazione,omitempty"`
+	Quantizzazione  string  `json:"quantizzazione,omitempty"`
+	TokS            float64 `json:"tokS"`
+	GB              float64 `json:"gb"`
+	Provato         string  `json:"provato"`
+	UltimoUso       string  `json:"ultimoUso,omitempty"`
+	Preferito       bool    `json:"preferito,omitempty"`
+	Indizi          []Hint  `json:"indizi"`
+	Etichetta       string  `json:"etichetta"`
 	// Note: le due frasi scritte dal modellino, salvate una volta in
 	// profili.json. Senza questo campo l'interfaccia non ha da dove leggerle e
 	// il riquadro «descritto dal modellino» resta vuoto per sempre.
@@ -175,9 +224,17 @@ type Card struct {
 
 func schede() []Card {
 	modelli, _ := configState()
+	metadata := catalogMetadata()
 	out := make([]Card, 0, len(modelli)) // mai nil: il client la scorre sempre
 	for _, m := range modelli {
 		s := Card{Model: m, Indizi: indizi(m.ID)}
+		annotation := catalogAnnotation(m.Runtime, m.ID)
+		s.Uso, s.MotivoCatalogo, s.AliasDi = annotation.Uso, annotation.Motivo, annotation.AliasDi
+		s.InInstallazione = installationPending(annotation)
+		s.Quantizzazione = annotation.Quantizzazione
+		if annotation.Uso == "embedding" {
+			s.Context, s.MaxTokens = 0, 0
+		}
 		if p := readProfile(m.Runtime, m.ID); p != nil {
 			s.TokS, s.GB, s.Etichetta, s.Note = p.TokS, p.GB, p.Etichetta, p.Note
 			s.Misurato = !p.Provato.IsZero()
@@ -187,14 +244,49 @@ func schede() []Card {
 			if !p.UltimoUso.IsZero() {
 				s.UltimoUso = p.UltimoUso.Format(time.RFC3339)
 			}
+			s.Preferito = p.Preferito
+		}
+		if info, ok := metadata[m.Runtime+"|"+m.ID]; ok {
+			if info.Bytes > 0 {
+				s.GB = info.Bytes / 1e9
+			}
+			if !m.InPi && !m.InOC && !m.InDSH && info.Context > 0 {
+				s.Context = info.Context
+			}
 		}
 		out = append(out, s)
 	}
-	return out
+	return mergeCatalogAliases(out)
 }
 
 func apiCards(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, schede())
+}
+
+// apiFavorite: il preferito lo sceglie chi usa il pannello, dal dettaglio del
+// modello. Sta nel profilo, quindi su disco: vale nell'app e nel browser, e
+// c'è ancora dopo un riavvio.
+func apiFavorite(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Runtime   string `json:"runtime"`
+		ID        string `json:"id"`
+		Preferito bool   `json:"preferito"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errJSON(w, "corpo non valido")
+		return
+	}
+	// Senza sapere di quale modello si parla nascerebbe un profilo fantasma.
+	if strings.TrimSpace(req.Runtime) == "" || strings.TrimSpace(req.ID) == "" {
+		errJSON(w, "manca il modello")
+		return
+	}
+	rimasto := false
+	updateProfile(req.Runtime, req.ID, func(p *Profile) {
+		p.Preferito = req.Preferito
+		rimasto = p.Preferito
+	})
+	writeJSON(w, map[string]any{"ok": true, "preferito": rimasto})
 }
 
 // apiLabel: il nome che l'utente dà a un modello. Vince su ogni deduzione.

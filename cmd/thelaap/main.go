@@ -3,8 +3,8 @@
 //	go build -o aipanel . && ./aipanel      → http://127.0.0.1:7070
 //
 // Legge lo stato reale dai runtime, non si fida di file di stato propri:
-// la verità restano i due JSON di Pi e OpenCode, questo è solo un editor
-// che non sbaglia la traduzione fra i due schemi.
+// la verità resta nei file di Pi, OpenCode e DeepSeek Harness; questo è solo
+// un editor che non sbaglia la traduzione fra JSON e YAML.
 package main
 
 import (
@@ -74,7 +74,9 @@ func rotte(pagina string) *http.ServeMux {
 	mux.HandleFunc("/api/memoria", guardia(apiMemory))
 	mux.HandleFunc("/api/config", guardia(apiConfig))
 	mux.HandleFunc("/api/prova", guardia(postOnly(apiProbe)))
-	mux.HandleFunc("/api/attiva", guardia(postOnly(apiActivate)))
+	// «Attiva» è il nome di prima per «accendi»: stessa strada, così chi la
+	// chiama ancora ottiene anche l'avvio del programma.
+	mux.HandleFunc("/api/attiva", guardia(postOnly(apiTurnOn)))
 	// Eseguono comandi o riscrivono le schede: da GET erano raggiungibili con
 	// un <img src=...> da qualunque pagina web.
 	mux.HandleFunc("/api/esegui", guardia(postOnly(apiRun)))
@@ -83,6 +85,7 @@ func rotte(pagina string) *http.ServeMux {
 	mux.HandleFunc("/api/domande", guardia(apiQuestions))
 	// Chi è il modellino che risponde: il pannello lo nomina invece di cablarlo.
 	mux.HandleFunc("/api/aiuto", guardia(apiHelper))
+	mux.HandleFunc("/api/autonomia", guardia(apiAutonomy))
 	mux.HandleFunc("/api/configurazione", guardia(apiSetup))
 	mux.HandleFunc("/api/strumenti", guardia(func(w http.ResponseWriter, r *http.Request) {
 		// Mai nil: uscirebbe "null" e la pagina cade appena prova a scorrerlo.
@@ -99,6 +102,9 @@ func rotte(pagina string) *http.ServeMux {
 	mux.HandleFunc("/api/regime", guardia(postOnly(apiRegime)))
 	mux.HandleFunc("/api/preflight", guardia(postOnly(apiPreflight)))
 	mux.HandleFunc("/api/modello/libera-memoria", guardia(postOnly(apiUnloadModel)))
+	// Accendere e spegnere un modello col suo programma (lifecycle.go).
+	mux.HandleFunc("/api/modello/accendi", guardia(postOnly(apiTurnOn)))
+	mux.HandleFunc("/api/modello/spegni", guardia(postOnly(apiTurnOff)))
 	// Cosa sanno servire i provider, compresi quelli remoti: senza questo il
 	// pannello mostra solo ciò che hai già scritto a mano nei client.
 	mux.HandleFunc("/api/provider", guardia(apiProvider))
@@ -122,6 +128,7 @@ func rotte(pagina string) *http.ServeMux {
 	mux.HandleFunc("/api/comandi", guardia(apiCommands))
 	mux.HandleFunc("/api/etichetta", guardia(postOnly(apiLabel)))
 	mux.HandleFunc("/api/etichetta-auto", guardia(postOnly(apiAutoLabel)))
+	mux.HandleFunc("/api/preferito", guardia(postOnly(apiFavorite)))
 	// Il tema del Mac letto dal Mac: un browser aperto in modalità applicazione
 	// riporta `prefers-color-scheme: light` anche col sistema in scuro.
 	mux.HandleFunc("/api/tema", guardia(func(w http.ResponseWriter, r *http.Request) {
