@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -114,5 +115,55 @@ func TestStatoRuntimeDiceQualeModelloEAttivo(t *testing.T) {
 	}
 	if math.Abs(tetto-120) > 0.01 {
 		t.Fatalf("tetto = %.1f, atteso 120", tetto)
+	}
+}
+
+// Il tetto per singolo modello lo dichiara un programma (oggi oMLX, il suo
+// «final_ceiling», che cambia con la memoria libera) e vale solo per i modelli
+// che carica lui. Il 4/10/2026 l'avviso diceva «qwen3.8-27b-mtp occupa 30 GB su
+// un tetto di 33»: il 27B gira su MTPLX, a cui quel tetto non si applica.
+func TestLAvvisoDelTettoRiguardaSoloIlProgrammaCheLoDichiara(t *testing.T) {
+	m := MemState{CeilingGB: 33, CeilingRuntime: "oMLX",
+		Caricati: []ModelInRAM{{Nome: "qwen3.8-27b-mtp", Runtime: "MTPLX", GB: 30}}}
+	if a := avvisoTetto(m); a != "" {
+		t.Fatalf("avviso per un modello di un altro programma: %q", a)
+	}
+}
+
+func TestLAvvisoDelTettoNominaIlProgrammaEIlModello(t *testing.T) {
+	m := MemState{CeilingGB: 33, CeilingRuntime: "oMLX", Caricati: []ModelInRAM{
+		{Nome: "qwen3.8-27b-mtp", Runtime: "MTPLX", GB: 30},
+		{Nome: "gemma-31b", Runtime: "oMLX", GB: 31}}}
+	a := avvisoTetto(m)
+	for _, atteso := range []string{"gemma-31b", "oMLX", "33 GB"} {
+		if !strings.Contains(a, atteso) {
+			t.Errorf("avviso %q: manca %q", a, atteso)
+		}
+	}
+}
+
+func TestLontanoDalTettoNessunAvviso(t *testing.T) {
+	m := MemState{CeilingGB: 63, CeilingRuntime: "oMLX",
+		Caricati: []ModelInRAM{{Nome: "gemma-31b", Runtime: "oMLX", GB: 31}}}
+	if a := avvisoTetto(m); a != "" {
+		t.Fatalf("avviso con metà del tetto libero: %q", a)
+	}
+}
+
+// Senza sapere di chi è il tetto non si avvisa: meglio tacere che attribuirlo
+// al programma sbagliato.
+func TestUnTettoSenzaProgrammaNonProduceAvvisi(t *testing.T) {
+	m := MemState{CeilingGB: 33, Caricati: []ModelInRAM{{Nome: "x", Runtime: "oMLX", GB: 32}}}
+	if a := avvisoTetto(m); a != "" {
+		t.Fatalf("avviso senza sapere di chi è il tetto: %q", a)
+	}
+}
+
+// Il tetto si legge insieme al nome di chi lo dichiara.
+func TestIlTettoArrivaConIlNomeDelProgramma(t *testing.T) {
+	b := []byte(`{"final_ceiling":62659642064,"models":[{"id":"m","loaded":true,"estimated_size":3000000000}]}`)
+	caricati, tetto := loadedFromHTTP(RuntimeCfg{Chiave: "omlx", Nome: "oMLX"}, b, nil)
+	if len(caricati) != 1 || math.Abs(tetto-62.66) > 0.01 || caricati[0].Runtime != "oMLX" {
+		t.Fatalf("caricati=%+v tetto=%.2f", caricati, tetto)
 	}
 }

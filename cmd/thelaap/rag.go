@@ -182,8 +182,9 @@ func liveState() string {
 			b.WriteString(fmt.Sprintf("    · %s, eseguito da %s, occupa %.1f GB\n", c.Nome, c.Runtime, c.GB))
 		}
 	}
-	if m.CeilingGB > 0 {
-		b.WriteString(fmt.Sprintf("- un singolo modello non può superare %.0f GB\n", m.CeilingGB))
+	if m.CeilingGB > 0 && m.CeilingRuntime != "" {
+		b.WriteString(fmt.Sprintf("- %s adesso accetta modelli fino a %.0f GB (il limite cambia con la memoria libera e vale solo per i suoi modelli)\n",
+			m.CeilingRuntime, m.CeilingGB))
 	}
 	if m.SwapUsatoGB > 5 {
 		b.WriteString(fmt.Sprintf("- il Mac sta usando %.0f GB di memoria virtuale su disco\n", m.SwapUsatoGB))

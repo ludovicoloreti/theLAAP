@@ -458,6 +458,7 @@ table.t td b{color:var(--strong);font-weight:600}
 const L = {
 en:{whatItIs:"The local AI admin panel",ask:"Ask or command",models:"Models",archive:"Archive",used:"used",
   free:"free",stale:"numbers frozen for",ceiling:"ceiling for one model",ceilingShort:"single ceiling",
+  ceilingOf:"ceiling of",ceilingWhy:"the largest model it accepts right now: it changes with free memory",
   threshold:"coexistence threshold",colModel:"Model",colWeight:"Weight",colContext:"Context",noneHere:"Nothing in this group",
   addHF:"Add from HuggingFace",stopAll:"Stop everything",startAll:"Start everything",
   pressAgain:"Press again to confirm",on:"on",off:"off",restart:"Restart",turnOn:"Start",turnOff:"Stop",
@@ -484,6 +485,7 @@ en:{whatItIs:"The local AI admin panel",ask:"Ask or command",models:"Models",arc
 it:{whatItIs:"Il pannello di amministrazione dell'AI locale",ask:"Chiedi o comanda",models:"Modelli",
   archive:"Archivio",used:"occupati",free:"liberi",stale:"numeri fermi da",ceiling:"tetto per un solo modello",
   ceilingShort:"tetto singolo",threshold:"soglia convivenza",colModel:"Modello",colWeight:"Peso",colContext:"Contesto",
+  ceilingOf:"tetto di",ceilingWhy:"il modello più grande che accetta adesso: cambia con la memoria libera",
   noneHere:"In questo gruppo non c'è niente",addHF:"Aggiungi da HuggingFace",stopAll:"Ferma tutto",
   startAll:"Riaccendi tutto",pressAgain:"Premi di nuovo per confermare",on:"acceso",off:"spento",
   restart:"Riavvia",turnOn:"Accendi",turnOff:"Spegni",run:"Esegui",output:"Output",clear:"Pulisci",
@@ -1190,11 +1192,13 @@ function graficoMemoria(){
      lo tengono le altre applicazioni del Mac: disegnarlo come «libero» è la
      promessa che il 3/10/2026 è finita in kernel panic. */
   const veri = Math.min(disponibiliGB(), Math.max(0, lib-ris)), altro = Math.max(0, lib-ris-veri);
+  /* il tetto è di un programma (oggi oMLX) e vale solo per i suoi modelli: lo si dice */
+  const nomeTetto = M().tettoDi ? T().ceilingOf+' '+M().tettoDi : T().ceilingShort;
   const pct = g => (g/tot*100).toFixed(2)+'%';
   const dentro = p => (p.modelli||[]).map(x=>cortoDi({id:x})).join(', ');
   let h = '<figure class="mem"><div class="mem-barra" role="img" aria-label="'
     +esc((IT()?'Memoria: ':'Memory: ')+gb(occupatiGB())+' / '+gb(tot)+' GB')+'">'
-    +(tet?'<span class="mem-tetto" style="left:'+pct(tet)+'"'+tip(tet+' GB',T().ceiling)+'></span>':'');
+    +(tet?'<span class="mem-tetto" style="left:'+pct(tet)+'"'+tip(tet+' GB',nomeTetto+' · '+T().ceilingWhy)+'></span>':'');
   proc.forEach(p => {
     const g = p.correnteByte/1e9;
     h += '<span class="mem-seg" tabindex="0" style="width:'+pct(g)+';background:'+coloreProgramma(p.chiave)+'"'
@@ -1210,7 +1214,7 @@ function graficoMemoria(){
     +(altro>0.5?'<span'+tip(gb(altro)+' GB', T().otherAppsWhy)+'><i class="mem-altro"></i>'+esc(T().otherApps)+' <b>'+gb(altro)+' GB</b></span>':'')
     +'<span><i style="background:var(--inset);border:1px solid var(--line2)"></i>'+esc(T().free)+' <b>'+gb(veri)+' GB</b></span>'
     +(ris>0?'<span><i class="mem-riserva"></i>'+esc(T().reserved)+' <b>'+gb(ris)+' GB</b></span>':'')
-    +(tet?'<span><i style="width:2px;background:var(--strong)"></i>'+esc(T().ceilingShort)+' <b>'+tet+' GB</b></span>':'')
+    +(tet?'<span'+tip(tet+' GB',T().ceilingWhy)+'><i style="width:2px;background:var(--strong)"></i>'+esc(nomeTetto)+' <b>'+tet+' GB</b></span>':'')
     +'</div></figure>';
   return h;
 }
@@ -2041,7 +2045,7 @@ function disegnaPiede(){
     ? metrica(T().used, gb(occupatiGB())+' / '+gb(totaleGB())+' GB')
       +metrica(T().available, gb(disponibiliGB())+' GB')
       +metrica(T().threshold, sogliaGB()+' GB', 'opz')
-      +metrica(T().ceilingShort, tettoGB()?tettoGB()+' GB':'—', 'opz')
+      +metrica(M().tettoDi?T().ceilingOf+' '+M().tettoDi:T().ceilingShort, tettoGB()?tettoGB()+' GB':'—', 'opz')
       +dove
     : dove;
   $('seg-tema').innerHTML = [['auto',T().themeAuto],['chiaro',T().themeLight],['scuro',T().themeDark]]

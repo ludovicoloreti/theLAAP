@@ -285,3 +285,16 @@ func TestLiberaPerUnModelloTieneContoDellaMemoriaVera(t *testing.T) {
 		t.Fatalf("libera per un modello = %.1f GB, attesi %.1f (30 impegnabili meno %.0f da lasciare)", got, attesi, freeMarginGB())
 	}
 }
+
+// La pagina sa di chi è il tetto, per scriverlo accanto alla riga nella barra.
+func TestLaPaginaSaDiChiEIlTetto(t *testing.T) {
+	withConfig(t, Config{})
+	ultimaMemMu.Lock()
+	vecchiaMem := ultimaMem
+	ultimaMem = MemState{TotaleGB: 137.4, CeilingGB: 62.7, CeilingRuntime: "oMLX"}
+	ultimaMemMu.Unlock()
+	t.Cleanup(func() { ultimaMemMu.Lock(); ultimaMem = vecchiaMem; ultimaMemMu.Unlock() })
+	if r := modelsWithState(); r.TettoDi != "oMLX" || r.TettoGB != 62.7 {
+		t.Fatalf("tetto %.1f di %q", r.TettoGB, r.TettoDi)
+	}
+}

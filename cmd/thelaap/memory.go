@@ -26,8 +26,10 @@ type MemState struct {
 	WiredCapGB  float64 `json:"wiredCapGB"` // iogpu.wired_limit_mb
 	// Tetto per singolo modello, se il runtime lo dichiara in /health.
 	// Non tutti lo fanno: zero significa "non lo so", non "nessun limite".
-	CeilingGB float64      `json:"ceilingGB"`
-	Caricati  []ModelInRAM `json:"caricati"`
+	CeilingGB float64 `json:"ceilingGB"`
+	// Di chi è il tetto: vale solo per i modelli che carica quel programma.
+	CeilingRuntime string       `json:"ceilingRuntime,omitempty"`
+	Caricati       []ModelInRAM `json:"caricati"`
 	// Quanto occupa davvero ogni programma acceso, misurato sul processo.
 	// `Caricati` dice quali modelli ci sono e quanto pesano i loro file;
 	// `Processi` dice quanta memoria tengono davvero, e le due cose
@@ -225,7 +227,7 @@ func readsMemory() MemState {
 		caricati, tetto := loadedFromHTTP(rc, statiModelli[i], corpi[i])
 		m.Caricati = append(m.Caricati, caricati...)
 		if tetto > 0 {
-			m.CeilingGB = tetto
+			m.CeilingGB, m.CeilingRuntime = tetto, rc.Nome
 		}
 	}
 
@@ -274,17 +276,11 @@ func readsMemory() MemState {
 	// Gli avvisi si riferiscono a quello che è caricato ADESSO, non a modelli
 	// per nome: se domani i modelli sono altri, questi messaggi restano validi.
 	var somma float64
-	var piuGrosso ModelInRAM
 	for _, c := range m.Caricati {
 		somma += c.GB
-		if c.GB > piuGrosso.GB {
-			piuGrosso = c
-		}
 	}
-	if m.CeilingGB > 0 && piuGrosso.GB > m.CeilingGB*0.9 {
-		m.Avvisi = append(m.Avvisi, fmt.Sprintf(
-			"%s occupa %.0f GB su un tetto di %.0f: un modello più grande non entrerebbe",
-			piuGrosso.Nome, piuGrosso.GB, m.CeilingGB))
+	if a := avvisoTetto(m); a != "" {
+		m.Avvisi = append(m.Avvisi, a)
 	}
 	if m.TotaleGB > 0 && somma > m.TotaleGB*0.75 {
 		m.Avvisi = append(m.Avvisi, fmt.Sprintf(
@@ -292,6 +288,30 @@ func readsMemory() MemState {
 			somma, m.TotaleGB))
 	}
 	return m
+}
+
+// avvisoTetto: l'avviso per un modello vicino al tetto del suo programma.
+//
+// Il tetto lo dichiara un programma (oMLX: il suo «final_ceiling», che cambia
+// con la memoria libera) e vale solo per i modelli che carica lui. Confrontarlo
+// col modello più grosso della macchina faceva dire «qwen3.8-27b-mtp occupa 30
+// GB su un tetto di 33» di un modello che gira su MTPLX. Senza sapere di chi è
+// il tetto si tace: meglio nessun avviso che uno attribuito al programma sbagliato.
+func avvisoTetto(m MemState) string {
+	if m.CeilingGB <= 0 || m.CeilingRuntime == "" {
+		return ""
+	}
+	var piuGrosso ModelInRAM
+	for _, c := range m.Caricati {
+		if c.Runtime == m.CeilingRuntime && c.GB > piuGrosso.GB {
+			piuGrosso = c
+		}
+	}
+	if piuGrosso.GB <= m.CeilingGB*0.9 {
+		return ""
+	}
+	return fmt.Sprintf("%s occupa %.0f GB e %s adesso accetta modelli fino a %.0f GB: uno più grande lì non entrerebbe",
+		piuGrosso.Nome, piuGrosso.GB, m.CeilingRuntime, m.CeilingGB)
 }
 
 // parseLoadedTable legge la tabella stampata dal comando «modelliCaricati»: il
