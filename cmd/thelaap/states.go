@@ -82,6 +82,7 @@ type ModelsResponse struct {
 	// cui l'arbitro decide, e va tenuto distinto da LiberiGB o il pannello
 	// promette spazio che non c'è.
 	DisponibiliGB float64     `json:"disponibiliGB"`
+	TettoDi       string      `json:"tettoDi,omitempty"`
 	RiservaGB     float64     `json:"riservaGB"`
 	SogliaGB      float64     `json:"sogliaGB"` // da qui in su, classe esclusivo
 	TettoGB       float64     `json:"tettoGB"`  // tetto per un singolo modello, 0 = non dichiarato
@@ -237,6 +238,7 @@ func modelsWithState() ModelsResponse {
 		RiservaGB:     systemReserveGB(),
 		SogliaGB:      sogliaGB,
 		TettoGB:       m.CeilingGB,
+		TettoDi:       m.CeilingRuntime,
 		Modelli:       make([]CardState, 0, 8), // mai nil: il client la scorre sempre
 	}
 

@@ -347,3 +347,12 @@ func TestLaSchedaDelleImmaginiHaUnNomeCorto(t *testing.T) {
 		t.Error("la scheda delle immagini ha ancora il nome lungo")
 	}
 }
+
+// Nella barra la riga del tetto dice di quale programma è.
+func TestLaRigaDelTettoDiceDiQualeProgrammaE(t *testing.T) {
+	barra := corpoFunzione(t, "graficoMemoria", "avvisi")
+	if !strings.Contains(barra, "M().tettoDi") {
+		t.Error("la barra non dice di chi è il tetto")
+	}
+	mustContain(t, "testi del tetto", `ceilingOf:"tetto di"`, `ceilingOf:"ceiling of"`)
+}
